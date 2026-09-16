@@ -31,9 +31,11 @@ Native 0.75.4; adding automation does not mean the framework migration is comple
 
 The `BASELINE - RN 0.75 bundled startup` GitHub Actions workflow runs on foundation
 branch pushes and relevant pull requests. It performs Linux lint/startup checks,
-then independently builds an Android APK and an unsigned iOS Simulator app and
+then independently builds an Android APK and an iOS Simulator app and
 drives credential-free navigation with Maestro. Neither app depends on Metro.
-No local Mac, EAS account, Apple signing identity, or Azure credentials are needed.
+No local Mac, EAS account, Apple Developer signing identity, or Azure credentials
+are needed. The simulator app is locally ad-hoc signed with CI-only Keychain
+entitlements; an unsigned app cannot exercise this secure-storage path.
 The internal Azure pipeline dispatcher is manual-only.
 
 CI application IDs are `com.iot_pnp.ci` and `com.microsoft.iotpnp.ci`; production

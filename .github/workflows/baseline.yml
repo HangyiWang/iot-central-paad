@@ -109,7 +109,7 @@ jobs:
           if-no-files-found: warn
 
   ios:
-    name: iOS bundled unsigned Simulator and Maestro
+    name: iOS bundled Simulator and Maestro
     if: github.event_name != 'workflow_dispatch' || inputs.platform != 'android'
     needs: javascript
     runs-on: macos-15

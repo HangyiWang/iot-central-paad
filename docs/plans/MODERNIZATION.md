@@ -143,7 +143,7 @@ Redact keys, tokens, connection strings and sensitive payloads at the log bounda
 | Priority | Work | Exit criterion |
 | --- | --- | --- |
 | M0: baseline | Record behavior and message/model contracts; repair the existing automated baseline in a small implementation commit. Preserve a known baseline build if available. | Reproducible install, clear supported toolchain, and useful baseline checks. |
-| M1: compatibility gate | Fresh shell, New Architecture, dev client, secure storage, sensor/QR/BLE adapters and shared connection interface. Establish bundled build and smoke automation before feature migration. | Android emulator and unsigned iOS Simulator builds launch and pass real UI assertions. Authorized live-cloud follow-up proves model-bearing Hub/DPS WSS traffic independently on both platforms. Physical sensors, QR/camera, BLE, secure hardware and phone suspension remain not exercised until device acceptance. Target 3-5 engineer-days, not a guarantee. |
+| M1: compatibility gate | Fresh shell, New Architecture, dev client, secure storage, sensor/QR/BLE adapters and shared connection interface. Establish bundled build and smoke automation before feature migration. | Android emulator and iOS Simulator builds launch and pass real UI assertions. Simulator-only ad-hoc signing may be used for Keychain entitlements; no paid Apple identity is needed. Authorized live-cloud follow-up proves model-bearing Hub/DPS WSS traffic independently on both platforms. Physical sensors, QR/camera, BLE, secure hardware and phone suspension remain not exercised until device acceptance. Target 3-5 engineer-days, not a guarantee. |
 | M2: parity migration | Port remaining sensors, BLE advertisements, properties/methods, image upload, registration, settings, logs and charts. Add dependency replacements in small batches. | Existing active features and telemetry units preserved; no unbounded subscriptions/history or duplicate connection attempts. |
 | M3: design and resilience | Apply the HIG contract, permission recovery, clear errors, reconnect/resume, credential reset and minimal redacted diagnostics. | Usable offline/error states, accessible controls, no false delivery claims or secret logging. |
 | M4: release readiness | Align CI and release toolchains; standalone Android/iPhone builds, upgrade migration, documentation and hardware coverage. | Acceptance matrix below passes; platform gaps explicitly block parity sign-off. |
@@ -262,7 +262,8 @@ npx expo start --dev-client
 ```
 
 This optional hardware profile must target a **physical device**. The primary
-GitHub Actions profile instead targets an unsigned **iOS Simulator**.
+GitHub Actions profile instead targets an **iOS Simulator** with local ad-hoc
+signing and isolated Keychain entitlements, not an Apple distribution identity.
 Use Apple Developer team access if available. EAS is a separate build service;
 its free build quota does not remove Apple's device-signing requirement.
 Prefer an existing approved macOS pipeline if code/signing cannot go to EAS.
