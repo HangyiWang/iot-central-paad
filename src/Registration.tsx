@@ -563,6 +563,10 @@ const EmptyClient = React.memo<{
         title="Scan QR code"
         onPress={() => navigation.navigate(screens.QR)}
       />
+      <Button
+        title={Strings.Registration.QRCode.Manually}
+        onPress={() => navigation.navigate(screens.MANUAL)}
+      />
       <Text style={style.footer}>
         {Strings.Registration.Footer}
         <Link

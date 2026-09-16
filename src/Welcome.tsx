@@ -33,7 +33,7 @@ const animations = {
       left: '65%',
     },
   },
-};
+} satisfies Record<string, Animatable.CustomAnimation>;
 
 Animatable.initializeRegistryWithDefinitions(animations);
 
@@ -73,6 +73,14 @@ export function Welcome(props: {
     defaults.dev = __DEV__;
     await new Promise(r => setTimeout(r, 2000));
     const storage = await read();
+    // Isolated CI apps are not store releases and must not prompt for updates.
+    const bundleId = DeviceInfo.getBundleId();
+    if (
+      bundleId === `${defaults.packageNameIOS}.ci` ||
+      bundleId === `${defaults.packageNameAndroid}.ci`
+    ) {
+      return;
+    }
     try {
       const minorOrPatchUpdateDetails = await VersionCheck.needUpdate({
         packageName: Platform.select({

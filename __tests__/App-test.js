@@ -2,16 +2,100 @@
  * @format
  */
 
-import 'react-native';
+import {Text} from 'react-native';
 import React from 'react';
-import App from '../App';
+import App from '../src/App';
+import {Welcome} from '../src/Welcome';
+import Strings from '../src/strings';
+import * as Keychain from 'react-native-keychain';
+import DeviceInfo from 'react-native-device-info';
+import VersionCheck from 'react-native-version-check';
+import {IoTCClient} from 'react-native-azure-iotcentral-client';
+import renderer, {act} from 'react-test-renderer';
 
-// Note: import explicitly to use the types shipped with jest.
-import {it} from '@jest/globals';
+describe('App startup', () => {
+  let app;
+  let connect;
 
-// Note: test renderer must be required after react-native.
-import renderer from 'react-test-renderer';
+  beforeEach(() => {
+    app = undefined;
+    jest.useFakeTimers();
+    jest.clearAllMocks();
+    connect = jest
+      .spyOn(IoTCClient.prototype, 'connect')
+      .mockImplementation(() => {
+        throw new Error(
+          'Startup without credentials must not connect to Azure',
+        );
+      });
+  });
 
-it('renders correctly', () => {
-  renderer.create(<App />);
+  afterEach(async () => {
+    try {
+      await act(async () => {
+        app?.unmount();
+        await jest.runOnlyPendingTimersAsync();
+      });
+      expect(jest.getTimerCount()).toBe(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(global.XMLHttpRequest).not.toHaveBeenCalled();
+      expect(global.WebSocket).not.toHaveBeenCalled();
+      expect(connect).not.toHaveBeenCalled();
+    } finally {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+      jest.restoreAllMocks();
+    }
+  });
+
+  const hasText = text =>
+    app.root.findAllByType(Text).some(node => node.props.children === text);
+
+  it.each([
+    ['com.microsoft.iotpnp', 2],
+    ['com.microsoft.iotpnp.ci', 0],
+    ['com.iot_pnp.ci', 0],
+  ])(
+    'opens registration without credentials for %s',
+    async (bundleId, updateChecks) => {
+      jest.spyOn(DeviceInfo, 'getBundleId').mockReturnValue(bundleId);
+      await act(async () => {
+        app = renderer.create(<App />);
+      });
+
+      expect(app.root.findByType(Welcome)).toBeDefined();
+      expect(hasText(Strings.Title)).toBe(true);
+      expect(hasText('Scan QR code')).toBe(false);
+      expect(DeviceInfo.isEmulator).toHaveBeenCalledTimes(1);
+      expect(Keychain.getGenericPassword).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1999);
+      });
+      expect(app.root.findByType(Welcome)).toBeDefined();
+      expect(Keychain.getGenericPassword).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1);
+        await jest.runOnlyPendingTimersAsync();
+      });
+
+      expect(app.root.findAllByType(Welcome)).toHaveLength(0);
+      expect(hasText(Strings.Title)).toBe(true);
+      expect(hasText(Strings.Registration.Header.Welcome)).toBe(true);
+      expect(hasText('Scan QR code')).toBe(true);
+      expect(hasText(Strings.Registration.QRCode.Manually)).toBe(true);
+      expect(hasText(Strings.Registration.StartHere.Title)).toBe(true);
+      expect(Keychain.getGenericPassword).toHaveBeenCalledTimes(1);
+      expect(Keychain.setGenericPassword).not.toHaveBeenCalled();
+      expect(Keychain.resetGenericPassword).not.toHaveBeenCalled();
+      expect(VersionCheck.needUpdate).toHaveBeenCalledTimes(updateChecks);
+      if (updateChecks > 0) {
+        expect(VersionCheck.needUpdate).toHaveBeenNthCalledWith(2, {
+          depth: 1,
+          packageName: 'com.microsoft.iotpnp',
+        });
+      }
+    },
+  );
 });
