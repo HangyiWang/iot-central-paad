@@ -18,8 +18,12 @@ The main features of the app are:
 - Commands handling to enable/disable telemetry items and set their sending interval.
 - Commands logs to trace data in app.
 - Bluetooth Gateway (see [Bluetooth.md](./docs/Bluetooth.md) for documentation/implementation details)
+- Individual-key DPS onboarding, including operator-configured ADR namespace links.
+- Assigned device/Hub details, safe diagnostics, and local proof-marker submission.
 
 You can read more about all features with instructions [here](./docs/Features.md).
+For the new onboarding flow, Windows emulator installation and independent Azure
+confirmation, use the [ADR simulator guide](docs/ADR-SIMULATOR.md).
 
 ## Build and Run
 
@@ -48,6 +52,13 @@ exact run outcome and commit before treating a platform as supported. A build
 or screenshot alone does not prove onboarding, cloud delivery, or hardware parity.
 Live Azure scenarios are separate, explicitly authorized runs. Camera, BLE, real sensors,
 secure hardware and physical-phone suspension still require device acceptance.
+
+The `LIVE - Dedicated device-only proof` workflow requires a manually authorized
+owner/topic/SHA combination and dedicated individual device-key secrets. Its
+push-only entrypoint-registration job performs no device traffic. Live jobs run
+the existing checks, build and publish credential-free binaries before receiving
+device inputs, then retain only allowlisted live summaries. A passing UI report
+still requires the separate operator-side Hub/ADR confirmation.
 
 ### Optional local development
 

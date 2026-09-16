@@ -263,7 +263,10 @@ const Navigation = React.memo(() => {
           accessibilityLiveRegion="polite"
           style={styles.connectionError}>
           <Text>{error.message}</Text>
-          <Text>{error.serviceCode ?? error.code}</Text>
+          <Text testID="connection-error-code">{error.code}</Text>
+          {error.serviceCode !== undefined && (
+            <Text testID="connection-service-code">{error.serviceCode}</Text>
+          )}
         </View>
       )}
     </NavigationContainer>

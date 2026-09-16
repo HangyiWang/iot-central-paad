@@ -1,0 +1,173 @@
+appId: ${MAESTRO_APP_ID}
+name: Dedicated-device real DPS assignment, local proof and cold restore
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+- extendedWaitUntil:
+    visible:
+      id: registration-manual
+    timeout: 60000
+- tapOn:
+    id: registration-manual
+- assertVisible:
+    id: connection-registrationId
+- tapOn:
+    id: registration-back
+- assertVisible:
+    id: registration-manual
+- tapOn:
+    id: registration-manual
+- tapOn:
+    id: connection-registrationId
+- eraseText
+- inputText: ${MAESTRO_REGISTRATION_ID}
+- tapOn:
+    id: connection-scopeId
+- eraseText
+- inputText: ${MAESTRO_SCOPE_ID}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: connection-provisioningHost
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: connection-provisioningHost
+- eraseText
+- inputText: ${MAESTRO_PROVISIONING_HOST}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: connection-deviceKey
+    direction: UP
+    timeout: 15000
+- tapOn:
+    id: connection-deviceKey
+- inputText: ${MAESTRO_DEVICE_KEY}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: connection-submit
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: connection-submit
+- extendedWaitUntil:
+    visible:
+      id: connection-status
+      text: "^Connected$"
+    timeout: 180000
+- assertVisible:
+    id: assigned-device-id
+    text: ${MAESTRO_EXPECTED_DEVICE_ID_PATTERN}
+- assertVisible:
+    id: assigned-hub
+    text: ${MAESTRO_EXPECTED_HUB_PATTERN}
+- tapOn:
+    id: connection-details
+- scrollUntilVisible:
+    element:
+      id: model-id
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: model-id
+    text: ${MAESTRO_MODEL_ID_PATTERN}
+- scrollUntilVisible:
+    element:
+      id: registration-id
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: registration-id
+    text: ${MAESTRO_REGISTRATION_ID_PATTERN}
+- scrollUntilVisible:
+    element:
+      id: registry-status
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: registry-status
+    text: "^Not checked$"
+- scrollUntilVisible:
+    element:
+      id: proof-nonce
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: proof-nonce
+- eraseText
+- inputText: ${MAESTRO_NONCE}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: proof-send
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: proof-send
+- scrollUntilVisible:
+    element:
+      id: proof-status
+    direction: DOWN
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: proof-status
+      text: "^Submitted locally$"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: registry-status
+    direction: UP
+    timeout: 15000
+- assertVisible:
+    id: registry-status
+    text: "^Not checked$"
+- stopApp
+- launchApp:
+    clearState: false
+    permissions:
+      all: deny
+- extendedWaitUntil:
+    visible:
+      id: connection-status
+      text: "^Connected$"
+    timeout: 180000
+- assertNotVisible:
+    id: registration-manual
+- assertVisible:
+    id: assigned-device-id
+    text: ${MAESTRO_EXPECTED_DEVICE_ID_PATTERN}
+- assertVisible:
+    id: assigned-hub
+    text: ${MAESTRO_EXPECTED_HUB_PATTERN}
+- tapOn:
+    id: connection-details
+- scrollUntilVisible:
+    element:
+      id: model-id
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: model-id
+    text: ${MAESTRO_MODEL_ID_PATTERN}
+- scrollUntilVisible:
+    element:
+      id: registration-id
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: registration-id
+    text: ${MAESTRO_REGISTRATION_ID_PATTERN}
+- scrollUntilVisible:
+    element:
+      id: registry-status
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: registry-status
+    text: "^Not checked$"
+- stopApp

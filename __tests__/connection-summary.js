@@ -2,6 +2,8 @@ import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import ConnectionSummary from '../src/components/connectionSummary';
 import * as hooks from '../src/hooks';
+import {Alert, Share} from 'react-native';
+import {PHONE_MODEL_ID} from '../src/connection/types';
 
 jest.mock('../src/hooks', () => ({
   useConnectIoTCentralClient: jest.fn(),
@@ -9,7 +11,7 @@ jest.mock('../src/hooks', () => ({
   useSimulation: jest.fn(),
   useTheme: () => ({colors: {card: '#fff'}}),
 }));
-jest.mock('../src/components/typography', () => ({Text: 'Text'}));
+jest.mock('../src/components/typography', () => ({Text: 'Text', Name: 'Text'}));
 
 let view;
 let connected;
@@ -39,6 +41,8 @@ beforeEach(() => {
       identity: {
         deviceId: 'Exact-Assigned-ID',
         assignedHub: 'assigned.azure-devices.net',
+        registrationId: 'registration-id',
+        modelId: PHONE_MODEL_ID,
       },
       isConnected: () => connected,
     },
@@ -57,6 +61,37 @@ beforeEach(() => {
     {deviceId: 'registration-id'},
   ]);
   hooks.useSimulation.mockReturnValue([false]);
+});
+it('opens scrollable details with value-only IDs and local-only destructive forgetting', async () => {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const share = jest.spyOn(Share, 'share').mockResolvedValue({});
+  act(() => {
+    view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+  });
+  act(() => press('Connection details'));
+  const value = id => view.root.findAllByProps({testID: id})[0].props.children;
+  expect(value('assigned-device-id')).toBe('Exact-Assigned-ID');
+  expect(value('assigned-hub')).toBe('assigned.azure-devices.net');
+  expect(value('model-id')).toBe(PHONE_MODEL_ID);
+  expect(value('registration-id')).toBe('registration-id');
+  expect(value('registry-status')).toBe('Not checked');
+  await act(async () => {
+    await press('Share nonsecret diagnostics');
+  });
+  expect(JSON.parse(share.mock.calls[0][0].message)).toMatchObject({
+    registryStatus: 'Not checked',
+  });
+  act(() => press('Forget credentials'));
+  expect(cancel).not.toHaveBeenCalled();
+  expect(alert.mock.calls[0][1]).toContain('No Azure device');
+  await act(async () => {
+    await alert.mock.calls[0][2]
+      .find(button => button.style === 'destructive')
+      .onPress();
+  });
+  expect(cancel).toHaveBeenCalledWith({clear: true});
+  alert.mockRestore();
+  share.mockRestore();
 });
 afterEach(() => {
   act(() => view?.unmount());

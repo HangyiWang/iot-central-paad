@@ -6,6 +6,22 @@ import {
 import {ConnectionError} from './errors';
 import {DeviceCredentials, PHONE_MODEL_ID} from './types';
 
+export type CredentialQrV1 = {
+  schema: 'paad.connection';
+  version: 1;
+} & (
+  | {
+      mode: 'dps';
+      credentials: {
+        registrationId: string;
+        scopeId: string;
+        deviceKey: string;
+        provisioningHost?: string;
+      };
+    }
+  | {mode: 'hub'; credentials: {connectionString: string}}
+);
+
 const fields = new Set([
   'connectionString',
   'deviceId',
@@ -233,7 +249,7 @@ export function decodeCredentials(
   encryptionKey?: string,
 ): DeviceCredentials {
   if (typeof input !== 'string') {
-    return validateCredentials(input);
+    return validateCredentials(unwrapQr(input));
   }
   if (
     !input.length ||
@@ -265,6 +281,42 @@ export function decodeCredentials(
   } catch {
     throw new ConnectionError('INVALID_CREDENTIALS');
   }
-  return validateCredentials(decoded);
+  return validateCredentials(unwrapQr(decoded));
+}
+
+/** v1 deliberately distributes individual device keys, never group/admin keys. */
+function unwrapQr(input: unknown): unknown {
+  const data = record(input);
+  if (!('schema' in data) && !('version' in data)) {
+    return data;
+  }
+  if (
+    data.schema !== 'paad.connection' ||
+    data.version !== 1 ||
+    Object.keys(data).some(
+      key => !['schema', 'version', 'mode', 'credentials'].includes(key),
+    )
+  ) {
+    throw new ConnectionError('INVALID_CREDENTIALS');
+  }
+  const credentials = record(data.credentials);
+  const allowed =
+    data.mode === 'dps'
+      ? ['registrationId', 'scopeId', 'deviceKey', 'provisioningHost']
+      : data.mode === 'hub'
+      ? ['connectionString']
+      : [];
+  if (
+    !allowed.length ||
+    Object.keys(credentials).some(key => !allowed.includes(key)) ||
+    (data.mode === 'dps' &&
+      (!credentials.registrationId ||
+        !credentials.scopeId ||
+        !credentials.deviceKey)) ||
+    (data.mode === 'hub' && !credentials.connectionString)
+  ) {
+    throw new ConnectionError('INVALID_CREDENTIALS');
+  }
+  return {...credentials, modelId: PHONE_MODEL_ID};
 }
 export const DecryptCredentials = decodeCredentials;

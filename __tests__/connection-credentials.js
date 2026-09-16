@@ -74,6 +74,94 @@ test('encrypted legacy QR works and wrong password is safely rejected', () => {
   );
 });
 
+test.each(['plain', 'base64', 'encrypted'])(
+  'versioned individual and Hub QR decode through the original %s decoder',
+  encoding => {
+    const encode = data =>
+      encoding === 'plain'
+        ? JSON.stringify(data)
+        : encoding === 'base64'
+        ? qr(data)
+        : encryptedQr(data, 'test-passphrase');
+    const envelope = {
+      schema: 'paad.connection',
+      version: 1,
+      mode: 'dps',
+      credentials: {
+        registrationId: 'synthetic-phone',
+        scopeId: fixture.scopeId,
+        deviceKey: key,
+        provisioningHost: 'global-canary.azure-devices-provisioning.net',
+      },
+    };
+    expect(
+      decodeCredentials(encode(envelope), 'test-passphrase'),
+    ).toMatchObject({
+      ...envelope.credentials,
+      keyType: 'device',
+      modelId: PHONE_MODEL_ID,
+    });
+    expect(
+      decodeCredentials(
+        encode({
+          schema: 'paad.connection',
+          version: 1,
+          mode: 'hub',
+          credentials: {connectionString: direct},
+        }),
+        'test-passphrase',
+      ),
+    ).toMatchObject({deviceId: 'phone', modelId: PHONE_MODEL_ID});
+  },
+);
+
+test.each([
+  {schema: 'other'},
+  {version: 2},
+  {version: '1'},
+  {mode: 'group'},
+  {mode: 'certificate'},
+  {adminToken: 'secret'},
+  {credentials: {...fixture, keyType: 'group', authKey: key}},
+  {
+    credentials: {
+      registrationId: 'phone',
+      scopeId: '0ne123',
+      certificate: 'secret',
+    },
+  },
+  {
+    credentials: {
+      registrationId: 'phone',
+      scopeId: '0ne123',
+      deviceKey: key,
+      modelId: PHONE_MODEL_ID,
+    },
+  },
+])('rejects unsupported versioned QR contract %#', invalid => {
+  const input = JSON.stringify({
+    schema: 'paad.connection',
+    version: 1,
+    mode: 'dps',
+    credentials: {registrationId: 'phone', scopeId: '0ne123', deviceKey: key},
+    ...invalid,
+  });
+  expect(() => decodeCredentials(input)).toThrow();
+});
+
+test('legacy group QR remains compatible without allowing new QR group delivery', () => {
+  expect(
+    decodeCredentials(
+      qr({
+        deviceId: 'synthetic-phone',
+        scopeId: fixture.scopeId,
+        authKey: key,
+        keyType: 'group',
+      }),
+    ),
+  ).toMatchObject({keyType: 'group', modelId: PHONE_MODEL_ID});
+});
+
 test('computeKey matches HMAC and legacy prederived group credentials are not derived twice', () => {
   const derived = createHmac('sha256', Buffer.from(key, 'base64'))
     .update(fixture.deviceId)

@@ -15,7 +15,7 @@ name: Credential-free bundled startup and manual-navigation smoke
     id: registration-manual
 - assertVisible: "Manually connect"
 - assertVisible: "Connection info"
-- assertVisible: "Device ID"
+- assertVisible: "Registration ID"
 - assertVisible: "ID scope"
 - tapOn:
     id: registration-back

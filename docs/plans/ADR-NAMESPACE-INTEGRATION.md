@@ -1,7 +1,7 @@
 # PAAD ADR namespace integration plan
 
-Status: planning only; no application or cloud changes made by this plan.
-Date: 2026-09-15. Branch: `feature/adr-onboarding`.
+Status: SAS-first application integrated; actual mobile-to-Azure acceptance pending.
+Date: 2026-09-16. Branch: `feature/adr-onboarding`.
 Parent: `modernize/paad-foundation`.
 
 ## CI-first update (2026-09-16)
@@ -15,14 +15,18 @@ entitlements; it is not production signing or physical-phone acceptance.
 
 The approved foundation is Expo SDK 57 development builds, with minimum iOS
 16.4 and Android 7/API 24. Foundation implementation and its shared connection
-interface must precede ADR application changes. Until foundation changes are
-integrated, this branch still contains the legacy app, not the modern shell.
-Do not merge or publish this feature branch without authorization.
+interface must precede ADR application changes. The foundation passed both
+native startup gates in run `35057354712` and was merged into this branch.
+The owner authorized local integration and publication of both topic branches;
+no merge into `master` or automatic PR merge is authorized.
 
 Keep credential-free build/UI jobs separate from explicitly authorized live
 Azure jobs. The foundation automation uses pinned tools, 45-minute job bounds,
-and three-day nonsecret artifacts. Azure access, role/resource changes and
-physical-device distribution remain separate approval gates.
+and three-day nonsecret artifacts. Subsequent authorization permits scoped reuse
+of the retained lab, uniquely named individual enrollments, actual device traffic,
+independent inventory reads and temporary dedicated device-input Actions secrets.
+No new billable resources, IAM changes, old-experiment changes, cloud cleanup or
+physical-device distribution is authorized.
 
 Use the local `image2.png` reference for information structure and `image1.png`
 for restrained visual treatment, following the foundation's Apple HIG contract.
@@ -39,8 +43,27 @@ not an Azure administration console.
 Follow the [modernization plan](MODERNIZATION.md), including its mandatory Apple
 HIG design contract and the CI-first update above. Begin device implementation only
 after M1 establishes a working modern build and the shared connection interface.
-Cloud contract investigation and wireframes can proceed sooner. Merge the
-foundation into `master` first; then merge this branch.
+Cloud contract investigation and wireframes can proceed sooner. Future PR order
+is foundation then ADR, but merging either into `master` requires separate approval.
+
+## Implemented prototype
+
+Individual-key DPS is the default, with configurable endpoint, registration ID,
+scope and the phone model. Direct Hub and explicit legacy group input remain
+available. Manual and versioned QR inputs share the foundation's decoder.
+Details show actual assigned identity, safe diagnostics and local proof
+submission; registry status deliberately remains **Not checked** in-app.
+
+The separate `live-device.yml` workflow gates device inputs by owner, topic,
+explicit consent and exact reviewed SHA. Its push-only registration job does
+not use device secrets or send traffic. Manual jobs publish credential-free
+binaries before receiving device keys and upload only allowlisted proof summaries
+afterward. Raw live diagnostics/images are never published.
+
+The operator-only `scripts/ci/verify-mobile-proof.js` reads DPS assignment,
+the Hub model/nonce and the actual ADR record using an existing Entra CLI session.
+It requests no keys and performs no cloud writes. See the
+[simulator guide](../ADR-SIMULATOR.md) for manual use and evidence boundaries.
 
 ## What the experiment proved, and what it did not
 

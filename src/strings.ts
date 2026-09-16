@@ -34,6 +34,34 @@ const Strings = {
       Disconnect: 'Disconnect',
       Reconnect: 'Reconnect',
       Manual: 'Connect manually',
+      Details: 'Connection details',
+      Forget: 'Forget credentials',
+      ForgetTitle: 'Forget saved device credentials?',
+      ForgetMessage:
+        'Disconnect and remove credentials from this phone only. No Azure device, enrollment or registry record will be deleted.',
+      Model: 'Model',
+      Registration: 'Registration ID',
+      Operation: 'Operation ID',
+      Stage: 'Connection stage',
+      Registry: 'Registry status',
+      NotChecked: 'Not checked',
+      RegistryExplanation:
+        'An authorized operator must independently check Azure Device Registry and the matching device activity. DPS assignment and Hub connection do not confirm a registry record. Namespace links are configured server-side.',
+      Share: 'Share nonsecret diagnostics',
+      ShareFailed:
+        'Diagnostics could not be shared. You can select the values instead.',
+      ProofTitle: 'Device activity proof',
+      ProofNonce: 'Proof nonce',
+      ProofSend: 'Submit proof activity',
+      ProofSending: 'Submitting…',
+      ProofSubmitted: 'Submitted locally',
+      ProofInvalid: 'Use 16–128 letters, numbers, underscores or hyphens.',
+      ProofUnavailable:
+        'Connect a real device to submit proof. Offline simulation cannot provide cloud proof.',
+      ProofFailed:
+        'Proof was not fully submitted. Retry with a new nonce if needed.',
+      ProofExplanation:
+        'Sends telemetry and a reported property through the connected client. Local submission is not a broker acknowledgement, downstream receipt or registry confirmation.',
     },
     Stages: {
       idle: 'Not connected',
@@ -93,22 +121,28 @@ const Strings = {
     },
     QRCode: {
       Manually: 'Connect manually',
+      Scan: 'Scan QR code',
     },
     Manual: {
       Title: 'Manually connect',
-      Header: 'Need help locating this information? ',
+      Header: 'Use the individual device key supplied by your operator.',
+      ChangeMethod: 'Change connection method',
       DeviceId: {
-        Label: 'Device ID',
-        PlaceHolder: 'Enter a unique ID to identify this device',
+        Label: 'Registration ID',
+        PlaceHolder: 'Enter your enrollment registration ID',
       },
       ScopeId: {
         Label: 'ID scope',
         PlaceHolder: 'Enter your DPS ID scope',
       },
       SASKey: {
-        Label: 'Shared access signature (SAS) key',
-        PlaceHolder: 'Enter or paste your SAS key',
+        Label: 'Device key',
+        PlaceHolder: 'Enter or paste your individual device key',
       },
+      ProvisioningHost: 'Provisioning hostname',
+      LegacyWarning:
+        'Legacy compatibility only. A group key can derive credentials for other devices. Prefer an individual device key.',
+      ConnectionStringPlaceholder: 'Enter or paste device connection string',
       Registered: 'Registered using:',
       RegisterNew: {
         Title: 'Register as a new device',
@@ -134,14 +168,14 @@ const Strings = {
       Body: {
         ConnectionType: {
           Title: 'How would you like to connect?',
-          Dps: 'Enrollment group information',
+          Dps: 'DPS individual enrollment',
           CString: 'IoT Hub device connection string',
         },
         ConnectionInfo: 'Connection info',
       },
       KeyTypes: {
         Label: 'Authentication',
-        Group: 'Group key',
+        Group: 'LEGACY group key',
         Device: 'Device key',
       },
     },

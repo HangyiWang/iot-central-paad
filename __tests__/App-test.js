@@ -2,7 +2,13 @@
  * @format
  */
 
-import {Keyboard, StyleSheet, Text, TouchableWithoutFeedback} from 'react-native';
+import {
+  Keyboard,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableWithoutFeedback,
+} from 'react-native';
 import React from 'react';
 import App from '../src/App';
 import {Welcome} from '../src/Welcome';
@@ -128,6 +134,28 @@ describe('App startup', () => {
         .filter(node => node.props.onPress === Keyboard.dismiss);
       expect(dismissWrappers).toHaveLength(1);
       expect(dismissWrappers[0].props.accessible).toBe(false);
+      const input = id =>
+        app.root
+          .findAllByType(TextInput)
+          .find(node => node.props.testID === id);
+      expect(input('connection-deviceKey').props.secureTextEntry).toBe(true);
+      await act(async () => {
+        input('connection-registrationId').props.onChangeText('phone');
+        input('connection-deviceKey').props.onChangeText(
+          'invalid-preserved-key',
+        );
+      });
+      await act(async () => {
+        press('connection-submit');
+      });
+      expect(input('connection-deviceKey').props.value).toBe(
+        'invalid-preserved-key',
+      );
+      expect(
+        app.root.findAllByProps({testID: 'connection-error-code'})[0].props
+          .children,
+      ).toBe('INVALID_CREDENTIALS');
+      expect(Keychain.setGenericPassword).not.toHaveBeenCalled();
       await act(async () => {
         press('registration-back');
         await jest.runOnlyPendingTimersAsync();
