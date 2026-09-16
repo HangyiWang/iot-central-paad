@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+name: Dismiss only the stock emulator launcher ANR
+---
+- runFlow:
+    when:
+      platform: Android
+      visible:
+        id: android:id/alertTitle
+        text: "^Quickstep isn't responding$"
+    commands:
+      - tapOn:
+          id: android:id/aerr_close
+      - assertNotVisible:
+          id: android:id/alertTitle
+          text: "^Quickstep isn't responding$"
