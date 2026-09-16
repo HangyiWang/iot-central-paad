@@ -4,6 +4,31 @@ Status: planning only; no application or cloud changes made by this plan.
 Date: 2026-09-15. Branch: `feature/adr-onboarding`.
 Parent: `modernize/paad-foundation`.
 
+## CI-first update (2026-09-16)
+
+This section supersedes the original Windows-first and early physical-iPhone
+prerequisites. The approved direction is automated Android emulator runs on
+standard GitHub Linux runners and iOS Simulator runs on standard macOS runners.
+No local Mac, EAS account or paid Apple signing identity is needed for this
+prototype gate. Local ad-hoc simulator signing may supply isolated Keychain
+entitlements; it is not production signing or physical-phone acceptance.
+
+The approved foundation is Expo SDK 57 development builds, with minimum iOS
+16.4 and Android 7/API 24. Foundation implementation and its shared connection
+interface must precede ADR application changes. Until foundation changes are
+integrated, this branch still contains the legacy app, not the modern shell.
+Do not merge or publish this feature branch without authorization.
+
+Keep credential-free build/UI jobs separate from explicitly authorized live
+Azure jobs. The foundation automation uses pinned tools, 45-minute job bounds,
+and three-day nonsecret artifacts. Azure access, role/resource changes and
+physical-device distribution remain separate approval gates.
+
+Use the local `image2.png` reference for information structure and `image1.png`
+for restrained visual treatment, following the foundation's Apple HIG contract.
+Do not publish the reference artwork. Virtual-device evidence never establishes
+real BLE reception, camera/flashlight quality, sensor accuracy or secure hardware.
+
 ## Goal and dependency
 
 Let a phone provision through a namespace-linked DPS, connect to its assigned
@@ -12,7 +37,7 @@ Keep direct Hub and classic DPS onboarding working. The phone is a device,
 not an Azure administration console.
 
 Follow the [modernization plan](MODERNIZATION.md), including its mandatory Apple
-HIG design contract and Windows/iPhone setup. Begin device implementation only
+HIG design contract and the CI-first update above. Begin device implementation only
 after M1 establishes a working modern build and the shared connection interface.
 Cloud contract investigation and wireframes can proceed sooner. Merge the
 foundation into `master` first; then merge this branch.
@@ -202,20 +227,26 @@ rotation and recovery. Ordinary JS WebSocket options do not supply this support.
 Reject unsupported connection profiles explicitly. Keep private keys on-device;
 do not introduce exportable production keys merely to copy the Python harness.
 
-## Windows-first validation and milestones
+## CI-first validation and milestones
 
-Use the [foundation Windows-first instructions](MODERNIZATION.md#windows-first-build-and-test).
-After M1, run the Android app locally on Windows and use a signed development
-client on the iPhone with Metro in WSL. Switch to `feature/adr-onboarding` in the
-relevant checkout. Reuse a dev binary only if its native dependency/configuration
-set matches this branch. No new cloud build is required for compatible JS edits.
+After M1, run the real app with bundled JavaScript on both an Android emulator
+and an iOS Simulator in GitHub Actions. Drive onboarding, cancellation, recovery
+and restart with assertions and bounded waits. Retain nonsecret screenshots,
+logs, platform/toolchain details and the exact built commit. Compilation,
+screenshots or a mocked registration alone do not satisfy mobile-to-cloud proof.
+
+Windows/WSL development and signed physical-iPhone builds are optional developer
+workflows and later hardware acceptance routes, not prerequisites for simulator
+progress. Reuse a dev binary only when its native dependency/configuration set
+matches this branch. No new native build is required for compatible JS edits in
+a development client; milestone acceptance still uses bundled builds without Metro.
 
 | Milestone | Acceptance |
 | --- | --- |
 | A0: setup contract | Operator can reproduce/read back a known-good owned namespace/Hub/DPS setup, role scopes and enrollment. No unrelated resources are modified. |
-| A1: first phone proof | Physical iPhone registers with a device key, uses returned assignment, sends a unique marker, and has a matching actual ADR record. Android emulator reproduces cloud networking. |
+| A1: first mobile proof | The actual app on Android emulator and iOS Simulator registers with a device key and the phone model, uses the returned Hub/device assignment, and reports a unique marker. Separate authorized Hub twin and ADR inventory reads match it on each platform. This is not physical-device acceptance. |
 | A2: real PAAD behavior | Model-bearing registration, sensors, twin/method contracts, cancellation, retry, secure restore and classic Hub/DPS compatibility work. HIG onboarding/error states are reviewed. |
-| A3: release gate | Standalone builds work without Metro; network loss, restart, permissions and credential reset covered; physical Android hardware coverage completed before two-platform sign-off. |
+| A3: release gate | Standalone builds work without Metro; network loss, restart, permissions and credential reset are covered. Physical iPhone and Android sensor/BLE/camera, secure-storage upgrade and accessibility acceptance remain required before two-platform parity sign-off. |
 
 For each cloud case, use an independent device/enrollment ID and record a
 nonsecret run nonce, assigned device/Hub, operation ID and timestamps:
@@ -234,7 +265,10 @@ Run malformed/duplicate QR, wrong key/scope, unavailable endpoint, timeout/cance
 network loss/resume, unassigned registration and permission-denial cases. Preserve
 actual service codes; do not diagnose every error as missing RBAC or silently
 fall back to a different Hub. Test credential reset without cloud deletion.
-Automated tests use mocked services; live-cloud cases require an explicit opt-in.
+Ordinary automated logic/UI jobs use mocked services or remain disconnected;
+separate live-cloud jobs exercise the actual mobile transport on trusted code
+with explicit opt-in and scoped access. Python SDK evidence is a reference,
+not a replacement for the app's model-bearing requests.
 
 Keep new reports secret-free and out of ordinary logs; never commit raw enrollment
 responses, keys or signing material. Obtain permission before retention changes,
