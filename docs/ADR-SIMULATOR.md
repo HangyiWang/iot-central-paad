@@ -190,3 +190,20 @@ acceptance, certificates and in-app inventory authorization remain separate.
 Android map preview needs a restricted key configured at native build time;
 without one, coordinates remain available. Image upload also requires Hub-side
 storage configuration; this workflow does not create that infrastructure.
+
+## Credential-free Android replay
+
+`replay-android.yml` reuses a completed, owner-dispatched live run's pre-secret
+APK without rebuilding it. Supply its exact run ID and source SHA:
+
+```bash
+gh workflow run replay-android.yml --ref feature/adr-onboarding \
+  -f source_run=<completed-live-run-id> -f source_sha=<binary-source-sha>
+```
+
+The lane verifies the run, artifact, identity and APK checksum, then uses the
+live-style isolated Java/home environment with synthetic input only. It never
+presses Connect and refuses device-key/live-config environment variables.
+Its three-day artifact contains credential-free runtime, window, screenshot and
+Maestro evidence. `replay-identity.json` distinguishes the original binary source
+from the replay harness and flow; this is not Azure acceptance evidence.
