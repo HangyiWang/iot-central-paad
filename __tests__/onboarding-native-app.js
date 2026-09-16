@@ -178,6 +178,20 @@ test('manual individual DPS connects to returned identity and submits genuine co
     'synthetic-service-secret',
   );
   expect(Keychain.setGenericPassword).not.toHaveBeenCalled();
+  httpFetch.mockResolvedValueOnce({
+    status: 400,
+    headers: {get: () => null},
+    json: async () => ({errorCode: 400123, message: 'synthetic-service-secret'}),
+  });
+  await act(async () => {
+    press('connection-submit');
+    await jest.advanceTimersByTimeAsync(500);
+  });
+  expect(value('connection-error-code')).toBe('PROVISIONING_FAILED');
+  expect(value('connection-http-status')).toBe('HTTP 400');
+  expect(value('connection-service-code')).toBe(400123);
+  expect(JSON.stringify(app.toJSON())).not.toContain('synthetic-service-secret');
+  expect(Keychain.setGenericPassword).not.toHaveBeenCalled();
   await act(async () => {
     press('connection-submit');
     await jest.advanceTimersByTimeAsync(500);

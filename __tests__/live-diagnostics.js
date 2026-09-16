@@ -90,6 +90,27 @@ test.each(ERROR_CODES)('accepts exact connection enum %s on iOS accessibility te
   expect(parseHierarchy(input)).toEqual({connectionErrorCode: code});
 });
 
+test.each([100, 200, 400, 401, 429, 503, 599])('exposes only the numeric HTTP status %s', status => {
+  const result = parseHierarchy(node('connection-http-status', `HTTP ${status}`));
+  expect(result).toEqual({connectionHttpStatus: status});
+  expect(sanitizeDiagnostics({availability: 'available', ui: result})).toEqual({
+    availability: 'available', failedCommands: [], ui: {connectionHttpStatus: status},
+  });
+});
+
+test.each([CANARY, 'HTTP 099', 'HTTP 600', 'HTTP 400\n', 'HTTP 400 SECRET', '400', 400])(
+  'rejects unexpected HTTP status text (%#)', text => {
+    expect(parseHierarchy(node('connection-http-status', text))).toEqual({});
+  },
+);
+
+test.each([99, 600, Infinity, NaN, 400.5, '400'])(
+  'rejects invalid report HTTP status (%#)', status => {
+    expect(sanitizeDiagnostics({availability: 'available', ui: {connectionHttpStatus: status}}))
+      .toEqual({availability: 'unavailable'});
+  },
+);
+
 test.each([CANARY, 'AUTHENTICATION_FAILED\n', 'CLOUD_CONFIRMED', 'Connected'])(
   'rejects unapproved error and proof values (%#)', value => {
     expect(parseHierarchy(node('connection-error-code', value))).toEqual({});

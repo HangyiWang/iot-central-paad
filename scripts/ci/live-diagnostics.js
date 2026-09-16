@@ -16,7 +16,7 @@ const TARGET_IDS = Object.freeze([
   'connection-provisioningHost', 'connection-deviceKey', 'connection-submit',
   'connection-status', 'assigned-device-id', 'assigned-hub', 'connection-details',
   'model-id', 'registration-id', 'registry-status', 'proof-nonce', 'proof-send',
-  'proof-status', 'connection-error-code', 'connection-service-code',
+  'proof-status', 'connection-error-code', 'connection-service-code', 'connection-http-status',
 ]);
 const ERROR_CODES = Object.freeze([
   'INVALID_CREDENTIALS', 'UNSAFE_ENDPOINT', 'CANCELLED', 'TIMEOUT',
@@ -70,6 +70,10 @@ function parseHierarchy(value) {
       const id = attributes['resource-id'];
       for (const text of [attributes.text, attributes.accessibilityText]) {
         if (id === 'connection-error-code' && ERROR_CODES.includes(text)) ui.connectionErrorCode = text;
+        if (id === 'connection-http-status' && typeof text === 'string' &&
+            text.length === 8 && /^HTTP [1-5][0-9]{2}$/.test(text)) {
+          ui.connectionHttpStatus = Number(text.slice(5));
+        }
         if (id === 'connection-service-code' && typeof text === 'string' &&
             text.length <= 15 && /^[0-9]+$/.test(text) && integer(Number(text))) {
           ui.connectionServiceCode = Number(text);
@@ -100,6 +104,8 @@ function sanitizeDiagnostics(value) {
     const ui = {};
     if (object(value.ui)) {
       if (ERROR_CODES.includes(value.ui.connectionErrorCode)) ui.connectionErrorCode = value.ui.connectionErrorCode;
+      if (integer(value.ui.connectionHttpStatus) && value.ui.connectionHttpStatus >= 100 &&
+          value.ui.connectionHttpStatus <= 599) ui.connectionHttpStatus = value.ui.connectionHttpStatus;
       if (integer(value.ui.connectionServiceCode)) ui.connectionServiceCode = value.ui.connectionServiceCode;
       if (PROOF_STATUSES.includes(value.ui.proofStatus)) ui.proofStatus = value.ui.proofStatus;
     }

@@ -23,11 +23,17 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     id: connection-registrationId
 - eraseText
 - inputText: ${MAESTRO_REGISTRATION_ID}
+- assertVisible:
+    id: connection-registrationId
+    text: ${MAESTRO_REGISTRATION_ID_PATTERN}
 - tapOn:
     id: connection-scopeId
 - eraseText
 - inputText: ${MAESTRO_SCOPE_ID}
 - pressKey: Enter
+- assertVisible:
+    id: connection-scopeId
+    text: "^${MAESTRO_SCOPE_ID}$"
 - scrollUntilVisible:
     element:
       id: connection-provisioningHost

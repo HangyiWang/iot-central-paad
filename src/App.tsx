@@ -264,6 +264,11 @@ const Navigation = React.memo(() => {
           style={styles.connectionError}>
           <Text>{error.message}</Text>
           <Text testID="connection-error-code">{error.code}</Text>
+          {error.status !== undefined &&
+            error.status >= 100 &&
+            error.status <= 599 && (
+              <Text testID="connection-http-status">{`HTTP ${error.status}`}</Text>
+            )}
           {error.serviceCode !== undefined && (
             <Text testID="connection-service-code">{error.serviceCode}</Text>
           )}
