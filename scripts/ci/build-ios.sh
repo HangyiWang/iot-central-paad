@@ -27,7 +27,7 @@ test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")
 codesign --force --sign - --timestamp=none \
   --entitlements ios/IoT_PnP/IoT_PnPCI.entitlements "$app"
 codesign --verify --strict "$app"
-codesign --display --entitlements - "$app" > build/ci-artifacts/ios-entitlements.plist
+codesign --display --entitlements - --xml "$app" > build/ci-artifacts/ios-entitlements.plist
 test "$(/usr/libexec/PlistBuddy -c 'Print application-identifier' build/ci-artifacts/ios-entitlements.plist)" = com.microsoft.iotpnp.ci
 test "$(/usr/libexec/PlistBuddy -c 'Print keychain-access-groups:0' build/ci-artifacts/ios-entitlements.plist)" = com.microsoft.iotpnp.ci
 ditto -c -k --sequesterRsrc --keepParent "$app" build/ci-artifacts/baseline-simulator.app.zip
