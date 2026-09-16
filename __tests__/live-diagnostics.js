@@ -90,6 +90,22 @@ test.each(ERROR_CODES)('accepts exact connection enum %s on iOS accessibility te
   expect(parseHierarchy(input)).toEqual({connectionErrorCode: code});
 });
 
+test.each([
+  ["Quickstep isn't responding", 'quickstep-anr'],
+  ["System UI isn't responding", 'system-ui-anr'],
+  ["IoT Plug and Play isn't responding", 'paad-anr'],
+])('exports only a known system-dialog category (%#)', (text, code) => {
+  const ui = parseHierarchy(node('android:id/alertTitle', text));
+  expect(ui).toEqual({systemDialog: code});
+  expect(sanitizeDiagnostics({availability: 'available', ui}).ui).toEqual({systemDialog: code});
+});
+
+test('never exports arbitrary dialog titles or unknown categories', () => {
+  expect(parseHierarchy(node('android:id/alertTitle', CANARY))).toEqual({});
+  expect(sanitizeDiagnostics({availability: 'available', ui: {systemDialog: CANARY}}))
+    .toEqual({availability: 'unavailable'});
+});
+
 test.each([100, 200, 400, 401, 429, 503, 599])('exposes only the numeric HTTP status %s', status => {
   const result = parseHierarchy(node('connection-http-status', `HTTP ${status}`));
   expect(result).toEqual({connectionHttpStatus: status});

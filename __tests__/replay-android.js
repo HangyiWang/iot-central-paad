@@ -236,15 +236,23 @@ test('only an exact stock-launcher ANR can be dismissed; PAAD failures are not h
     runFlow: {
       when: {
         platform: 'Android',
-        visible: {id: 'android:id/alertTitle', text: "^Quickstep isn't responding$"},
       },
       commands: [
-        {tapOn: {id: 'android:id/aerr_close'}},
-        {assertNotVisible: {id: 'android:id/alertTitle', text: "^Quickstep isn't responding$"}},
+        {extendedWaitUntil: {
+          visible: {id: 'registration-manual|connection-status|android:id/alertTitle'},
+          timeout: 60000,
+        }},
+        {runFlow: {
+          when: {visible: {id: 'android:id/alertTitle', text: "^Quickstep isn't responding$"}},
+          commands: [
+            {tapOn: {id: 'android:id/aerr_close'}},
+            {assertNotVisible: {id: 'android:id/alertTitle', text: "^Quickstep isn't responding$"}},
+          ],
+        }},
       ],
     },
   }]);
-  const title = new RegExp(flow[1][0].runFlow.when.visible.text);
+  const title = new RegExp(flow[1][0].runFlow.commands[1].runFlow.when.visible.text);
   expect(title.test("Quickstep isn't responding")).toBe(true);
   expect(title.test("IoT Plug and Play isn't responding")).toBe(false);
   expect(title.test("System UI isn't responding")).toBe(false);

@@ -26,6 +26,13 @@ const ERROR_CODES = Object.freeze([
   'NOT_CONNECTED', 'OPERATION_FAILED', 'STORAGE_FAILED', 'BUSY',
 ]);
 const PROOF_STATUSES = Object.freeze(['Submitted locally']);
+const SYSTEM_DIALOGS = new Map([
+  ["Quickstep isn't responding", 'quickstep-anr'],
+  ["System UI isn't responding", 'system-ui-anr'],
+  ["IoT Plug and Play isn't responding", 'paad-anr'],
+  ["IoT PnP isn't responding", 'paad-anr'],
+]);
+const SYSTEM_DIALOG_CODES = [...new Set(SYSTEM_DIALOGS.values())];
 const LIMITS = Object.freeze({
   entries: 256, files: 32, fileBytes: 1024 * 1024, totalBytes: 4 * 1024 * 1024,
   directoryDepth: 6, nodes: 4096, hierarchyDepth: 64, commands: 512,
@@ -80,6 +87,9 @@ function parseHierarchy(value) {
           ui.connectionServiceCode = Number(text);
         }
         if (id === 'proof-status' && PROOF_STATUSES.includes(text)) ui.proofStatus = text;
+        if (id === 'android:id/alertTitle' && SYSTEM_DIALOGS.has(text)) {
+          ui.systemDialog = SYSTEM_DIALOGS.get(text);
+        }
       }
     }
     if (Array.isArray(node.children)) {
@@ -109,6 +119,7 @@ function sanitizeDiagnostics(value) {
           value.ui.connectionHttpStatus <= 599) ui.connectionHttpStatus = value.ui.connectionHttpStatus;
       if (integer(value.ui.connectionServiceCode)) ui.connectionServiceCode = value.ui.connectionServiceCode;
       if (PROOF_STATUSES.includes(value.ui.proofStatus)) ui.proofStatus = value.ui.proofStatus;
+      if (SYSTEM_DIALOG_CODES.includes(value.ui.systemDialog)) ui.systemDialog = value.ui.systemDialog;
     }
     return failedCommands.length || Object.keys(ui).length
       ? {availability: 'available', failedCommands, ui} : unavailable();
