@@ -5,6 +5,7 @@ name: Credential-free bundled startup and manual-navigation smoke
     clearState: true
     permissions:
       all: deny
+- runFlow: dismiss-quickstep-anr.yaml
 - extendedWaitUntil:
     visible:
       id: registration-manual
@@ -26,6 +27,7 @@ name: Credential-free bundled startup and manual-navigation smoke
     clearState: false
     permissions:
       all: deny
+- runFlow: dismiss-quickstep-anr.yaml
 - extendedWaitUntil:
     visible:
       id: registration-manual
