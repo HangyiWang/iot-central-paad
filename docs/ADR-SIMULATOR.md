@@ -207,3 +207,6 @@ presses Connect and refuses device-key/live-config environment variables.
 Its three-day artifact contains credential-free runtime, window, screenshot and
 Maestro evidence. `replay-identity.json` distinguishes the original binary source
 from the replay harness and flow; this is not Azure acceptance evidence.
+Startup recovery dismisses only the observed stock-emulator **Quickstep isn't
+responding** dialog. It does not dismiss PAAD or other application ANRs, and the
+normal app/startup assertions still have to pass.

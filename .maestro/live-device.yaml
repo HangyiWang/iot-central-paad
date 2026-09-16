@@ -5,6 +5,10 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     clearState: true
     permissions:
       all: deny
+- runFlow:
+    file: dismiss-quickstep-anr.yaml
+    env:
+      APP_ID: ${MAESTRO_APP_ID}
 - extendedWaitUntil:
     visible:
       id: registration-manual
@@ -158,6 +162,10 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     clearState: false
     permissions:
       all: deny
+- runFlow:
+    file: dismiss-quickstep-anr.yaml
+    env:
+      APP_ID: ${MAESTRO_APP_ID}
 - extendedWaitUntil:
     visible:
       id: connection-status

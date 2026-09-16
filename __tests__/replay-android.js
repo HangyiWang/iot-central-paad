@@ -36,6 +36,7 @@ function withFixture(testBody, {download = false} = {}) {
     }
     fs.writeFileSync(file('scripts/ci/replay-android.sh'), script);
     fs.copyFileSync('.maestro/startup.yaml', file('.maestro/startup.yaml'));
+    fs.copyFileSync('.maestro/dismiss-quickstep-anr.yaml', file('.maestro/dismiss-quickstep-anr.yaml'));
     const apk = Buffer.from('credential-free mock APK, not an Android binary');
     const apkSha256 = crypto.createHash('sha256').update(apk).digest('hex');
     const identity = [
@@ -219,9 +220,34 @@ test('replays the unchanged synthetic startup assertions and never submits Conne
   expect(commands).toContainEqual({assertVisible: {id: 'connection-submit'}});
   expect(commands.filter(command => command.tapOn).map(command => command.tapOn.id))
     .not.toContain('connection-submit');
-  expect(commands.some(command => command.runFlow || command.runScript)).toBe(false);
+  expect(commands.filter(command => command.runFlow)).toEqual([
+    {runFlow: 'dismiss-quickstep-anr.yaml'},
+    {runFlow: 'dismiss-quickstep-anr.yaml'},
+  ]);
+  expect(commands.some(command => command.runScript)).toBe(false);
   expect(script).toContain("'-e', 'APP_ID=com.iot_pnp.ci', '.maestro/startup.yaml'");
   expect(script).not.toMatch(/-e[^\n]*(?:DEVICE_KEY|PAAD_LIVE_CONFIG)/);
+});
+
+test('only an exact stock-launcher ANR can be dismissed; PAAD failures are not hidden', () => {
+  const flow = yaml.loadAll(fs.readFileSync('.maestro/dismiss-quickstep-anr.yaml', 'utf8'));
+  expect(flow[0].appId).toBe('${APP_ID}');
+  expect(flow[1]).toEqual([{
+    runFlow: {
+      when: {
+        platform: 'Android',
+        visible: {id: 'android:id/alertTitle', text: "^Quickstep isn't responding$"},
+      },
+      commands: [
+        {tapOn: {id: 'android:id/aerr_close'}},
+        {assertNotVisible: {id: 'android:id/alertTitle', text: "^Quickstep isn't responding$"}},
+      ],
+    },
+  }]);
+  const title = new RegExp(flow[1][0].runFlow.when.visible.text);
+  expect(title.test("Quickstep isn't responding")).toBe(true);
+  expect(title.test("IoT Plug and Play isn't responding")).toBe(false);
+  expect(title.test("System UI isn't responding")).toBe(false);
 });
 
 test.each([

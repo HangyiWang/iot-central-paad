@@ -71,6 +71,7 @@ try {
     replayHarnessSha: process.env.GITHUB_SHA,
     replayScriptSha256: digest('scripts/ci/replay-android.sh'),
     startupFlowSha256: digest('.maestro/startup.yaml'),
+    launcherRecoveryFlowSha256: digest('.maestro/dismiss-quickstep-anr.yaml'),
     evidenceScope: 'Credential-free synthetic startup only; no Connect or cloud proof',
   }, null, 2));
 } catch {
