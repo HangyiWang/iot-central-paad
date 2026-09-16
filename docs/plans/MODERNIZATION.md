@@ -1,6 +1,6 @@
 # PAAD modernization plan
 
-Status: M0 complete; modern native builds pass; iOS navigation fix awaiting rerun.
+Status: M0 and M1 complete; modern prototype foundation ready for ADR integration.
 Date: 2026-09-16. Branch: `modernize/paad-foundation`.
 Base: fork `master` at `2549196`.
 
@@ -95,6 +95,20 @@ but the Back tap failed to leave that form. The captured hierarchy placed the
 120-point intrinsic logo view over the Back target. The follow-up bounds the
 noninteractive logo to 30 points and computes nested-header ownership in
 Navigation 7's options callback rather than a stale route effect.
+
+**M1 passed:** [run 35057354712](https://github.com/HangyiWang/iot-central-paad/actions/runs/35057354712)
+at `966969648307c242b222668b5a514b0126f5b93e` passed all 229 JavaScript tests
+and both native launch/manual/back/cold-restart flows. The iOS Back assertion
+was unchanged. JUnit, final screens and exact-commit artifact hashes were inspected:
+
+| Modern artifact | SHA-256 |
+| --- | --- |
+| Android `foundation-ci.apk` | `1e97eda636c3f762089dd29012394505b902b4ce2be77502b0f963a5ac8a635f` |
+| iOS `foundation-simulator.app.zip` | `e676f39ed310af9411fda5211601fa64556a6bc1fba74bc899279dbb9c7425bd` |
+
+This establishes the modern shared/native compatibility gate, not live Azure
+traffic or physical-device acceptance. ADR application implementation can now
+consume this foundation without replacing its connection or storage boundary.
 
 Follow-up coverage exercises the real vendor/Paho/owned-WebSocket boundary
 against an in-memory broker, secure-storage serialization, shared connection
