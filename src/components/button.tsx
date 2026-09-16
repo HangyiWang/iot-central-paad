@@ -5,7 +5,9 @@ import React from 'react';
 import {Platform} from 'react-native';
 import {Button as ElButton, ButtonProps} from '@rneui/themed';
 
-const Button = React.memo<ButtonProps>(({containerStyle, ...props}) => {
+type Props = Omit<ButtonProps, 'children'> & {children?: React.ReactNode};
+
+const Button = React.memo<Props>(({containerStyle, ...props}) => {
   return (
     <ElButton
       type={Platform.OS === 'ios' ? 'clear' : 'solid'}

@@ -1,8 +1,127 @@
 # PAAD modernization plan
 
-Status: planning only; no framework, dependency, or application changes yet.
-Date: 2026-09-15. Branch: `modernize/paad-foundation`.
+Status: M0 and M1 complete; modern prototype foundation ready for ADR integration.
+Date: 2026-09-16. Branch: `modernize/paad-foundation`.
 Base: fork `master` at `2549196`.
+
+## Current decisions (supersede the original local-first plan)
+
+The foundation uses **CI first**: Android emulators on standard GitHub Linux
+runners and iOS Simulators on standard GitHub macOS runners. Windows Android
+Studio, a local Mac, EAS and paid physical-iPhone signing are not prerequisites
+for prototype progress. Physical-device acceptance remains an independent gate.
+
+The owner approved Expo SDK 57 development builds, minimum iOS 16.4 and Android
+7/API 24, and incremental foundation commits/pushes with credential-free Actions
+runs. Each job is bounded to 45 minutes and nonsecret build/log/screenshot
+artifacts to three days. No larger runners, Azure access, production signing,
+automatic merges, or billable-resource/role changes are included.
+
+Subsequent authorization permits local foundation-to-ADR merges and pushes of
+both topic branches, plus scoped reuse of the retained proof lab for individual
+test enrollments and device traffic. Dedicated temporary device-input Actions
+secrets are permitted only in manually dispatched trusted-code live jobs and
+must be removed afterward. No administrator credentials enter the app or CI.
+No `master` merge, new billable resources, IAM changes or cloud cleanup is authorized.
+
+The baseline lane is `.github/workflows/baseline.yml`: lint and genuine app-startup
+Jest coverage, followed by independent bundled Android/iOS builds and Maestro
+navigation/cold-restart scenarios. Builds use isolated `.ci` application IDs,
+not production signing or credentials. Results must identify the exact built
+commit and toolchain; a written workflow is not evidence of a successful run.
+
+Reference artwork remains local and untracked. Use `image2.png` for information
+structure and `image1.png` for calm visual tone, with selective accents from the
+other two images. Produce an original design, not copied artwork.
+
+## M0 evidence (2026-09-16)
+
+[Run 35047634369](https://github.com/HangyiWang/iot-central-paad/actions/runs/35047634369)
+completed successfully for commit `6d6186d23d30dfb2b12d5fb947a76750ea31f4c6`.
+This is the repaired **RN 0.75.4 / React 18.3.1 baseline**, not the Expo or
+New Architecture compatibility gate.
+
+| Lane | Environment | Observed result |
+| --- | --- | --- |
+| JavaScript | Ubuntu 24.04, Node 20.19.4 | Lint and all 19 startup/recovery, device-contract and pod-install tests passed. |
+| Android | AOSP API 34, x86_64 emulator, bundled `ci` APK | Launch, manual-form assertions, back navigation and cold restart passed without Metro or cloud credentials. |
+| iOS | macOS 15 ARM64, Xcode 16.4, iPhone 16 / iOS 18.5 Simulator | Real Keychain initialization and the same bundled launch/manual/back/cold-restart flow passed. |
+
+The native artifact identities, JUnit reports and final screenshots were
+inspected, and the downloaded artifact hashes matched their identity records:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `baseline-ci.apk` | `190fb7244a4271bf84632475b7dcab7bd41c21a6c5ee8f431ac945be84838823` |
+| `baseline-simulator.app.zip` | `7133891db252aeffa5e7e69a64a713d7d9c04e55642dbb4f978278976f7b6f57` |
+
+Artifacts expire after three days. The exact source commit and this evidence
+record remain available for reproducing the baseline.
+
+The iOS lane uses Xcode-managed local ad-hoc signing: simulated Keychain
+entitlements are embedded in the executable's `__TEXT,__entitlements` section,
+not the host macOS signature. No Apple account, certificate or provisioning
+profile is used. The form's keyboard-dismiss wrapper no longer groups its
+heading and choices into one inaccessible element on iOS.
+
+No live Hub/DPS/ADR traffic, secure-storage upgrade migration, physical
+sensor/BLE/camera behavior, suspension handling or full HIG acceptance is
+established by this run. Those gates, the modern shell and ADR application
+implementation remain pending.
+
+## Modern foundation progress (2026-09-16)
+
+[Run 35052582168](https://github.com/HangyiWang/iot-central-paad/actions/runs/35052582168)
+built `f02ed75b061f675b5a3312a67c940de4b2a37cbc` using Expo 57.0.23,
+React Native 0.86.3 and React 19.2.3. Its JavaScript gate and real Android
+API 36 bundled launch/manual/back/cold-restart flow passed. iOS resolved its
+new CocoaPods lock on Xcode 26.6, then rejected duplicate icon-font copies.
+The fix leaves CocoaPods as the sole iOS font-copy owner; Expo embeds Android
+fonts, and both platforms register the required font families.
+
+The initially resolved lock had SHA-256
+`ff546c745d21063bbb8f83507a086d1edabe48b867d94bad8d6d2c5f9bdc1f78`.
+The follow-up promotes Expo Constants 57.0.18 to a direct dependency, updating
+only its two external-source paths in that lock; versions/checksums are retained.
+Subsequent installs use deployment mode, not implicit resolution updates.
+
+[Run 35055499091](https://github.com/HangyiWang/iot-central-paad/actions/runs/35055499091)
+at `33fe667412b517c07a7969d1cb0f6afe218ed8f6` passed all 223 JavaScript tests
+and Android's full startup flow. iOS compiled successfully and its deployment
+install preserved the reviewed lock byte-for-byte (current SHA-256:
+`351da6b578ae9db25305302f1c9f386e315ee7ae11ecd69621d622d8106e5584`).
+Its app initialized, opened the manual form and exposed the expected fields,
+but the Back tap failed to leave that form. The captured hierarchy placed the
+120-point intrinsic logo view over the Back target. The follow-up bounds the
+noninteractive logo to 30 points and computes nested-header ownership in
+Navigation 7's options callback rather than a stale route effect.
+
+**M1 passed:** [run 35057354712](https://github.com/HangyiWang/iot-central-paad/actions/runs/35057354712)
+at `966969648307c242b222668b5a514b0126f5b93e` passed all 229 JavaScript tests
+and both native launch/manual/back/cold-restart flows. The iOS Back assertion
+was unchanged. JUnit, final screens and exact-commit artifact hashes were inspected:
+
+| Modern artifact | SHA-256 |
+| --- | --- |
+| Android `foundation-ci.apk` | `1e97eda636c3f762089dd29012394505b902b4ce2be77502b0f963a5ac8a635f` |
+| iOS `foundation-simulator.app.zip` | `e676f39ed310af9411fda5211601fa64556a6bc1fba74bc899279dbb9c7425bd` |
+
+This establishes the modern shared/native compatibility gate, not live Azure
+traffic or physical-device acceptance. ADR application implementation can now
+consume this foundation without replacing its connection or storage boundary.
+
+Follow-up coverage exercises the real vendor/Paho/owned-WebSocket boundary
+against an in-memory broker, secure-storage serialization, shared connection
+ownership, cancellation, explicit disconnect, one-shot restoration, commands,
+PnP component acknowledgements, sensor availability and bounded/redacted logs.
+It does not replace actual mobile-to-cloud acceptance.
+
+Android map previews require an operator-supplied, application-restricted
+`PAAD_ANDROID_MAPS_API_KEY` at native build time. Without one, the location
+view displays coordinates and an explicit configuration notice instead of
+creating a native map that would fail. No Maps service or key is created by CI.
+Hardware parity, production distribution and secure-storage upgrade acceptance
+remain separate from the simulator prototype.
 
 ## Goal and branch order
 
@@ -39,16 +158,20 @@ after a long suspension.
 
 ## Foundation decision
 
-Recommended candidate for the compatibility spike: **Expo SDK 57 development
-builds**, using its matched React Native 0.86.3 / React 19.2.3 dependency set.
-This supports the available Windows/WSL plus physical-iPhone workflow. It is not
-Expo Go, and EAS is optional if an approved macOS build pipeline is available.
+Approved foundation for the compatibility spike: **Expo SDK 57 development
+builds**, using Expo 57.0.23 with its matched React Native 0.86.3 / React 19.2.3
+dependency set. Published bare-minimum template: 57.0.25. These package versions
+were rechecked against npm and the official templates on 2026-09-15. It is not
+Expo Go; GitHub Actions builds locally on its runners without EAS.
 
 Confirm versions against the supported template at implementation time and pin
 the result. Do not independently upgrade every package to its latest release.
 The candidate requires the New Architecture and raises the minimum supported OS;
-SDK 57 currently specifies iOS 16.4 and Android API 24. Confirm the available
-iPhone and customer device requirements before adopting it.
+SDK 57 specifies iOS 16.4 and Android API 24; these floors are owner-approved.
+Pin Node 24.19.0 for the modern shell, JDK 17, Android compile/target SDK 36,
+Build Tools 36.0.0 and NDK 27.1.12297006. Use the template's Gradle wrapper.
+The modern iOS lane needs Xcode 26.4 or newer; the assessed runner is
+`macos-26` with Xcode 26.6. The legacy baseline uses its own older toolchain.
 
 If a required native integration or the iOS floor rules this out, evaluate a
 fresh bare React Native shell with selective Expo modules and development-client
@@ -116,17 +239,43 @@ Redact keys, tokens, connection strings and sensitive payloads at the log bounda
 | Priority | Work | Exit criterion |
 | --- | --- | --- |
 | M0: baseline | Record behavior and message/model contracts; repair the existing automated baseline in a small implementation commit. Preserve a known baseline build if available. | Reproducible install, clear supported toolchain, and useful baseline checks. |
-| M1: compatibility gate | Fresh shell, New Architecture, build signing, dev client, one real sensor, secure storage, QR and BLE permission/scan probe, Hub/DPS WSS connection. Agree connection interface. | Android emulator and signed physical-iPhone build work; real iPhone telemetry/twin exchange succeeds. Record unresolved BLE hardware limitations and make the foundation decision. Target 3-5 engineer-days, not a guarantee. |
+| M1: compatibility gate | Fresh shell, New Architecture, dev client, secure storage, sensor/QR/BLE adapters and shared connection interface. Establish bundled build and smoke automation before feature migration. | Android emulator and iOS Simulator builds launch and pass real UI assertions. Simulator-only ad-hoc signing may be used for Keychain entitlements; no paid Apple identity is needed. Authorized live-cloud follow-up proves model-bearing Hub/DPS WSS traffic independently on both platforms. Physical sensors, QR/camera, BLE, secure hardware and phone suspension remain not exercised until device acceptance. Target 3-5 engineer-days, not a guarantee. |
 | M2: parity migration | Port remaining sensors, BLE advertisements, properties/methods, image upload, registration, settings, logs and charts. Add dependency replacements in small batches. | Existing active features and telemetry units preserved; no unbounded subscriptions/history or duplicate connection attempts. |
 | M3: design and resilience | Apply the HIG contract, permission recovery, clear errors, reconnect/resume, credential reset and minimal redacted diagnostics. | Usable offline/error states, accessible controls, no false delivery claims or secret logging. |
 | M4: release readiness | Align CI and release toolchains; standalone Android/iPhone builds, upgrade migration, documentation and hardware coverage. | Acceptance matrix below passes; platform gaps explicitly block parity sign-off. |
 
 Run existing logic checks on every PR; add focused Jest + React Native Testing
-Library coverage as needed. Consider a few Maestro flows only after the basic
-pipeline is stable. Native signing must not be exposed to untrusted fork PRs.
+Library coverage as needed. Establish Maestro launch/navigation assertions with
+the build pipeline, then expand them with each migrated feature. Native signing
+must not be exposed to untrusted fork PRs.
 Keep cloud device credentials in restricted test jobs, not ordinary UI jobs.
 
-## Windows-first build and test
+## CI-first build and test
+
+1. Repair baseline install/type/Jest issues separately from migration regressions.
+2. Build the legacy baseline with bundled JS and isolated IDs. Record native
+   incompatibilities honestly rather than weakening tests or faking modules.
+3. Create the approved fresh native shell, then run equivalent Android and iOS
+   Simulator flows. Do not port every screen before this gate succeeds.
+4. Exercise manual onboarding, navigation, denied permissions, restart and
+   explicitly labelled simulation without cloud credentials. Use actual UI
+   assertions and bounded waits, not screenshots alone.
+5. Keep live-cloud jobs separate and opt-in on trusted code, after additional
+   scoped-access authorization. The running app must report a unique nonce;
+   independent Hub twin and ADR inventory reads must match the assigned identity.
+6. Preserve exact-commit evidence and report passed, failed and not-exercised
+   coverage. Virtual-device results never satisfy physical hardware acceptance.
+
+The first baseline install succeeded with `npm ci`; the IoT dependency includes
+its Paho fork in the published package. This does not establish maintained
+transport ownership or native/runtime compatibility on the new foundation.
+The baseline animation typing, test import, missing native Jest setup and
+ESLint plugin resolution are repaired deliberately, without relaxing type rules.
+
+## Optional Windows and physical-device development
+
+The following local workflows are alternatives for developers and later hardware
+acceptance, not prerequisites for the CI-first milestone.
 
 ### A. Run the current checkout, before modernization
 
@@ -208,7 +357,9 @@ eas build --platform ios --profile development
 npx expo start --dev-client
 ```
 
-The proposed iOS profile must target a **physical device**, not an iOS Simulator.
+This optional hardware profile must target a **physical device**. The primary
+GitHub Actions profile instead targets an **iOS Simulator** with local ad-hoc
+signing and isolated Keychain entitlements, not an Apple distribution identity.
 Use Apple Developer team access if available. EAS is a separate build service;
 its free build quota does not remove Apple's device-signing requirement.
 Prefer an existing approved macOS pipeline if code/signing cannot go to EAS.
@@ -230,7 +381,7 @@ runs without Metro. Test cold launch and release behavior, not only Fast Refresh
 | Layer | Required coverage |
 | --- | --- |
 | Automated | Credential/QR validation, key derivation, sensor units, cancellation, retry/state transitions, no secret logging, critical UI behavior. |
-| Windows emulator | Navigation, forms, layouts, errors, permission-denied UI, simulated telemetry and real cloud networking. |
+| Android emulator and iOS Simulator in CI | Bundled cold launch, navigation, forms, layouts, errors, denied-permission UI and labelled simulation. Live cloud networking requires separate authorized runs on both platforms. |
 | Physical iPhone | QR/camera, available sensors, Keychain restore/reset, BLE with a peripheral, flashlight, image upload, connectivity and HIG review. |
 | Physical Android before parity sign-off | BLE/sensors, platform permissions, secure-storage upgrade, file/image behavior and reconnect. Borrow a device if necessary; emulator-only status remains incomplete. |
 | Cloud | Direct Hub and classic DPS still work; reported-property nonce independently matches. Do not equate MQTT acknowledgement with downstream telemetry consumption. |

@@ -14,6 +14,7 @@ import {Input} from '@rneui/themed';
 import ButtonGroup from './buttonGroup';
 import {Text, Name, normalize} from './typography';
 import {StyleDefinition} from 'types';
+import Strings from '../strings';
 
 export type FormItem = {
   id: string;
@@ -27,6 +28,7 @@ export type FormItem = {
   }[];
   value?: string;
   readonly?: boolean;
+  secure?: boolean;
 };
 
 function initValues(items: FormItem[]): {[itemId: string]: string} {
@@ -53,11 +55,13 @@ type FormProps = {
 const Form = React.memo<FormProps>(
   ({title, items, submit, submitAction, onSubmit}) => {
     const [values, setValues] = React.useState<{[itemId: string]: string}>({});
-    const {dark, colors} = useTheme();
+    const [revealed, setRevealed] = React.useState<Record<string, boolean>>({});
+    const {colors} = useTheme();
 
     // fire if initial items change
     React.useEffect(() => {
       setValues(initValues(items));
+      setRevealed({});
     }, [items, setValues]);
 
     React.useEffect(() => {
@@ -83,13 +87,13 @@ const Form = React.memo<FormProps>(
     );
 
     return (
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <TouchableWithoutFeedback accessible={false} onPress={Keyboard.dismiss}>
         <View>
           {title && <Name style={styles.title}>{title}</Name>}
-          {items.map((item, index) => {
+          {items.map(item => {
             if (item.choices && item.choices.length > 0) {
               return (
-                <View key={`formitem-${index}`}>
+                <View key={item.id}>
                   <Text style={styles.item}>{item.label}</Text>
                   <ButtonGroup
                     readonly={item.readonly}
@@ -108,9 +112,15 @@ const Form = React.memo<FormProps>(
             return (
               <Input
                 shake={() => null}
-                key={`formitem-${index}`}
-                multiline={item.multiline}
-                value={values[item.id]}
+                key={item.id}
+                testID={`connection-${item.id}`}
+                multiline={item.multiline && !item.secure}
+                secureTextEntry={item.secure && !revealed[item.id]}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
+                textContentType="none"
+                value={values[item.id] ?? ''}
                 label={item.label}
                 labelStyle={styles.label}
                 disabled={item.readonly}
@@ -130,7 +140,30 @@ const Form = React.memo<FormProps>(
                   paddingBottom: 0,
                   textAlignVertical: item.multiline ? 'top' : 'center',
                 }}
-                placeholderTextColor={dark ? '#444' : '#BBB'}
+                placeholderTextColor={colors.secondary}
+                rightIcon={
+                  item.secure
+                    ? {
+                        name: revealed[item.id]
+                          ? 'eye-off-outline'
+                          : 'eye-outline',
+                        type: 'ionicon',
+                        accessibilityLabel: revealed[item.id]
+                          ? Strings.Core.HideCredential
+                          : Strings.Core.ShowCredential,
+                        containerStyle: {
+                          minWidth: 44,
+                          minHeight: 44,
+                          justifyContent: 'center',
+                        },
+                        onPress: () =>
+                          setRevealed(current => ({
+                            ...current,
+                            [item.id]: !current[item.id],
+                          })),
+                      }
+                    : undefined
+                }
                 onChangeText={text =>
                   setValues(current => ({...current, [item.id]: text}))
                 }

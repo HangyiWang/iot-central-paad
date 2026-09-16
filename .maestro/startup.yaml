@@ -1,0 +1,34 @@
+appId: ${APP_ID}
+name: Credential-free bundled startup and manual-navigation smoke
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+- extendedWaitUntil:
+    visible:
+      id: registration-manual
+    timeout: 60000
+- assertVisible: "IoT Plug and Play"
+- assertVisible: "Connect manually"
+- tapOn:
+    id: registration-manual
+- assertVisible: "Manually connect"
+- assertVisible: "Connection info"
+- assertVisible: "Device ID"
+- assertVisible: "ID scope"
+- tapOn:
+    id: registration-back
+- assertVisible: ".*Start here.*"
+- assertVisible: "Connect manually"
+- stopApp
+- launchApp:
+    clearState: false
+    permissions:
+      all: deny
+- extendedWaitUntil:
+    visible:
+      id: registration-manual
+    timeout: 60000
+- assertVisible: "IoT Plug and Play"
+- assertVisible: "Connect manually"

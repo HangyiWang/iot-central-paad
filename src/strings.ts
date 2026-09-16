@@ -4,11 +4,45 @@
 const Strings = {
   Title: 'IoT Plug and Play',
   Core: {
+    Back: 'Back',
+    Retry: 'Retry',
     Close: 'Close',
     Cancel: 'Cancel',
     Loading: 'Loading...',
     DisableSensor: 'Disable sensor',
     EnableSensor: 'Enable sensor',
+    HideCredential: 'Hide credential',
+    ShowCredential: 'Show credential',
+  },
+  Startup: {
+    Failed:
+      'Could not initialize the app. Your saved data has not been reset. Please retry.',
+    ErrorCode: 'Error code: {{0}}',
+  },
+  Map: {
+    CurrentLocation: 'Current location',
+    NotConfigured:
+      'Map preview is not configured in this Android build. Location coordinates remain available.',
+  },
+  Connection: {
+    Summary: {
+      Connected: 'Connected',
+      Disconnected: 'Disconnected',
+      Simulated: 'Offline simulation — no cloud connection',
+      Device: 'Assigned device',
+      Hub: 'Assigned Hub',
+      Disconnect: 'Disconnect',
+      Reconnect: 'Reconnect',
+      Manual: 'Connect manually',
+    },
+    Stages: {
+      idle: 'Not connected',
+      validating: 'Checking connection details...',
+      provisioning: 'Requesting a device assignment...',
+      connecting: 'Connecting to the assigned IoT Hub...',
+      connected: 'Connected',
+      error: 'Connection needs attention',
+    },
   },
   Settings: {
     Title: 'Settings',
@@ -43,7 +77,7 @@ const Strings = {
       },
       Success: {
         Title: 'Success',
-        Text: 'Successfully wiped data. Please restart the app!',
+        Text: 'Saved credentials and local settings were cleared. Azure devices were not deleted.',
       },
     },
   },
@@ -120,7 +154,10 @@ const Strings = {
     Properties: {
       Send: 'Send',
       Delivery: {
-        Success: 'Property "{{0}}" successfully sent to Azure IoT.',
+        Simulated:
+          'Property "{{0}}" was simulated locally. Nothing was sent to the cloud.',
+        Success:
+          'Property "{{0}}" was submitted to the device transport. Cloud receipt has not been independently checked.',
         Failure: 'Failed to send property "{{0}}" to Azure IoT.',
       },
       Loading: 'Waiting for properties...',
@@ -155,6 +192,13 @@ const Strings = {
     Enabled: 'Simulation mode is enabled.',
     Disable:
       'Disable simulation mode and connect to Azure IoT to work with file uploads.',
+  },
+  Sensors: {
+    Unavailable: 'Unavailable — check hardware and permissions',
+    Checking: 'Waiting for sensor',
+    Simulated: 'Simulated data',
+    Disabled: 'Disabled',
+    Retry: 'Retry sensor',
   },
   Update: {
     Mandatory: {

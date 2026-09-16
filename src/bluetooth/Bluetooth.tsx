@@ -7,11 +7,11 @@ import {
   FlatList,
   StyleSheet,
   Platform,
-  PermissionsAndroid,
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import {Device, State, UUID} from 'react-native-ble-plx';
+import {Device, UUID} from 'react-native-ble-plx';
+import {useIsFocused} from '@react-navigation/native';
 import {IotcBleManager} from './BleManager';
 import {ItemProps, Pages} from 'types';
 import {Loader, Text} from '../components';
@@ -51,7 +51,7 @@ export function BluetoothPage() {
           ),
           headerTitleAlign: 'left',
           headerLeft: isListPage ? () => <Logo /> : undefined,
-          headerBackTitleVisible: false,
+          headerBackButtonDisplayMode: 'minimal',
           headerRight: () => (
             <View style={appStyles.headerButtons}>
               {isListPage && <ReloadButton />}
@@ -80,7 +80,7 @@ type BluetoothListProps = StackScreenProps<
 function BluetoothList({navigation}: BluetoothListProps) {
   const {colors} = useTheme();
   const [isVisible, setIsVisible] = React.useState(true);
-  const {devices} = useBluetoothDevicesList(isVisible);
+  const {devices, unavailable} = useBluetoothDevicesList(isVisible);
 
   React.useEffect(() => {
     const unsubscribeFocus = navigation.addListener('focus', () => {
@@ -98,6 +98,12 @@ function BluetoothList({navigation}: BluetoothListProps) {
 
   return (
     <View style={styles.container}>
+      {unavailable && (
+        <Text>
+          Bluetooth unavailable. Enable Bluetooth and allow Nearby Devices
+          access in Settings.
+        </Text>
+      )}
       <FlatList<Device>
         data={devices}
         renderItem={({item}) => (
@@ -108,10 +114,10 @@ function BluetoothList({navigation}: BluetoothListProps) {
           />
         )}
         onRefresh={() => IotcBleManager.getInstance().resetDeviceList()}
-        refreshing={devices.length === 0}
+        refreshing={!unavailable && devices.length === 0}
         refreshControl={
           <RefreshControl
-            refreshing={devices.length === 0}
+            refreshing={!unavailable && devices.length === 0}
             onRefresh={() => IotcBleManager.getInstance().resetDeviceList()}
             colors={[colors.text]}
           />
@@ -169,6 +175,8 @@ function BluetoothDeviceListItem({
 
 function useBluetoothDevicesList(shouldScan: boolean) {
   const [devices, setDevices] = React.useState<Device[]>([]);
+  const [unavailable, setUnavailable] = React.useState(false);
+  const [revision, refresh] = React.useReducer(value => value + 1, 0);
   const deviceMap = React.useRef<Map<UUID, Device> | null>(null);
 
   if (deviceMap.current === null) {
@@ -178,57 +186,33 @@ function useBluetoothDevicesList(shouldScan: boolean) {
   const bleManager = IotcBleManager.getInstance();
 
   React.useEffect(() => {
-    async function scan() {
-      if (!shouldScan) {
-        return;
-      }
-
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Bluetooth Permission',
-            message:
-              'Application would like to use bluetooth and location permissions',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          },
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          throw new Error('Permission rejected');
-        }
-      }
-
-      const sub = bleManager.onStateChange(s => {
-        if (s === State.PoweredOn) {
-          sub.remove();
-
-          bleManager.startDeviceScan(null, {scanMode: 2}, (e, device) => {
-            if (e) {
-              console.error(e);
-            }
-
-            if (!device?.name) {
-              return;
-            }
-
-            deviceMap.current?.set(device.id, device);
-            setDevices(Array.from(deviceMap.current?.values() ?? []));
-          });
-        }
-      }, true);
+    if (!shouldScan) {
+      return;
     }
-
+    setUnavailable(false);
     bleManager.setResetDeviceListCallback(() => {
       deviceMap.current?.clear();
       setDevices([]);
+      refresh();
     });
+    const subscription = bleManager.observeAdvertisements(
+      device => {
+        if (!device.name) {
+          return;
+        }
+        setUnavailable(false);
+        deviceMap.current?.set(device.id, device);
+        setDevices(Array.from(deviceMap.current?.values() ?? []));
+      },
+      () => setUnavailable(true),
+    );
+    return () => {
+      subscription.remove();
+      bleManager.setResetDeviceListCallback(() => {});
+    };
+  }, [bleManager, shouldScan, revision]);
 
-    scan().catch(console.error);
-  }, [bleManager, setDevices, shouldScan]);
-
-  return {devices};
+  return {devices, unavailable};
 }
 
 type BluetoothDetailProps = StackScreenProps<
@@ -243,40 +227,58 @@ function BluetoothDetail({
 }: BluetoothDetailProps) {
   const [items, setData] = React.useState<ItemProps[] | null>(() => null);
   const [iotcentralClient] = useIoTCentralClient();
+  const focused = useIsFocused();
+  const [unavailable, setUnavailable] = React.useState(false);
 
   React.useEffect(() => {
+    if (!focused) {
+      return;
+    }
     const bleManager = IotcBleManager.getInstance();
+    const subscription = bleManager.observeAdvertisements(
+      device => {
+        if (device.id !== deviceId) {
+          return;
+        }
 
-    bleManager.startDeviceScan(null, {scanMode: 2}, (error, device) => {
-      if (error) {
-        console.error(error);
-      }
+        const model = bleManager.getModelForDevice(device);
 
-      if (device?.id !== deviceId) {
-        return;
-      }
+        const deviceData = model.onScan(device);
+        if (!deviceData) {
+          return;
+        }
 
-      const model = bleManager.getModelForDevice(device);
+        const itemProps = model.getItemProps(deviceData);
 
-      const deviceData = model.onScan(device);
-      if (!deviceData) {
-        return;
-      }
+        setUnavailable(false);
+        void Promise.resolve(iotcentralClient?.sendTelemetry(deviceData)).catch(
+          () => {},
+        );
+        void Promise.resolve(
+          iotcentralClient?.sendProperty({bleDeviceName: device.name}),
+        ).catch(() => {});
 
-      const itemProps = model.getItemProps(deviceData);
+        setData(
+          itemProps.map(item => ({
+            ...item,
+            sendInterval(_value) {},
+            enable(_value) {},
+          })),
+        );
+      },
+      () => setUnavailable(true),
+    );
+    return () => subscription.remove();
+  }, [deviceId, iotcentralClient, focused]);
 
-      iotcentralClient?.sendTelemetry(deviceData);
-      iotcentralClient?.sendProperty({bleDeviceName: device.name});
-
-      setData(
-        itemProps.map(item => ({
-          ...item,
-          sendInterval(_value) {},
-          enable(_value) {},
-        })),
-      );
-    });
-  }, [deviceId, iotcentralClient]);
+  if (unavailable) {
+    return (
+      <Text>
+        Bluetooth unavailable. Enable Bluetooth and allow Nearby Devices access
+        in Settings.
+      </Text>
+    );
+  }
 
   if (!(deviceName && items)) {
     return (

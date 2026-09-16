@@ -21,7 +21,6 @@ import {
 } from 'react-native';
 import {
   CommonActions,
-  getFocusedRouteNameFromRoute,
   RouteProp,
   StackActions,
   useNavigation,
@@ -29,6 +28,7 @@ import {
 } from '@react-navigation/native';
 import {
   ConnectionOptions,
+  ConnectionResult,
   useConnectIoTCentralClient,
   useScreenDimensions,
   useTheme,
@@ -40,6 +40,7 @@ import {
   Pages,
   PagesNavigator,
   StyleDefinition,
+  RegistrationScreens,
 } from './types';
 import Strings from 'strings';
 import {
@@ -61,24 +62,18 @@ import {
   ButtonGroup,
   ButtonGroupItem,
 } from 'components';
-import {Buffer} from 'buffer';
-import {computeKey} from 'react-native-azure-iotcentral-client';
 import {IoTCContext, StorageContext} from 'contexts';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 const Stack = createStackNavigator();
-const screens = {
-  EMPTY: 'EMPTY',
-  QR: 'QR',
-  MANUAL: 'MANUAL',
-};
+const screens = RegistrationScreens;
 
 export const Registration = React.memo<{
   route?: RouteProp<Record<string, NavigationParams>, 'Registration'>;
   navigation?: PagesNavigator;
-}>(({navigation: parentNavigator, route}) => {
+}>(({navigation: parentNavigator}) => {
   const {colors} = useTheme();
-  const [connect, cancel, , {client, error, loading}] =
+  const [connect, , , {client, loading}] =
     useConnectIoTCentralClient();
   const {registeringNew, setRegisteringNew} = useContext(IoTCContext);
   const previousLoading = usePrevious(loading);
@@ -87,21 +82,6 @@ export const Registration = React.memo<{
     parentNavigatorKey: state.key,
     parentRoutes: state.routes,
   }));
-
-  useEffect(() => {
-    if (route) {
-      const routeName = getFocusedRouteNameFromRoute(route);
-      if (
-        routeName === screens.QR ||
-        routeName === screens.MANUAL ||
-        routeName === screens.EMPTY
-      ) {
-        parentNavigator?.setOptions({
-          headerShown: routeName === screens.EMPTY,
-        });
-      }
-    }
-  }, [parentNavigator, route]);
 
   useEffect(() => {
     const listener = () => {
@@ -125,42 +105,17 @@ export const Registration = React.memo<{
     }
   }, [client, loading, parentNavigator, previousLoading]);
 
-  if (error && loading) {
-    Alert.alert(
-      'Error',
-      'The QR code you have scanned is not an Azure IoT Central Device QR code',
-      [
-        {
-          text: 'Retry',
-          onPress: async () => {
-            await cancel({clear: false});
-            qrcodeRef.current?.reactivate();
-          },
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: async () => {
-            await cancel({clear: false});
-            parentNavigator?.dispatch(
-              CommonActions.navigate({
-                name: screens.EMPTY,
-              }),
-            );
-          },
-        },
-      ],
-      {
-        cancelable: false,
-      },
-    );
-  }
   return (
     <Stack.Navigator
       initialRouteName={
         client && client.isConnected() ? screens.MANUAL : screens.EMPTY
       }
-      screenOptions={{headerBackTitleVisible: false, headerMode: 'float'}}>
+      screenOptions={{
+        headerBackButtonDisplayMode: 'minimal',
+        headerBackAccessibilityLabel: Strings.Core.Back,
+        headerBackTestID: 'registration-back',
+        headerMode: 'float',
+      }}>
       <Stack.Screen
         name={screens.EMPTY}
         options={() => ({
@@ -209,7 +164,7 @@ type QRCodeScannerProps = {
   connect: (
     encryptedCredentials: string,
     options?: ConnectionOptions,
-  ) => Promise<void>;
+  ) => Promise<ConnectionResult>;
   scannerRef: React.MutableRefObject<QRCodeScanner | null>;
 };
 
@@ -222,10 +177,13 @@ const QRCodeScreen = React.memo<QRCodeScannerProps>(({connect, scannerRef}) => {
 
   const onRead = useCallback(
     async (e: Event) => {
-      await connect(e.data);
+      const result = await connect(e.data);
+      if (!result.ok) {
+        scannerRef.current?.reactivate();
+      }
       // scannerRef.current?.reactivate(); // reactivate camera in order to make it available for other use (e.g. torch)
     },
-    [connect],
+    [connect, scannerRef],
   );
   return (
     <QRCodeScanner
@@ -289,16 +247,10 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
     const readonly = !registeringNew && !!client && client?.isConnected();
     const connectDevice = useCallback(
       async (values: FormValues) => {
-        if (values.keyType) {
-          if (values.keyType === 'group' && values.deviceId) {
-            // generate deviceKey
-            values.deviceKey = computeKey(values.authKey, values.deviceId);
-          } else {
-            values['deviceKey'] = values.authKey;
-          }
+        const result = await connect(values);
+        if (result.ok) {
+          navigation.navigate(Pages.ROOT);
         }
-        await connect(Buffer.from(JSON.stringify(values)).toString('base64'));
-        navigation.navigate(Pages.ROOT);
       },
       [connect, navigation],
     );
@@ -374,6 +326,7 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
           },
           {
             id: 'authKey',
+            secure: true,
             label: Strings.Registration.Manual.SASKey.Label,
             placeHolder: Strings.Registration.Manual.SASKey.PlaceHolder,
             multiline: true,
@@ -385,6 +338,7 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
         return [
           {
             id: 'connectionString',
+            secure: true,
             label: 'IoT Hub device connection string',
             placeHolder: 'Enter or paste connection string',
             multiline: true,
@@ -562,6 +516,11 @@ const EmptyClient = React.memo<{
       <Button
         title="Scan QR code"
         onPress={() => navigation.navigate(screens.QR)}
+      />
+      <Button
+        title={Strings.Registration.QRCode.Manually}
+        testID="registration-manual"
+        onPress={() => navigation.navigate(screens.MANUAL)}
       />
       <Text style={style.footer}>
         {Strings.Registration.Footer}
