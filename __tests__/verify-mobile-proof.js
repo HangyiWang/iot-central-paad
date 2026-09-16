@@ -2,8 +2,12 @@ const {
   inspectProof,
   checkBefore,
   validateTargets,
+  azureReader,
 } = require('../scripts/ci/verify-mobile-proof');
 const {validateLiveConfig, MODEL_ID} = require('../scripts/ci/live-config');
+const {spawnSync} = require('node:child_process');
+
+jest.mock('node:child_process', () => ({spawnSync: jest.fn()}));
 
 const config = validateLiveConfig({
   schemaVersion: 1,
@@ -40,6 +44,26 @@ const record = {
   externalDeviceId: 'different-assigned-id',
 };
 const reader = (...responses) => jest.fn(() => responses.shift());
+
+test('recognizes the actual pre-registration DPS service code without logging its body', () => {
+  spawnSync.mockReturnValueOnce({
+    status: 3,
+    stdout: '',
+    stderr: "ERROR: {'code': 404202, 'message': 'Registration not found.'}",
+  });
+  expect(azureReader(targets, Date.now() + 30000)(['iot', 'dps'], 'status', true)).toBeNull();
+});
+
+test.each([401001, 403004])('classifies service authorization code %s without leaking details', code => {
+  spawnSync.mockReturnValueOnce({
+    status: 3,
+    stdout: '',
+    stderr: `ERROR: {'code': ${code}, 'message': 'private-fixture'}`,
+  });
+  expect(() => azureReader(targets, Date.now() + 30000)(['iot', 'dps'], 'status')).toThrow(
+    'AZURE_READ_DENIED',
+  );
+});
 
 test('before traffic checks both registration and assigned identities', () => {
   expect(checkBefore(config, 'android', targets, reader([]))).toMatchObject({

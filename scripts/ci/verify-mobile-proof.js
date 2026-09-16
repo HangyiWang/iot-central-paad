@@ -44,10 +44,10 @@ function azureReader(targets, deadline) {
     ], {encoding: 'utf8', timeout: Math.min(30000, remaining), maxBuffer: 1048576});
     if (result.error || result.signal) throw new ProofError('AZURE_READER_UNAVAILABLE');
     if (result.status !== 0) {
-      if (allowMissing && /\b404\b|DeviceNotFound|RegistrationNotFound/i.test(result.stderr)) {
+      if (allowMissing && /\b404(?:[0-9]{3})?\b|DeviceNotFound|RegistrationNotFound/i.test(result.stderr)) {
         return null;
       }
-      if (/AuthorizationFailed|Unauthorized|Forbidden|\b40[13]\b/i.test(result.stderr)) {
+      if (/AuthorizationFailed|Unauthorized|Forbidden|\b40[13](?:[0-9]{3})?\b/i.test(result.stderr)) {
         throw new ProofError('AZURE_READ_DENIED');
       }
       throw new ProofError('AZURE_READ_FAILED');
@@ -219,7 +219,7 @@ Output is allowlisted JSON; no raw Azure CLI errors or device properties are pri
   throw new ProofError('VERIFICATION_TIMEOUT');
 }
 
-module.exports = {ProofError, validateTargets, checkBefore, inspectProof};
+module.exports = {ProofError, validateTargets, azureReader, checkBefore, inspectProof};
 if (require.main === module) {
   main().catch(error => {
     const code = error instanceof ProofError ? error.code : 'INVALID_OPERATOR_INPUT';
