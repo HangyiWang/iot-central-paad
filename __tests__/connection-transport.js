@@ -86,8 +86,8 @@ test('actual vendor adapter sends to assigned identity with model and no retry',
   expect(mqtt.options.clientId).toBe('actual-id');
   expect(mqtt._client.webSocket).toBe(secureWebSocket.implementation);
   expect(mqtt.connect).toHaveBeenCalledTimes(1);
-  expect(mqtt.connect.mock.calls[0][0].userName).toContain(
-    'model-id=dtmi%3Aazureiot%3APhoneAsADevice%3B2',
+  expect(mqtt.connect.mock.calls[0][0].userName).toBe(
+    'synthetic.azure-devices.net/actual-id/?api-version=2021-04-12&model-id=dtmi%3Aazureiot%3APhoneAsADevice%3B2',
   );
   expect(mqtt.connect.mock.calls[0][0].delay).toBe(0);
   expect(mqtt.subscribe.mock.calls.every(call => call[1].timeout === 0)).toBe(

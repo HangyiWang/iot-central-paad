@@ -3,6 +3,7 @@ import {record, validateHost} from './credentials';
 import {ConnectionError} from './errors';
 import {bounded, request} from './http';
 import {DeviceIdentity, FileUploadResult, HttpTransport} from './types';
+import {IOT_HUB_API_VERSION} from './protocol';
 
 export async function upload(
   identity: DeviceIdentity,
@@ -51,13 +52,17 @@ export async function upload(
     'hub',
   )}/devices/${encodeURIComponent(identity.deviceId)}/files`;
   const headers = {Authorization: password, 'Content-Type': 'application/json'};
-  const initial = await request(http, `${base}?api-version=2021-06-01`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({blobName: fileName}),
-    signal,
-    redirect: 'error',
-  });
+  const initial = await request(
+    http,
+    `${base}?api-version=${IOT_HUB_API_VERSION}`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({blobName: fileName}),
+      signal,
+      redirect: 'error',
+    },
+  );
   if (initial.status < 200 || initial.status >= 300) {
     throw new ConnectionError('OPERATION_FAILED', {status: initial.status});
   }
@@ -101,7 +106,7 @@ export async function upload(
   const success = result.status >= 200 && result.status < 300;
   const notification = await request(
     http,
-    `${base}/notifications?api-version=2021-06-01`,
+    `${base}/notifications?api-version=${IOT_HUB_API_VERSION}`,
     {
       method: 'POST',
       headers,

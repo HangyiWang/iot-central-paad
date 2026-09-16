@@ -16,6 +16,7 @@ import {
   SubmissionResult,
 } from './types';
 import {record} from './credentials';
+import {IOT_HUB_API_VERSION} from './protocol';
 
 type Mqtt = {
   connect(options: Record<string, unknown>): Promise<void>;
@@ -153,7 +154,7 @@ export function createLegacyHub(
       mqtt.connect({
         userName: `${identity.assignedHub}/${
           identity.deviceId
-        }/?api-version=2021-06-01&model-id=${encodeURIComponent(
+        }/?api-version=${IOT_HUB_API_VERSION}&model-id=${encodeURIComponent(
           identity.modelId,
         )}`,
         password,

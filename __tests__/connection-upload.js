@@ -38,6 +38,9 @@ test('uploads exact decoded bytes only to approved storage and checks notificati
     'base64',
   );
   expect(result).toEqual({status: 201, delivery: 'acknowledged'});
+  expect(http.mock.calls[0][0]).toBe(
+    'https://synthetic.azure-devices.net/devices/actual-id/files?api-version=2021-04-12',
+  );
   expect(http.mock.calls[1][0]).toBe(
     'https://synthetic.blob.core.windows.net/files/actual-id/photo%20name.jpg?sv=synthetic&sig=synthetic',
   );
@@ -47,6 +50,9 @@ test('uploads exact decoded bytes only to approved storage and checks notificati
     true,
   );
   expect(JSON.parse(http.mock.calls[2][1].body).isSuccess).toBe(true);
+  expect(http.mock.calls[2][0]).toBe(
+    'https://synthetic.azure-devices.net/devices/actual-id/files/notifications?api-version=2021-04-12',
+  );
 });
 test('rejects storage redirection to an arbitrary server before sending SAS/content', async () => {
   const http = jest.fn(async () =>
