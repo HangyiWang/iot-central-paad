@@ -23,6 +23,7 @@ import {
 import Strings from 'strings';
 import {connectionDiagnostics} from '../onboarding/diagnostics';
 import {ProofActivity} from '../onboarding/proof';
+import {palette} from '../theme/palette';
 
 export default function ConnectionSummary({
   onManualConnection,
@@ -33,7 +34,8 @@ export default function ConnectionSummary({
     useConnectIoTCentralClient();
   const [, credentials] = useIoTCentralClient();
   const [simulated] = useSimulation();
-  const {colors} = useTheme();
+  const {colors, dark} = useTheme();
+  const appearance = palette(dark);
   const [connected, setConnected] = useState(false);
   const [details, setDetails] = useState(false);
   const [shareFailed, setShareFailed] = useState(false);
@@ -53,33 +55,106 @@ export default function ConnectionSummary({
     return () => clearInterval(timer);
   }, [client]);
   const text = Strings.Connection.Summary;
+  const operationId = error?.operationId ?? client?.identity?.operationId;
   return (
-    <View style={[styles.container, {backgroundColor: colors.card}]}>
-      <Text
-        testID="connection-status"
-        accessibilityRole="header"
-        accessibilityLiveRegion="polite">
-        {!simulated && connected ? text.Connected : text.Disconnected}
-      </Text>
-      {simulated && <Text>{text.Simulated}</Text>}
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.card,
+          borderColor: appearance.border,
+        },
+      ]}>
+      <View style={styles.header}>
+        <View
+          style={[
+            styles.statusBadge,
+            {
+              backgroundColor:
+                !simulated && connected
+                  ? appearance.positiveSurface
+                  : appearance.inset,
+            },
+          ]}>
+          <View
+            accessible={false}
+            style={[
+              styles.statusDot,
+              {
+                backgroundColor:
+                  !simulated && connected
+                    ? appearance.positive
+                    : appearance.muted,
+              },
+            ]}
+          />
+          <Text
+            testID="connection-status"
+            style={[
+              styles.statusText,
+              {
+                color:
+                  !simulated && connected
+                    ? appearance.positive
+                    : appearance.muted,
+              },
+            ]}
+            accessibilityRole="header"
+            accessibilityLiveRegion="polite">
+            {!simulated && connected ? text.Connected : text.Disconnected}
+          </Text>
+        </View>
+        {!loading && (
+          <Pressable
+            testID="connection-details"
+            accessibilityRole="button"
+            accessibilityLabel={text.Details}
+            onPress={() => setDetails(true)}
+            style={styles.detailsAction}>
+            <Text style={[styles.actionText, {color: appearance.primary}]}>
+              {text.Details}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+      {simulated && (
+        <Text style={[styles.supporting, {color: appearance.muted}]}>
+          {text.Simulated}
+        </Text>
+      )}
       {client?.identity && !simulated && (
-        <>
-          <Text>{text.Device}</Text>
-          <Text selectable testID="assigned-device-id">
+        <View style={styles.identity}>
+          <Text style={[styles.label, {color: appearance.muted}]}>
+            {text.Device}
+          </Text>
+          <Text
+            selectable
+            testID="assigned-device-id"
+            style={styles.identityValue}>
             {client.identity.deviceId}
           </Text>
-          <Text>{text.Hub}</Text>
-          <Text selectable testID="assigned-hub">
+          <Text style={[styles.label, {color: appearance.muted}]}>
+            {text.Hub}
+          </Text>
+          <Text selectable testID="assigned-hub" style={styles.identityValue}>
             {client.identity.assignedHub}
           </Text>
-        </>
+        </View>
       )}
       {loading && (
-        <Text accessibilityLiveRegion="polite">
+        <Text
+          style={[styles.supporting, {color: appearance.muted}]}
+          accessibilityLiveRegion="polite">
           {Strings.Connection.Stages[stage]}
         </Text>
       )}
-      {error && <Text accessibilityLiveRegion="polite">{error.message}</Text>}
+      {error && (
+        <Text
+          style={{color: appearance.danger}}
+          accessibilityLiveRegion="polite">
+          {error.message}
+        </Text>
+      )}
       <View style={styles.actions}>
         {loading ? (
           <Pressable
@@ -87,7 +162,9 @@ export default function ConnectionSummary({
             accessibilityRole="button"
             onPress={() => cancel()}
             style={styles.action}>
-            <Text>{Strings.Core.Cancel}</Text>
+            <Text style={[styles.actionText, {color: appearance.primary}]}>
+              {Strings.Core.Cancel}
+            </Text>
           </Pressable>
         ) : (
           <>
@@ -97,7 +174,9 @@ export default function ConnectionSummary({
                 accessibilityRole="button"
                 onPress={clear}
                 style={styles.action}>
-                <Text>{text.Disconnect}</Text>
+                <Text style={[styles.actionText, {color: appearance.muted}]}>
+                  {text.Disconnect}
+                </Text>
               </Pressable>
             ) : null}
             {credentials && !connected ? (
@@ -106,7 +185,9 @@ export default function ConnectionSummary({
                 accessibilityRole="button"
                 onPress={() => connect(credentials)}
                 style={styles.action}>
-                <Text>{text.Reconnect}</Text>
+                <Text style={[styles.actionText, {color: appearance.primary}]}>
+                  {text.Reconnect}
+                </Text>
               </Pressable>
             ) : null}
             <Pressable
@@ -114,15 +195,9 @@ export default function ConnectionSummary({
               accessibilityRole="button"
               onPress={onManualConnection}
               style={styles.action}>
-              <Text>{text.Manual}</Text>
-            </Pressable>
-            <Pressable
-              testID="connection-details"
-              accessibilityRole="button"
-              accessibilityLabel={text.Details}
-              onPress={() => setDetails(true)}
-              style={styles.action}>
-              <Text>{text.Details}</Text>
+              <Text style={[styles.actionText, {color: appearance.primary}]}>
+                {text.Manual}
+              </Text>
             </Pressable>
           </>
         )}
@@ -134,52 +209,92 @@ export default function ConnectionSummary({
           presentationStyle="pageSheet"
           onRequestClose={() => setDetails(false)}>
           <KeyboardAvoidingView
+            testID="connection-details-sheet"
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={[styles.sheet, {backgroundColor: colors.card}]}>
+            style={[styles.sheet, {backgroundColor: appearance.background}]}>
+            <View
+              style={[styles.handle, {backgroundColor: appearance.border}]}
+              accessible={false}
+            />
+            <View style={styles.sheetHeader}>
+              <Text accessibilityRole="header" style={styles.sheetTitle}>
+                {text.Details}
+              </Text>
+              <Pressable
+                testID="connection-details-close"
+                accessibilityRole="button"
+                accessibilityLabel={Strings.Core.Close}
+                onPress={() => setDetails(false)}
+                style={[styles.close, {backgroundColor: appearance.surface}]}>
+                <Text style={[styles.actionText, {color: appearance.primary}]}>
+                  {Strings.Core.Close}
+                </Text>
+              </Pressable>
+            </View>
             <ScrollView
+              style={styles.scroll}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode={
                 Platform.OS === 'ios' ? 'interactive' : 'on-drag'
               }
               contentContainerStyle={styles.details}>
-              <Text accessibilityRole="header">{text.Details}</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={Strings.Core.Close}
-                onPress={() => setDetails(false)}
-                style={styles.action}>
-                <Text>{Strings.Core.Close}</Text>
-              </Pressable>
-              {client?.identity && !simulated && (
-                <>
-                  <Text>{text.Model}</Text>
-                  <Text selectable testID="model-id">
-                    {client.identity.modelId}
+              <View
+                style={[
+                  styles.metadata,
+                  {backgroundColor: appearance.surface},
+                ]}>
+                {client?.identity && !simulated && (
+                  <>
+                    <DetailValue
+                      label={text.Model}
+                      value={client.identity.modelId}
+                      valueTestID="model-id"
+                    />
+                    {client.identity.registrationId && (
+                      <DetailValue
+                        label={text.Registration}
+                        value={client.identity.registrationId}
+                        valueTestID="registration-id"
+                      />
+                    )}
+                  </>
+                )}
+                {operationId && (
+                  <DetailValue label={text.Operation} value={operationId} />
+                )}
+                <DetailValue
+                  label={text.Stage}
+                  value={Strings.Connection.Stages[stage]}
+                />
+                {error && (
+                  <Text selectable style={{color: appearance.danger}}>
+                    {error.code}
                   </Text>
-                  {client.identity.registrationId && (
-                    <>
-                      <Text>{text.Registration}</Text>
-                      <Text selectable testID="registration-id">
-                        {client.identity.registrationId}
-                      </Text>
-                    </>
-                  )}
-                </>
-              )}
-              {(client?.identity?.operationId || error?.operationId) && (
-                <>
-                  <Text>{text.Operation}</Text>
-                  <Text selectable>
-                    {error?.operationId || client?.identity?.operationId}
-                  </Text>
-                </>
-              )}
-              <Text>{text.Stage}</Text>
-              <Text selectable>{Strings.Connection.Stages[stage]}</Text>
-              {error && <Text selectable>{error.code}</Text>}
-              <Text>{text.Registry}</Text>
-              <Text testID="registry-status">{text.NotChecked}</Text>
-              <Text>{text.RegistryExplanation}</Text>
+                )}
+              </View>
+              <View
+                style={[
+                  styles.registry,
+                  {backgroundColor: appearance.surface},
+                ]}>
+                <Text style={[styles.label, {color: appearance.muted}]}>
+                  {text.Registry}
+                </Text>
+                <Text
+                  testID="registry-status"
+                  style={[
+                    styles.registryBadge,
+                    {
+                      backgroundColor: appearance.inset,
+                      color: appearance.text,
+                    },
+                  ]}>
+                  {text.NotChecked}
+                </Text>
+                <Text style={[styles.supporting, {color: appearance.muted}]}>
+                  {text.RegistryExplanation}
+                </Text>
+              </View>
               <ProofActivity
                 client={client}
                 connected={connected}
@@ -188,7 +303,10 @@ export default function ConnectionSummary({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={text.Share}
-                style={styles.action}
+                style={[
+                  styles.secondaryAction,
+                  {backgroundColor: appearance.surface},
+                ]}
                 onPress={async () => {
                   setShareFailed(false);
                   try {
@@ -211,7 +329,9 @@ export default function ConnectionSummary({
                     }
                   }
                 }}>
-                <Text>{text.Share}</Text>
+                <Text style={[styles.actionText, {color: appearance.primary}]}>
+                  {text.Share}
+                </Text>
               </Pressable>
               {shareFailed && (
                 <Text accessibilityLiveRegion="polite">{text.ShareFailed}</Text>
@@ -223,7 +343,10 @@ export default function ConnectionSummary({
                   accessibilityLabel={text.Forget}
                   accessibilityState={{disabled: forgetting || loading}}
                   disabled={forgetting || loading}
-                  style={styles.action}
+                  style={[
+                    styles.secondaryAction,
+                    {backgroundColor: appearance.dangerSurface},
+                  ]}
                   onPress={() =>
                     Alert.alert(text.ForgetTitle, text.ForgetMessage, [
                       {text: Strings.Core.Cancel, style: 'cancel'},
@@ -253,7 +376,9 @@ export default function ConnectionSummary({
                       },
                     ])
                   }>
-                  <Text style={styles.destructive}>{text.Forget}</Text>
+                  <Text style={[styles.actionText, {color: appearance.danger}]}>
+                    {text.Forget}
+                  </Text>
                 </Pressable>
               )}
             </ScrollView>
@@ -264,11 +389,113 @@ export default function ConnectionSummary({
   );
 }
 
+function DetailValue({
+  label,
+  value,
+  valueTestID,
+}: {
+  label: string;
+  value: string;
+  valueTestID?: string;
+}) {
+  const {dark} = useTheme();
+  return (
+    <View style={styles.detailValue}>
+      <Text style={[styles.label, {color: palette(dark).muted}]}>{label}</Text>
+      <Text selectable testID={valueTestID} style={styles.metadataValue}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {paddingHorizontal: 16, paddingTop: 8},
-  actions: {flexDirection: 'row', flexWrap: 'wrap'},
-  action: {minHeight: 44, justifyContent: 'center', paddingRight: 20},
+  container: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    borderRadius: 24,
+    borderWidth: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  statusDot: {width: 7, height: 7, borderRadius: 4},
+  statusText: {fontSize: 13, lineHeight: 19, fontWeight: '600'},
+  detailsAction: {
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  identity: {gap: 2, paddingTop: 4},
+  label: {fontSize: 12, lineHeight: 18, fontWeight: '500'},
+  identityValue: {fontSize: 13, lineHeight: 19, marginBottom: 5, flexShrink: 1},
+  supporting: {fontSize: 13, lineHeight: 20},
+  actions: {flexDirection: 'row', flexWrap: 'wrap', gap: 16},
+  action: {minHeight: 48, justifyContent: 'center'},
+  actionText: {fontSize: 14, fontWeight: '600'},
   sheet: {flex: 1},
-  details: {padding: 24, paddingBottom: 48},
-  destructive: {color: '#b34432'},
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 4,
+    alignSelf: 'center',
+    marginTop: 12,
+  },
+  sheetHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  sheetTitle: {
+    fontSize: 24,
+    lineHeight: 31,
+    fontWeight: '600',
+    letterSpacing: -0.5,
+    flexShrink: 1,
+  },
+  close: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    borderRadius: 24,
+  },
+  scroll: {flex: 1},
+  details: {paddingHorizontal: 20, paddingBottom: 48, gap: 16},
+  metadata: {padding: 20, borderRadius: 24, gap: 18},
+  detailValue: {gap: 5},
+  metadataValue: {fontSize: 15, lineHeight: 22, flexShrink: 1},
+  registry: {padding: 20, borderRadius: 24, gap: 10},
+  registryBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  secondaryAction: {
+    minHeight: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 18,
+  },
 });

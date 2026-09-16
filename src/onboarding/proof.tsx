@@ -11,6 +11,7 @@ import {DeviceClient} from '../connection';
 import {Text, Name} from '../components/typography';
 import {useTheme} from '../hooks';
 import Strings from '../strings';
+import {palette} from '../theme/palette';
 
 export const validProofNonce = (nonce: string): boolean =>
   /^[A-Za-z0-9_-]{16,128}$/.test(nonce);
@@ -54,7 +55,8 @@ export function ProofActivity({
   simulated: boolean;
 }) {
   const text = Strings.Connection.Summary;
-  const {colors} = useTheme();
+  const {dark} = useTheme();
+  const colors = palette(dark);
   const [nonce, setNonce] = useState(newProofNonce);
   const [status, setStatus] = useState('');
   const [pending, setPending] = useState(false);
@@ -75,10 +77,19 @@ export function ProofActivity({
   }, []);
   const unavailable = !client || !connected || simulated;
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {backgroundColor: colors.surface}]}>
       <Name>{text.ProofTitle}</Name>
-      <Text>{text.ProofExplanation}</Text>
-      {unavailable && <Text>{text.ProofUnavailable}</Text>}
+      <Text style={[styles.supporting, {color: colors.muted}]}>
+        {text.ProofExplanation}
+      </Text>
+      {unavailable && (
+        <Text style={[styles.supporting, {color: colors.muted}]}>
+          {text.ProofUnavailable}
+        </Text>
+      )}
+      <Text style={[styles.label, {color: colors.muted}]}>
+        {text.ProofNonce}
+      </Text>
       <TextInput
         testID="proof-nonce"
         accessibilityLabel={text.ProofNonce}
@@ -93,7 +104,14 @@ export function ProofActivity({
         returnKeyType="done"
         submitBehavior="blurAndSubmit"
         onSubmitEditing={Keyboard.dismiss}
-        style={[styles.input, {borderColor: colors.border, color: colors.text}]}
+        style={[
+          styles.input,
+          {
+            borderColor: colors.controlBorder,
+            color: colors.text,
+            backgroundColor: colors.inset,
+          },
+        ]}
         onChangeText={value => {
           setNonce(value);
           setStatus('');
@@ -105,7 +123,13 @@ export function ProofActivity({
         accessibilityLabel={text.ProofSend}
         accessibilityState={{disabled: unavailable || pending}}
         disabled={unavailable || pending}
-        style={styles.button}
+        style={[
+          styles.button,
+          {
+            backgroundColor:
+              unavailable || pending ? colors.inset : colors.primary,
+          },
+        ]}
         onPress={async () => {
           if (lock.current || unavailable || !client) {
             return;
@@ -145,9 +169,24 @@ export function ProofActivity({
             }
           }
         }}>
-        <Text>{text.ProofSend}</Text>
+        <Text
+          style={[
+            styles.buttonText,
+            {color: unavailable || pending ? colors.muted : colors.onPrimary},
+          ]}>
+          {text.ProofSend}
+        </Text>
       </Pressable>
-      <Text testID="proof-status" accessibilityLiveRegion="polite">
+      <Text
+        testID="proof-status"
+        style={[
+          styles.status,
+          {
+            color:
+              status === text.ProofSubmitted ? colors.positive : colors.text,
+          },
+        ]}
+        accessibilityLiveRegion="polite">
         {status}
       </Text>
     </View>
@@ -155,14 +194,23 @@ export function ProofActivity({
 }
 
 const styles = StyleSheet.create({
-  container: {marginTop: 20},
+  container: {padding: 20, borderRadius: 24, gap: 12},
+  supporting: {fontSize: 13, lineHeight: 20},
+  label: {fontSize: 12, lineHeight: 18, fontWeight: '500'},
   input: {
     minHeight: 48,
     borderWidth: 1,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 14,
     fontSize: 16,
-    marginTop: 12,
   },
-  button: {minHeight: 48, justifyContent: 'center', paddingVertical: 12},
+  button: {
+    minHeight: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 16,
+  },
+  buttonText: {fontSize: 15, fontWeight: '600', textAlign: 'center'},
+  status: {fontSize: 13, lineHeight: 20, fontWeight: '500'},
 });

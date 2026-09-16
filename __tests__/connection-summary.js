@@ -69,12 +69,19 @@ it('opens scrollable details with value-only IDs and local-only destructive forg
     view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
   });
   act(() => press('Connection details'));
-  const value = id => view.root.findAllByProps({testID: id})[0].props.children;
+  const value = id =>
+    view.root.findAllByType('Text').find(node => node.props.testID === id)
+      ?.props.children;
   expect(value('assigned-device-id')).toBe('Exact-Assigned-ID');
   expect(value('assigned-hub')).toBe('assigned.azure-devices.net');
   expect(value('model-id')).toBe(PHONE_MODEL_ID);
   expect(value('registration-id')).toBe('registration-id');
   expect(value('registry-status')).toBe('Not checked');
+  const sheet = view.root.findAllByProps({testID: 'connection-details-sheet'});
+  expect(sheet.length).toBeGreaterThan(0);
+  expect(
+    view.root.findAllByProps({testID: 'connection-details-close'}).length,
+  ).toBeGreaterThan(0);
   await act(async () => {
     await press('Share nonsecret diagnostics');
   });

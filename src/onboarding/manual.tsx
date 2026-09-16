@@ -11,6 +11,7 @@ import {DeviceCredentials, PHONE_MODEL_ID} from '../connection';
 import {useTheme} from '../hooks';
 import {Text, Name} from '../components/typography';
 import Strings from '../strings';
+import {palette} from '../theme/palette';
 
 export type ManualMode = 'individual' | 'hub' | 'legacy';
 export type ManualValues = {
@@ -54,6 +55,7 @@ export function CredentialForm({
   submit(values: DeviceCredentials): Promise<void>;
 }) {
   const {colors, dark} = useTheme();
+  const appearance = palette(dark);
   const [mode, setMode] = useState<ManualMode>(
     credentials?.connectionString
       ? 'hub'
@@ -100,7 +102,7 @@ export function CredentialForm({
   ];
   return (
     <TouchableWithoutFeedback accessible={false} onPress={Keyboard.dismiss}>
-      <View>
+      <View style={styles.form}>
         <Name>{choices.find(choice => choice.mode === mode)?.label}</Name>
         {!readonly && (
           <Pressable
@@ -111,7 +113,9 @@ export function CredentialForm({
             disabled={loading}
             style={styles.changeMethod}
             onPress={() => setShowMethods(value => !value)}>
-            <Text>{manual.ChangeMethod}</Text>
+            <Text style={[styles.link, {color: colors.primary}]}>
+              {manual.ChangeMethod}
+            </Text>
           </Pressable>
         )}
         {showMethods &&
@@ -130,7 +134,13 @@ export function CredentialForm({
                 styles.choice,
                 {
                   borderColor:
-                    mode === choice.mode ? colors.primary : colors.border,
+                    mode === choice.mode
+                      ? colors.primary
+                      : appearance.controlBorder,
+                  backgroundColor:
+                    mode === choice.mode
+                      ? appearance.inset
+                      : appearance.surface,
                 },
               ]}
               onPress={() => {
@@ -141,11 +151,15 @@ export function CredentialForm({
               <Text>{choice.label}</Text>
             </Pressable>
           ))}
-        {mode === 'legacy' && <Text>{manual.LegacyWarning}</Text>}
-        <Name>{manual.Body.ConnectionInfo}</Name>
+        {mode === 'legacy' && (
+          <Text style={{color: appearance.danger}}>{manual.LegacyWarning}</Text>
+        )}
+        <Name style={styles.sectionTitle}>{manual.Body.ConnectionInfo}</Name>
         {fields.map(field => (
-          <View key={field.key}>
-            <Text>{field.label}</Text>
+          <View key={field.key} style={styles.field}>
+            <Text style={[styles.label, {color: appearance.muted}]}>
+              {field.label}
+            </Text>
             <TextInput
               testID={`connection-${field.key}`}
               accessibilityLabel={field.label}
@@ -166,7 +180,11 @@ export function CredentialForm({
               onSubmitEditing={Keyboard.dismiss}
               style={[
                 styles.input,
-                {color: colors.text, borderColor: colors.border},
+                {
+                  color: colors.text,
+                  borderColor: appearance.controlBorder,
+                  backgroundColor: appearance.inset,
+                },
               ]}
             />
           </View>
@@ -177,8 +195,8 @@ export function CredentialForm({
             revealed ? Strings.Core.HideCredential : Strings.Core.ShowCredential
           }
           onPress={() => setRevealed(value => !value)}
-          style={styles.choice}>
-          <Text>
+          style={styles.changeMethod}>
+          <Text style={[styles.link, {color: colors.primary}]}>
             {revealed
               ? Strings.Core.HideCredential
               : Strings.Core.ShowCredential}
@@ -219,26 +237,31 @@ export function CredentialForm({
 }
 
 const styles = StyleSheet.create({
-  changeMethod: {minHeight: 44, justifyContent: 'center'},
+  form: {paddingTop: 8},
+  sectionTitle: {marginTop: 16, marginBottom: 18},
+  field: {marginBottom: 12},
+  label: {fontSize: 13, lineHeight: 19, fontWeight: '500'},
+  link: {fontSize: 14, fontWeight: '600'},
+  changeMethod: {minHeight: 48, justifyContent: 'center'},
   input: {
     minHeight: 48,
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 14,
+    padding: 14,
     fontSize: 16,
-    marginVertical: 8,
+    marginTop: 7,
   },
   choice: {
-    minHeight: 44,
+    minHeight: 48,
     justifyContent: 'center',
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 14,
+    padding: 14,
     marginVertical: 5,
   },
   submit: {
-    minHeight: 48,
-    borderRadius: 8,
+    minHeight: 52,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 16,
