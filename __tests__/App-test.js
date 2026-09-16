@@ -2,7 +2,7 @@
  * @format
  */
 
-import {Keyboard, Text, TouchableWithoutFeedback} from 'react-native';
+import {Keyboard, StyleSheet, Text, TouchableWithoutFeedback} from 'react-native';
 import React from 'react';
 import App from '../src/App';
 import {Welcome} from '../src/Welcome';
@@ -101,6 +101,12 @@ describe('App startup', () => {
       expect(Keychain.getGenericPassword).toHaveBeenCalledTimes(1);
       expect(Keychain.setGenericPassword).not.toHaveBeenCalled();
       expect(Keychain.resetGenericPassword).not.toHaveBeenCalled();
+      const logo = app.root.findByProps({testID: 'app-header-logo'});
+      expect(logo.props.pointerEvents).toBe('none');
+      expect(StyleSheet.flatten(logo.props.style)).toMatchObject({
+        width: 30,
+        height: 30,
+      });
       expect(VersionCheck.needUpdate).toHaveBeenCalledTimes(updateChecks);
       if (updateChecks > 0) {
         expect(VersionCheck.needUpdate).toHaveBeenNthCalledWith(2, {
@@ -116,6 +122,7 @@ describe('App startup', () => {
       expect(hasText(Strings.Registration.Manual.Body.ConnectionInfo)).toBe(
         true,
       );
+      expect(hasText(Strings.Title)).toBe(false);
       const dismissWrappers = app.root
         .findAllByType(TouchableWithoutFeedback)
         .filter(node => node.props.onPress === Keyboard.dismiss);

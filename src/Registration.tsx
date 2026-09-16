@@ -21,7 +21,6 @@ import {
 } from 'react-native';
 import {
   CommonActions,
-  getFocusedRouteNameFromRoute,
   RouteProp,
   StackActions,
   useNavigation,
@@ -41,6 +40,7 @@ import {
   Pages,
   PagesNavigator,
   StyleDefinition,
+  RegistrationScreens,
 } from './types';
 import Strings from 'strings';
 import {
@@ -66,16 +66,12 @@ import {IoTCContext, StorageContext} from 'contexts';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 const Stack = createStackNavigator();
-const screens = {
-  EMPTY: 'EMPTY',
-  QR: 'QR',
-  MANUAL: 'MANUAL',
-};
+const screens = RegistrationScreens;
 
 export const Registration = React.memo<{
   route?: RouteProp<Record<string, NavigationParams>, 'Registration'>;
   navigation?: PagesNavigator;
-}>(({navigation: parentNavigator, route}) => {
+}>(({navigation: parentNavigator}) => {
   const {colors} = useTheme();
   const [connect, , , {client, loading}] =
     useConnectIoTCentralClient();
@@ -86,21 +82,6 @@ export const Registration = React.memo<{
     parentNavigatorKey: state.key,
     parentRoutes: state.routes,
   }));
-
-  useEffect(() => {
-    if (route) {
-      const routeName = getFocusedRouteNameFromRoute(route);
-      if (
-        routeName === screens.QR ||
-        routeName === screens.MANUAL ||
-        routeName === screens.EMPTY
-      ) {
-        parentNavigator?.setOptions({
-          headerShown: routeName === screens.EMPTY,
-        });
-      }
-    }
-  }, [parentNavigator, route]);
 
   useEffect(() => {
     const listener = () => {

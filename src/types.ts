@@ -25,6 +25,12 @@ export const Pages = {
   BLUETOOTH_DETAIL: 'Bluetooth Detail',
 } as const;
 
+export const RegistrationScreens = {
+  EMPTY: 'EMPTY',
+  QR: 'QR',
+  MANUAL: 'MANUAL',
+} as const;
+
 /**
  * NAVIGATION
  */

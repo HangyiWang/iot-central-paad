@@ -15,6 +15,7 @@ import {
   Pages,
   NavigationPages,
   Screens,
+  RegistrationScreens,
   // ChartType,
 } from 'types';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
@@ -24,6 +25,7 @@ import {
   IoTCProvider,
   ThemeProvider,
   StorageContext,
+  IoTCContext,
 } from 'contexts';
 import LogoLight from './assets/IoT-Plug-And-Play_Dark.svg';
 import LogoDark from './assets/IoT-Plug-And-Play_Light.svg';
@@ -78,6 +80,7 @@ export default function App() {
 const Navigation = React.memo(() => {
   const {type: themeType, setThemeMode} = useThemeMode();
   const {credentials, initialized} = useContext(StorageContext);
+  const {registeringNew} = useContext(IoTCContext);
   const [deliveryInterval, setDeliveryInterval] = useDeliveryInterval();
   const [connect, cancel, , {client, loading, error, stage}] =
     useConnectIoTCentralClient();
@@ -103,9 +106,16 @@ const Navigation = React.memo(() => {
       <Stack.Navigator
         initialRouteName={simulated ? Pages.ROOT : Pages.REGISTRATION}
         screenOptions={({navigation, route}) => {
+          const childRoute = getFocusedRouteNameFromRoute(route);
+          const registrationHasHeader =
+            route.name === Pages.REGISTRATION &&
+            (childRoute === RegistrationScreens.QR ||
+              (childRoute === RegistrationScreens.MANUAL &&
+                (registeringNew || !client?.isConnected())));
           const defaultOptions = {
             gestureEnabled: false,
             headerBackButtonDisplayMode: 'minimal' as const,
+            headerShown: !registrationHasHeader,
           };
           if (
             route.name === Pages.ROOT ||
@@ -114,7 +124,8 @@ const Navigation = React.memo(() => {
             return {
               ...defaultOptions,
               headerShown:
-                getFocusedRouteNameFromRoute(route) !== Screens.BLUETOOTH_STACK,
+                !registrationHasHeader &&
+                childRoute !== Screens.BLUETOOTH_STACK,
               headerTitle: () => (
                 <Text
                   style={{
@@ -263,11 +274,14 @@ export const Logo = React.memo(function Logo() {
   const {colors, dark} = useTheme();
 
   return (
-    <View style={styles.logoContainer}>
+    <View
+      testID="app-header-logo"
+      pointerEvents="none"
+      style={styles.logoContainer}>
       {dark ? (
-        <LogoDark width={30} fill={colors.primary} />
+        <LogoDark width={30} height={30} fill={colors.primary} />
       ) : (
-        <LogoLight width={30} fill={colors.primary} />
+        <LogoLight width={30} height={30} fill={colors.primary} />
       )}
     </View>
   );
@@ -300,6 +314,8 @@ export const styles = StyleSheet.create({
     padding: 16,
   },
   logoContainer: {
+    width: 30,
+    height: 30,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',

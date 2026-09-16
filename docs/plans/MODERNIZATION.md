@@ -1,6 +1,6 @@
 # PAAD modernization plan
 
-Status: M0 complete; modern Android startup passed; iOS font fix awaiting rerun.
+Status: M0 complete; modern native builds pass; iOS navigation fix awaiting rerun.
 Date: 2026-09-16. Branch: `modernize/paad-foundation`.
 Base: fork `master` at `2549196`.
 
@@ -84,6 +84,17 @@ The initially resolved lock had SHA-256
 The follow-up promotes Expo Constants 57.0.18 to a direct dependency, updating
 only its two external-source paths in that lock; versions/checksums are retained.
 Subsequent installs use deployment mode, not implicit resolution updates.
+
+[Run 35055499091](https://github.com/HangyiWang/iot-central-paad/actions/runs/35055499091)
+at `33fe667412b517c07a7969d1cb0f6afe218ed8f6` passed all 223 JavaScript tests
+and Android's full startup flow. iOS compiled successfully and its deployment
+install preserved the reviewed lock byte-for-byte (current SHA-256:
+`351da6b578ae9db25305302f1c9f386e315ee7ae11ecd69621d622d8106e5584`).
+Its app initialized, opened the manual form and exposed the expected fields,
+but the Back tap failed to leave that form. The captured hierarchy placed the
+120-point intrinsic logo view over the Back target. The follow-up bounds the
+noninteractive logo to 30 points and computes nested-header ownership in
+Navigation 7's options callback rather than a stale route effect.
 
 Follow-up coverage exercises the real vendor/Paho/owned-WebSocket boundary
 against an in-memory broker, secure-storage serialization, shared connection
