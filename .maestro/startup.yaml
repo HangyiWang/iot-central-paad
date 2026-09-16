@@ -21,10 +21,16 @@ name: Credential-free bundled startup and manual-navigation smoke
     id: connection-registrationId
 - inputText: "ci-input-fixture"
 - pressKey: Enter
+- assertVisible:
+    id: connection-registrationId
+    text: "^ci-input-fixture$"
 - tapOn:
     id: connection-scopeId
 - inputText: "0ne00000000"
 - pressKey: Enter
+- assertVisible:
+    id: connection-scopeId
+    text: "^0ne00000000$"
 - scrollUntilVisible:
     element:
       id: connection-deviceKey
@@ -42,6 +48,9 @@ name: Credential-free bundled startup and manual-navigation smoke
 - eraseText
 - inputText: "global-canary.azure-devices-provisioning.net"
 - pressKey: Enter
+- assertVisible:
+    id: connection-provisioningHost
+    text: '^global-canary\.azure-devices-provisioning\.net$'
 - scrollUntilVisible:
     element:
       id: connection-submit

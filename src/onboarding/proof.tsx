@@ -89,6 +89,7 @@ export function ProofActivity({
         autoComplete="off"
         textContentType="none"
         importantForAutofill="no"
+        selectTextOnFocus
         returnKeyType="done"
         submitBehavior="blurAndSubmit"
         onSubmitEditing={Keyboard.dismiss}

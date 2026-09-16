@@ -38,6 +38,9 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
 - eraseText
 - inputText: ${MAESTRO_PROVISIONING_HOST}
 - pressKey: Enter
+- assertVisible:
+    id: connection-provisioningHost
+    text: ${MAESTRO_PROVISIONING_HOST_PATTERN}
 - scrollUntilVisible:
     element:
       id: connection-deviceKey
@@ -101,6 +104,9 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
 - eraseText
 - inputText: ${MAESTRO_NONCE}
 - pressKey: Enter
+- assertVisible:
+    id: proof-nonce
+    text: ${MAESTRO_NONCE_PATTERN}
 - scrollUntilVisible:
     element:
       id: proof-send

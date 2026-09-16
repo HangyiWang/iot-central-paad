@@ -161,15 +161,23 @@ test('case environment whitelists nonsecret variables and anchors literal expect
   const env = caseEnvironment(fixture(), 'android');
   expect(Object.keys(env)).toEqual([
     'MAESTRO_APP_ID', 'MAESTRO_PLATFORM', 'MAESTRO_PROVISIONING_HOST',
+    'MAESTRO_PROVISIONING_HOST_PATTERN',
     'MAESTRO_SCOPE_ID', 'MAESTRO_REGISTRATION_ID', 'MAESTRO_REGISTRATION_ID_PATTERN',
     'MAESTRO_EXPECTED_DEVICE_ID_PATTERN', 'MAESTRO_EXPECTED_HUB_PATTERN',
-    'MAESTRO_NONCE', 'MAESTRO_MODEL_ID_PATTERN',
+    'MAESTRO_NONCE', 'MAESTRO_NONCE_PATTERN', 'MAESTRO_MODEL_ID_PATTERN',
   ]);
   expect(env.MAESTRO_DEVICE_KEY).toBeUndefined();
   const pattern = new RegExp(env.MAESTRO_EXPECTED_DEVICE_ID_PATTERN);
   expect(pattern.test('returned.android')).toBe(true);
   expect(pattern.test('returnedXandroid')).toBe(false);
   expect(pattern.test('prefix-returned.android')).toBe(false);
+  const hostPattern = new RegExp(env.MAESTRO_PROVISIONING_HOST_PATTERN);
+  expect(hostPattern.test(fixture().provisioningHost)).toBe(true);
+  expect(hostPattern.test(fixture().provisioningHost + '-leftover')).toBe(false);
+  expect(hostPattern.test(fixture().provisioningHost.replace('.', 'X'))).toBe(false);
+  const noncePattern = new RegExp(env.MAESTRO_NONCE_PATTERN);
+  expect(noncePattern.test(fixture().cases.android.nonce)).toBe(true);
+  expect(noncePattern.test(fixture().cases.android.nonce + '-leftover')).toBe(false);
   expect(() => caseEnvironment(fixture(), 'all')).toThrow();
 });
 

@@ -68,6 +68,8 @@ test('individual is the default; controlled fields survive failure and duplicate
   expect(input('deviceKey').props.secureTextEntry).toBe(true);
   expect(input('deviceKey').props.autoCorrect).toBe(false);
   expect(input('deviceKey').props.autoComplete).toBe('off');
+  expect(input('provisioningHost').props.selectTextOnFocus).toBe(true);
+  expect(input('deviceKey').props.selectTextOnFocus).toBe(false);
   for (const field of [
     'registrationId',
     'scopeId',
@@ -140,6 +142,7 @@ test('nonce keyboard submission dismisses without publishing a proof', () => {
     view = render(<ProofActivity client={device} connected simulated={false} />);
   });
   const input = view.root.findByType(TextInput);
+  expect(input.props.selectTextOnFocus).toBe(true);
   expect(input.props.returnKeyType).toBe('done');
   expect(input.props.submitBehavior).toBe('blurAndSubmit');
   act(() => input.props.onSubmitEditing());

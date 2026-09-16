@@ -96,12 +96,14 @@ function caseEnvironment(input, platform) {
     MAESTRO_APP_ID: platform === 'android' ? 'com.iot_pnp.ci' : 'com.microsoft.iotpnp.ci',
     MAESTRO_PLATFORM: platform,
     MAESTRO_PROVISIONING_HOST: config.provisioningHost,
+    MAESTRO_PROVISIONING_HOST_PATTERN: exactPattern(config.provisioningHost),
     MAESTRO_SCOPE_ID: config.scopeId,
     MAESTRO_REGISTRATION_ID: item.registrationId,
     MAESTRO_REGISTRATION_ID_PATTERN: exactPattern(item.registrationId),
     MAESTRO_EXPECTED_DEVICE_ID_PATTERN: exactPattern(item.expectedDeviceId),
     MAESTRO_EXPECTED_HUB_PATTERN: exactPattern(config.expectedHub),
     MAESTRO_NONCE: item.nonce,
+    MAESTRO_NONCE_PATTERN: exactPattern(item.nonce),
     MAESTRO_MODEL_ID_PATTERN: exactPattern(MODEL_ID),
   };
 }

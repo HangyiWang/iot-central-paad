@@ -160,6 +160,7 @@ export function CredentialForm({
               autoComplete="off"
               textContentType="none"
               importantForAutofill="no"
+              selectTextOnFocus={field.key === 'provisioningHost'}
               returnKeyType="done"
               submitBehavior="blurAndSubmit"
               onSubmitEditing={Keyboard.dismiss}
