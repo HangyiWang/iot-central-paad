@@ -131,7 +131,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       # Only this post-build step receives the temporary individual device key.
       - name: Live dedicated Android input (no Azure operator credentials)
-        timeout-minutes: 12
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         env:
           PAAD_LIVE_CONFIRM: ${{ inputs.confirm_live }}
@@ -201,7 +201,7 @@ jobs:
           java-version: "21"
       - run: bash scripts/ci/install-maestro.sh
       - name: Live dedicated iOS input (no Azure operator credentials)
-        timeout-minutes: 12
+        timeout-minutes: 20
         env:
           PAAD_LIVE_CONFIRM: ${{ inputs.confirm_live }}
           PAAD_LIVE_EXPECTED_SHA: ${{ inputs.expected_sha }}

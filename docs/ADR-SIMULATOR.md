@@ -166,6 +166,10 @@ Dedicated secrets are `PAAD_LIVE_ANDROID_DEVICE_KEY` and
 `PAAD_LIVE_IOS_DEVICE_KEY`. Only the post-build device-input step receives them;
 no Azure operator credentials are supplied to CI. The operator must remove these
 temporary secrets after the run, including unsuccessful attempts.
+Confirm the names were absent before creating them, and arrange operator-side
+cleanup monitoring before waiting for interactive input. Native jobs remain
+bounded to 45 minutes; the device step allows 20 minutes for simulator startup,
+a 15-minute maximum Maestro process, and private-state cleanup.
 
 The flow exercises manual navigation, actual provisioning/connection, assigned
 identity, nonce submission and cold restoration. Credential-free binaries are

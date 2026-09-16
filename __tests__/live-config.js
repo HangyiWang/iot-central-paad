@@ -220,6 +220,7 @@ test('live flow does not capture screenshots, simulate cloud, or use key command
   expect(flow).toContain('clearState: false');
   expect(flow).toContain('text: "^Submitted locally$"');
   expect(smoke).not.toMatch(/-e\s+(?:MAESTRO_)?DEVICE_KEY|set -x|printenv|logcat -d/);
+  expect(smoke).toContain("timeout: 900000, killSignal: 'SIGKILL'");
 });
 
 test('workflow gates every live job, scopes secrets after binary publication and whitelists uploads', () => {
@@ -243,7 +244,7 @@ test('workflow gates every live job, scopes secrets after binary publication and
     const secretSteps = job.steps.filter(step => JSON.stringify(step).includes('secrets.'));
     expect(secretSteps).toHaveLength(1);
     const secretStep = secretSteps[0];
-    expect(secretStep['timeout-minutes']).toBeLessThanOrEqual(12);
+    expect(secretStep['timeout-minutes']).toBe(20);
     expect(secretStep.env.MAESTRO_DEVICE_KEY).toBe(
       '${{ secrets.PAAD_LIVE_' + platform.toUpperCase() + '_DEVICE_KEY }}',
     );

@@ -158,7 +158,7 @@ const result = spawnSync(process.env.PAAD_LIVE_MAESTRO_BIN, [
   '--format', 'junit', '--output', `${path}/results/result.xml`,
   '--debug-output', `${path}/debug`, '--test-output-dir', `${path}/results`,
   '.maestro/live-device.yaml',
-], {stdio: 'inherit', timeout: 540000, killSignal: 'SIGKILL'});
+], {stdio: 'inherit', timeout: 900000, killSignal: 'SIGKILL'});
 process.exit(result.error || result.signal ? 1 : (result.status ?? 1));
 NODE
 status=$?
