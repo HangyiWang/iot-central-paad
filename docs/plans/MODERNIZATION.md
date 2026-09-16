@@ -222,6 +222,15 @@ secondary tasks logically; review any tab consolidation separately so no
 existing feature disappears. Prefer standard native navigation/materials over
 a hand-built glass or blur system.
 
+The reference-inspired presentation uses a warm neutral canvas, restrained
+mint/lavender/peach/sand surfaces, system typography and low visual elevation.
+Sensor colors are stable by identifier rather than random. Phone readings use
+roomy single-column cards; wide layouts may use two columns, returning to one
+for enlarged text. Cards grow with their content instead of clipping values
+into fixed-height tiles. Settings are grouped, while availability and simulation
+remain explicit text rather than color-only signals. Reference artwork is not
+copied into the app.
+
 Each UI PR must map changed screens to the applicable HIG rows and include
 light/dark, enlarged-text, keyboard and error-state evidence. An Android emulator
 cannot establish iOS HIG conformance. Require physical-iPhone VoiceOver, large

@@ -29,6 +29,7 @@ import {Loader} from 'components/loader';
 import {StorageContext} from 'contexts/storage';
 import {IoTCContext} from 'contexts/iotc';
 import {reportDiagnostic, safeError} from './connection/errors';
+import {cardTint, palette} from './theme/palette';
 
 const pkg = require('../package.json');
 
@@ -53,7 +54,7 @@ export default function Settings() {
   const {clear} = useContext(StorageContext);
   const [loading, setLoading] = useBoolean(false);
   const styles: Literal<ViewStyle | TextStyle> = {
-    container: {flex: 1, marginVertical: 10},
+    container: {flex: 1, backgroundColor: colors.background},
   };
 
   const clearStorage = useCallback(() => {
@@ -236,54 +237,101 @@ const RightElement = React.memo<{
 const Root = React.memo<{items: ProfileItem[]; colors: any; dark: boolean}>(
   ({items, colors, dark}) => {
     const nav = useNavigation<PagesNavigator>();
+    const appearance = palette(dark);
 
-    const styles = React.useMemo(
+    const styles = React.useMemo<Literal<ViewStyle | TextStyle>>(
       () => ({
         container: {flex: 1},
+        content: {padding: 20, paddingBottom: 32},
+        group: {
+          borderRadius: 24,
+          overflow: 'hidden',
+          backgroundColor: colors.card,
+        },
+        row: {
+          backgroundColor: colors.card,
+          minHeight: 76,
+          paddingHorizontal: 18,
+          borderBottomColor: appearance.border,
+        },
+        icon: {
+          width: 40,
+          height: 40,
+          borderRadius: 14,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
         subtitle: {
-          color: colors.secondary,
+          color: appearance.muted,
+          fontSize: 13,
+          lineHeight: 19,
+          marginTop: 4,
         },
         title: {
           color: colors.text,
+          fontSize: 16,
+          fontWeight: '600',
         },
       }),
-      [colors],
+      [colors, appearance],
     );
 
     return (
-      <ScrollView style={styles.container}>
-        {items.map((item, index) => (
-          <ListItem
-            key={`setting-${index}`}
-            bottomDivider
-            containerStyle={{backgroundColor: colors.card}}
-            onPress={
-              item.action && item.action.type !== 'switch'
-                ? item.action.fn.bind(null, nav)
-                : undefined
-            }>
-            {item.icon && (
-              <Icon name={item.icon} type="ionicon" color={colors.text} />
-            )}
-            <ListItem.Content>
-              <ListItem.Title style={styles.title}>{item.title}</ListItem.Title>
-              {item.subtitle && (
-                <ListItem.Subtitle style={styles.subtitle}>
-                  {item.subtitle}
-                </ListItem.Subtitle>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}>
+        <View style={styles.group}>
+          {items.map((item, index) => (
+            <ListItem
+              key={`setting-${index}`}
+              bottomDivider={index < items.length - 1}
+              containerStyle={styles.row}
+              onPress={
+                item.action && item.action.type !== 'switch'
+                  ? item.action.fn.bind(null, nav)
+                  : undefined
+              }>
+              {item.icon && (
+                <View
+                  style={[
+                    styles.icon,
+                    {backgroundColor: cardTint(item.title, dark)},
+                  ]}
+                  accessible={false}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants">
+                  <Icon
+                    name={item.icon}
+                    type="ionicon"
+                    size={21}
+                    color={colors.text}
+                  />
+                </View>
               )}
-            </ListItem.Content>
-            {item.action && (
-              <>
-                <RightElement item={item} colors={colors} dark={dark} />
-                {item.action.type === 'expand' && <ListItem.Chevron />}
-              </>
-            )}
-            {item.value && typeof item.value === 'string' && (
-              <Text>{item.value}</Text>
-            )}
-          </ListItem>
-        ))}
+              <ListItem.Content>
+                <ListItem.Title style={styles.title}>
+                  {item.title}
+                </ListItem.Title>
+                {item.subtitle && (
+                  <ListItem.Subtitle style={styles.subtitle}>
+                    {item.subtitle}
+                  </ListItem.Subtitle>
+                )}
+              </ListItem.Content>
+              {item.action && (
+                <>
+                  <RightElement item={item} colors={colors} dark={dark} />
+                  {item.action.type === 'expand' && <ListItem.Chevron />}
+                </>
+              )}
+              {item.value && typeof item.value === 'string' && (
+                <Text style={{fontSize: 13, color: appearance.muted}}>
+                  {item.value}
+                </Text>
+              )}
+            </ListItem>
+          ))}
+        </View>
       </ScrollView>
     );
   },
