@@ -30,103 +30,11 @@ if [[ "$mode" = replay && ( "${GH_TOKEN+x}" || "${GITHUB_TOKEN+x}" ) ]]; then
 fi
 
 verify_binary() {
-  node - <<'NODE'
-const fs = require('node:fs');
-const crypto = require('node:crypto');
-try {
-  for (const directory of ['build', 'build/ci-artifacts']) {
-    const stat = fs.lstatSync(directory);
-    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error();
-  }
-  for (const file of ['identity.txt', 'foundation-ci.apk']) {
-    const stat = fs.lstatSync(`build/ci-artifacts/${file}`);
-    if (!stat.isFile() || stat.isSymbolicLink() || !stat.size) throw new Error();
-  }
-  const lines = fs.readFileSync('build/ci-artifacts/identity.txt', 'utf8').split(/\r?\n/);
-  const expected = {
-    'Built commit: ': process.env.SOURCE_SHA,
-    'Event SHA: ': process.env.SOURCE_SHA,
-    'Run: ': `${process.env.SOURCE_RUN} attempt 1`,
-    'Native variant: ': 'ci',
-  };
-  for (const [prefix, value] of Object.entries(expected)) {
-    const matches = lines.filter(line => line.startsWith(prefix));
-    if (matches.length !== 1 || matches[0] !== prefix + value) throw new Error();
-  }
-  const entries = lines.filter(line => line.endsWith('build/ci-artifacts/foundation-ci.apk'));
-  if (entries.length !== 1 || !/^[a-f0-9]{64}  build\/ci-artifacts\/foundation-ci\.apk$/.test(entries[0])) {
-    throw new Error();
-  }
-  const digest = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-  const apkSha256 = digest('build/ci-artifacts/foundation-ci.apk');
-  if (apkSha256 !== entries[0].slice(0, 64)) throw new Error();
-  console.log(JSON.stringify({
-    sourceRepository: process.env.GITHUB_REPOSITORY,
-    sourceWorkflowId: 359345717,
-    sourceRun: process.env.SOURCE_RUN,
-    sourceAttempt: 1,
-    sourceSha: process.env.SOURCE_SHA,
-    sourceArtifact: `live-build-android-${process.env.SOURCE_SHA}-1`,
-    apkSha256,
-    replayHarnessSha: process.env.GITHUB_SHA,
-    replayScriptSha256: digest('scripts/ci/replay-android.sh'),
-    startupFlowSha256: digest('.maestro/startup.yaml'),
-    launcherRecoveryFlowSha256: digest('.maestro/dismiss-quickstep-anr.yaml'),
-    evidenceScope: 'Credential-free synthetic startup only; no Connect or cloud proof',
-  }, null, 2));
-} catch {
-  console.error('Android replay binary identity or checksum rejected.');
-  process.exit(1);
-}
-NODE
+  node scripts/ci/replay-artifact.js android verify
 }
 
 if [[ "$mode" = download ]]; then
-  node - <<'NODE'
-const fs = require('node:fs');
-const {execFileSync} = require('node:child_process');
-try {
-  const repository = process.env.GITHUB_REPOSITORY;
-  const owner = process.env.GITHUB_REPOSITORY_OWNER;
-  const sourceRun = process.env.SOURCE_RUN;
-  const sourceSha = process.env.SOURCE_SHA;
-  const gh = args => execFileSync('gh', args, {
-    encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000,
-    maxBuffer: 16 * 1024 * 1024,
-  });
-  const endpoint = `repos/${repository}/actions/runs/${sourceRun}`;
-  const run = JSON.parse(gh(['api', endpoint]));
-  if (String(run.id) !== sourceRun || run.repository?.full_name !== repository ||
-      run.head_repository?.full_name !== repository || run.head_sha !== sourceSha ||
-      run.head_branch !== 'feature/adr-onboarding' || run.workflow_id !== 359345717 ||
-      run.event !== 'workflow_dispatch' || run.actor?.login !== owner ||
-      run.triggering_actor?.login !== owner || run.run_attempt !== 1 ||
-      run.status !== 'completed') throw new Error();
-  const name = `live-build-android-${sourceSha}-1`;
-  const pages = JSON.parse(gh(['api', '--paginate', '--slurp', `${endpoint}/artifacts?per_page=100`]));
-  const artifacts = pages.flatMap(page => page.artifacts).filter(artifact => artifact.name === name);
-  if (artifacts.length !== 1) throw new Error();
-  const artifact = artifacts[0];
-  if (artifact.expired !== false || !Number.isSafeInteger(artifact.id) || artifact.id <= 0 ||
-      artifact.workflow_run?.id !== run.id || artifact.workflow_run?.head_sha !== sourceSha ||
-      artifact.workflow_run?.head_branch !== run.head_branch ||
-      artifact.workflow_run?.head_repository_id !== run.head_repository.id ||
-      artifact.workflow_run?.repository_id !== run.repository.id) throw new Error();
-  // The completed, first-attempt run and unique exact name bind the download.
-  if (!fs.existsSync('build')) fs.mkdirSync('build');
-  const build = fs.lstatSync('build');
-  if (!build.isDirectory() || build.isSymbolicLink()) throw new Error();
-  fs.mkdirSync('build/ci-artifacts');
-  gh(['run', 'download', sourceRun, '--repo', repository, '--name', name, '--dir', 'build/ci-artifacts']);
-  if (fs.readdirSync('build/ci-artifacts').sort().join('\n') !== 'foundation-ci.apk\nidentity.txt') {
-    throw new Error();
-  }
-} catch {
-  console.error('Android replay source run or artifact verification failed.');
-  process.exit(1);
-}
-NODE
-  verify_binary > /dev/null
+  node scripts/ci/replay-artifact.js android download
   exit 0
 fi
 

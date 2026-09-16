@@ -1,0 +1,89 @@
+name: REPLAY - Credential-free iOS startup
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('iOS replay of run {0}', inputs.source_run) || 'Register manual workflow only - no device traffic' }}
+
+on:
+  push:
+    branches: [feature/adr-onboarding]
+    paths: [.github/workflows/replay-ios.yml]
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Completed owner-dispatched live workflow run ID (attempt 1 only)
+        type: string
+        required: true
+      source_sha:
+        description: Exact binary source commit (40 lowercase hex)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: replay-ios
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  PAAD_VARIANT: ci
+  EXPO_NO_TELEMETRY: "1"
+  MAESTRO_CLI_NO_ANALYTICS: "1"
+  MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  register-manual-entrypoint:
+    if: github.event_name == 'push'
+    runs-on: macos-26
+    timeout-minutes: 5
+    steps:
+      - run: echo 'Manual entrypoint registered. No binary, device traffic or credentials are used by this job.'
+
+  replay:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/feature/adr-onboarding' &&
+      github.repository == 'HangyiWang/iot-central-paad' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      SOURCE_RUN: ${{ inputs.source_run }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      IOS_SIMULATOR_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.19.0"
+      - name: Verify exact source run and download only its pre-secret simulator app
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci/replay-ios.sh download
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: bash scripts/ci/install-maestro.sh
+      - name: Replay synthetic startup on a newly owned iPhone simulator
+        timeout-minutes: 15
+        run: bash scripts/ci/replay-ios.sh
+      - name: Upload only credential-free replay diagnostics and binary identity
+        if: ${{ !cancelled() && steps.source.outcome == 'success' && hashFiles('build/ci-artifacts/replay-ios/replay-identity.json') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: replay-ios-${{ inputs.source_run }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/ci-artifacts/identity.txt
+            build/ci-artifacts/replay-ios/
+          retention-days: 3
+          if-no-files-found: error

@@ -217,3 +217,18 @@ from the replay harness and flow; this is not Azure acceptance evidence.
 Startup recovery dismisses only the observed stock-emulator **Quickstep isn't
 responding** dialog. It does not dismiss PAAD or other application ANRs, and the
 normal app/startup assertions still have to pass.
+
+## Credential-free iOS replay
+
+`replay-ios.yml` accepts the same exact `source_run` and `source_sha` inputs and
+reuses that completed live run's pre-secret `foundation-simulator.app.zip`.
+Both replay lanes share the run/artifact/identity/checksum binding. iOS creates
+its own iPhone 17 / iOS 26.5 Simulator with Xcode 26.6, verifies the isolated
+bundle ID, and runs only the synthetic startup flow with a cold, isolated
+Maestro home. It never adopts an existing simulator or receives device inputs.
+
+The eight-minute Maestro budget and bounded simulator operations leave cleanup
+time within the fifteen-minute step. The lane captures credential-free Maestro
+output, selected runtime logs and a final screenshot, then shuts down/deletes
+only its newly created simulator. Its scoped three-day artifact distinguishes
+the binary source from the replay harness; this is not mobile-to-Azure proof.

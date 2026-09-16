@@ -35,6 +35,7 @@ function withFixture(testBody, {download = false} = {}) {
       fs.mkdirSync(file(child), {recursive: true});
     }
     fs.writeFileSync(file('scripts/ci/replay-android.sh'), script);
+    fs.copyFileSync('scripts/ci/replay-artifact.js', file('scripts/ci/replay-artifact.js'));
     fs.copyFileSync('.maestro/startup.yaml', file('.maestro/startup.yaml'));
     fs.copyFileSync('.maestro/dismiss-quickstep-anr.yaml', file('.maestro/dismiss-quickstep-anr.yaml'));
     const apk = Buffer.from('credential-free mock APK, not an Android binary');
