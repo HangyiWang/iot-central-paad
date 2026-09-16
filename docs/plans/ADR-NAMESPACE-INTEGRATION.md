@@ -1,6 +1,7 @@
 # PAAD ADR namespace integration plan
 
-Status: SAS-first application integrated; actual mobile-to-Azure acceptance pending.
+Status: SAS-first application integrated; Android end-to-end and cold restore confirmed;
+iOS nonce/cold-restore acceptance remains pending.
 Date: 2026-09-16. Branch: `feature/adr-onboarding`.
 Parent: `modernize/paad-foundation`.
 
@@ -64,6 +65,33 @@ The operator-only `scripts/ci/verify-mobile-proof.js` reads DPS assignment,
 the Hub model/nonce and the actual ADR record using an existing Entra CLI session.
 It requests no keys and performs no cloud writes. See the
 [simulator guide](../ADR-SIMULATOR.md) for manual use and evidence boundaries.
+
+### Recorded mobile evidence (2026-09-16)
+
+Credential-free Android replay `35149722810` and iOS replay `35149723154`
+passed bundled startup, manual-input, Back and cold-start assertions.
+The iOS replay also confirmed deletion of its freshly owned simulator.
+
+Real-device-input run `35150711575`, app source
+`d8cd8abea76b67a6658bd5b493c8524535726ffd`, reached actual DPS assignment and
+Hub connection on both virtual platforms. Independent operator reads confirmed
+the phone model in both Hub twins and one matching automatic ADR record per
+assigned device. That CI run still failed its details-screen UI assertions;
+these partial cloud results do not make the run or milestone A1 pass.
+
+The same run's credential-free Android APK was subsequently exercised manually
+on the Windows Android Studio emulator. The operator independently matched the
+exact submitted nonce/platform, assigned identity, Hub model and automatically
+created ADR record. A scoped force-stop and relaunch produced a new app process
+that returned to Connected with the same identity without re-entering credentials.
+APK SHA256:
+`e03817b61d15a7e678c1c26ed1a8cef2ea12838df5685b3535089ca1e04ba3ba`.
+Lab-specific proof reports remain private and are not committed.
+
+Android's manual cloud/cold-restore case is complete. iOS still needs the exact
+nonce and connected cold-restoration evidence; CI selector failures remain under
+investigation. None of this establishes physical-device parity or downstream
+telemetry receipt.
 
 ## What the experiment proved, and what it did not
 
