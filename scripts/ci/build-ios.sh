@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Inventory verified at actions/runner-images@dff7cf5f1d89bdac4336cd261875e553582fe769:
-# Build with 16.2's SDK (before libc++ changes incompatible with RN 0.75's fmt).
-# The installed iOS 18.5 runtime uses 16.4's simulator tools, independently.
+# Keep the legacy compiler and simulator runtime matched; hosted defaults move.
 test "$DEVELOPER_DIR" = /Applications/Xcode_16.2.app/Contents/Developer
 xcodebuild -version | tee -a build/ci-artifacts/identity.txt
 DEVELOPER_DIR="$IOS_SIMULATOR_DEVELOPER_DIR" xcrun simctl list runtimes
 DEVELOPER_DIR="$IOS_SIMULATOR_DEVELOPER_DIR" xcrun simctl list devicetypes
 device=$(DEVELOPER_DIR="$IOS_SIMULATOR_DEVELOPER_DIR" xcrun simctl create PAAD-Baseline-CI \
   com.apple.CoreSimulator.SimDeviceType.iPhone-16 \
-  com.apple.CoreSimulator.SimRuntime.iOS-18-5)
+  com.apple.CoreSimulator.SimRuntime.iOS-18-2)
 printf 'IOS_SIMULATOR_UDID=%s\n' "$device" >> "$GITHUB_ENV"
-printf 'iOS simulator: iPhone 16 / iOS 18.5 / %s\n' "$device" \
+printf 'iOS simulator: iPhone 16 / iOS 18.2 / %s\n' "$device" \
   | tee -a build/ci-artifacts/identity.txt
 xcodebuild -workspace ios/IoT_PnP.xcworkspace -scheme IoT_PnP \
   -configuration Release -sdk iphonesimulator \
