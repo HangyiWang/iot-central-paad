@@ -43,7 +43,11 @@ const [milliseconds, command, ...args] = process.argv.slice(2);
 const result = spawnSync(command, args, {
   stdio: 'inherit', timeout: Number(milliseconds), killSignal: 'SIGKILL',
 });
-if (result.error || result.signal) console.error('iOS replay subprocess did not exit normally.');
+if (result.error || result.signal) {
+  console.error(result.error?.code === 'ETIMEDOUT'
+    ? 'iOS replay subprocess exceeded its deadline.'
+    : 'iOS replay subprocess did not exit normally.');
+}
 process.exit(result.error || result.signal ? 1 : (result.status ?? 1));
 NODE
 }
@@ -115,7 +119,7 @@ if [[ "$bundle_id" != com.microsoft.iotpnp.ci ]]; then
   echo 'iOS replay simulator app bundle identity rejected.' >&2
   exit 1
 fi
-candidate=$(run_bounded 15000 xcrun simctl create PAAD-Replay-CI \
+candidate=$(run_bounded 60000 xcrun simctl create PAAD-Replay-CI \
   com.apple.CoreSimulator.SimDeviceType.iPhone-17 \
   com.apple.CoreSimulator.SimRuntime.iOS-26-5 2> "$diagnostics/logs/create-errors.log")
 if [[ ! "$candidate" =~ ^[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}$ ]]; then
@@ -132,7 +136,7 @@ run_bounded 60000 xcrun simctl install "$device" "$app" > "$diagnostics/logs/ins
 flow_attempted=1
 HOME="$state/home" TMPDIR="$state/scratch" \
 JAVA_TOOL_OPTIONS="-Duser.home=$state/home -Djava.io.tmpdir=$state/scratch" \
-run_bounded 480000 "$maestro" --device "$device" test --no-ansi \
+run_bounded 450000 "$maestro" --device "$device" test --no-ansi \
   --format junit --output "$diagnostics/results/result.xml" \
   --debug-output "$diagnostics/debug" --test-output-dir "$diagnostics/results" \
   -e APP_ID=com.microsoft.iotpnp.ci .maestro/startup.yaml \

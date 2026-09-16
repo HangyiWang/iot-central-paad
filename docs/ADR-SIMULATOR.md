@@ -215,7 +215,7 @@ Its three-day artifact contains credential-free runtime, window, screenshot and
 Maestro evidence. `replay-identity.json` distinguishes the original binary source
 from the replay harness and flow; this is not Azure acceptance evidence.
 Startup recovery dismisses only the observed stock-emulator **Quickstep isn't
-responding** dialog. It does not dismiss PAAD or other application ANRs, and the
+responding** and **System UI isn't responding** dialogs. It does not dismiss PAAD or other application ANRs, and the
 normal app/startup assertions still have to pass.
 
 ## Credential-free iOS replay
@@ -227,7 +227,7 @@ its own iPhone 17 / iOS 26.5 Simulator with Xcode 26.6, verifies the isolated
 bundle ID, and runs only the synthetic startup flow with a cold, isolated
 Maestro home. It never adopts an existing simulator or receives device inputs.
 
-The eight-minute Maestro budget and bounded simulator operations leave cleanup
+The bounded Maestro budget and simulator operations leave cleanup
 time within the fifteen-minute step. The lane captures credential-free Maestro
 output, selected runtime logs and a final screenshot, then shuts down/deletes
 only its newly created simulator. Its scoped three-day artifact distinguishes
