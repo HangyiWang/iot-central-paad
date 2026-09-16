@@ -24,6 +24,14 @@ if [[ -z "${MAESTRO_DEVICE_KEY:-}" ]]; then
   echo 'Dedicated device input secret is unavailable.' >&2
   exit 1
 fi
+node - <<'NODE'
+const key = process.env.MAESTRO_DEVICE_KEY;
+if (key.length > 512 || Buffer.from(key, 'base64').length < 16 ||
+    Buffer.from(key, 'base64').toString('base64') !== key) {
+  console.error('Dedicated device input is not canonical Base64 key material.');
+  process.exit(1);
+}
+NODE
 
 test ! -L build
 mkdir -p build

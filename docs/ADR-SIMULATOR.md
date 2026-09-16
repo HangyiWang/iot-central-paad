@@ -71,6 +71,10 @@ Keys are masked until deliberately revealed. Do not put keys, QR images or
 credential screenshots in issues, logs or reports. Avoid clipboard history/sync
 when transferring a key, and clear the clipboard after pasting it.
 
+Connection failures show a sanitized error code, the HTTP status when available,
+and a numeric DPS service code when returned. Service response bodies and raw
+messages are not displayed. Form values remain available for correction/retry.
+
 Disconnect stops the session without erasing saved credentials. Forget
 Credentials is a separate confirmed action and does not delete an Azure device.
 Ordinary cold restart restores the saved connection once; failures offer an

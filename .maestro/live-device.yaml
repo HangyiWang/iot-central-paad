@@ -54,7 +54,22 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     timeout: 15000
 - tapOn:
     id: connection-deviceKey
-- inputText: ${MAESTRO_DEVICE_KEY}
+# The pinned iOS typer can drop rapid events. Each call uses its slow first-character path.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - evalScript: ${output.keyIndex = 0}
+      - repeat:
+          times: ${MAESTRO_DEVICE_KEY.length}
+          commands:
+            - inputText: ${MAESTRO_DEVICE_KEY.charAt(output.keyIndex)}
+            - evalScript: ${output.keyIndex = output.keyIndex + 1}
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - inputText: ${MAESTRO_DEVICE_KEY}
 - pressKey: Enter
 - scrollUntilVisible:
     element:

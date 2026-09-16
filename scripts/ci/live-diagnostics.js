@@ -10,6 +10,7 @@ const COMMAND_KINDS = Object.freeze([
   'eraseTextCommand', 'inputTextCommand', 'hideKeyboardCommand', 'pressKeyCommand',
   'scrollUntilVisible', 'assertCommand', 'assertConditionCommand',
   'applyConfigurationCommand', 'defineVariablesCommand',
+  'runFlowCommand', 'repeatCommand', 'evalScriptCommand',
 ]);
 const TARGET_IDS = Object.freeze([
   'registration-manual', 'registration-back', 'connection-registrationId', 'connection-scopeId',

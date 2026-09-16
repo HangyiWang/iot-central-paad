@@ -231,6 +231,23 @@ test('live flow does not capture screenshots, simulate cloud, or use key command
   expect(smoke).toContain("timeout: 900000, killSignal: 'SIGKILL'");
 });
 
+test('iOS key injection uses isolated slow characters without revealing the value', () => {
+  const commands = yaml.loadAll(fs.readFileSync('.maestro/live-device.yaml', 'utf8'))[1];
+  const ios = commands.find(command => command.runFlow?.when?.platform === 'iOS').runFlow;
+  expect(ios.commands).toEqual([
+    {evalScript: '${output.keyIndex = 0}'},
+    {repeat: {
+      times: '${MAESTRO_DEVICE_KEY.length}',
+      commands: [
+        {inputText: '${MAESTRO_DEVICE_KEY.charAt(output.keyIndex)}'},
+        {evalScript: '${output.keyIndex = output.keyIndex + 1}'},
+      ],
+    }},
+  ]);
+  const android = commands.find(command => command.runFlow?.when?.platform === 'Android').runFlow;
+  expect(android.commands).toEqual([{inputText: '${MAESTRO_DEVICE_KEY}'}]);
+});
+
 test('workflow gates every live job, scopes secrets after binary publication and whitelists uploads', () => {
   const workflow = yaml.load(fs.readFileSync('.github/workflows/live-device.yml', 'utf8'));
   expect(Object.keys(workflow.on)).toEqual(['push', 'workflow_dispatch']);
@@ -305,6 +322,33 @@ test.each([
   expect(result.stderr).toBe('Live smoke authorization rejected.\n');
 });
 
+test.each([
+  'KEY_CANARY',
+  Buffer.alloc(15).toString('base64'),
+  Buffer.alloc(32).toString('base64') + '\n',
+])('invalid dedicated input is rejected before accessing a device (%#)', key => {
+  const result = spawnSync('bash', ['scripts/ci/smoke-live-device.sh', 'ios'], {
+    encoding: 'utf8',
+    env: {
+      ...mockEnvironment,
+      GITHUB_EVENT_NAME: 'workflow_dispatch',
+      PAAD_LIVE_CONFIRM: 'true',
+      GITHUB_REF: 'refs/heads/feature/adr-onboarding',
+      GITHUB_REPOSITORY_OWNER: 'owner',
+      GITHUB_ACTOR: 'owner',
+      GITHUB_SHA: sourceSha,
+      PAAD_LIVE_EXPECTED_SHA: sourceSha,
+      PAAD_VARIANT: 'ci',
+      PAAD_LIVE_CONFIG: JSON.stringify(fixture()),
+      MAESTRO_DEVICE_KEY: key,
+    },
+  });
+  expect(result.status).toBe(1);
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toBe('Dedicated device input is not canonical Base64 key material.\n');
+  expect(result.stderr).not.toContain(key);
+});
+
 test('report sanitizes nested diagnostics and never upgrades a failed UI result', () => {
   const diagnostics = {
     availability: 'available',
@@ -349,6 +393,7 @@ test.each([
   {maestroResult: '7', diagnostics: 'no', cleanupFailure: 'no', expected: 'failed'},
   {maestroResult: '0', diagnostics: 'yes', cleanupFailure: 'yes', expected: 'failed'},
 ])('mock-only smoke preserves outcome and removes all private state (%#)', scenario => {
+  const key = Buffer.from('SECRET_CANARY'.repeat(3)).toString('base64');
   const directory = `.live-smoke-fixture-${process.pid}-${scenario.maestroResult}-${scenario.diagnostics}-${scenario.cleanupFailure}`;
   fs.mkdirSync(directory, {mode: 0o700});
   try {
@@ -369,7 +414,7 @@ const root = process.env.PAAD_LIVE_PRIVATE;
 if (process.env.HOME !== root + '/home' || process.env.TMPDIR !== root + '/scratch' ||
     !process.env.JAVA_TOOL_OPTIONS.includes('-Duser.home=' + root + '/home') ||
     !process.argv[1].startsWith(path.resolve('build/ci-tools/maestro/bin'))) process.exit(99);
-console.log('SECRET_CANARY');
+console.log('SECRET_CANARY', process.env.MAESTRO_DEVICE_KEY);
 fs.writeFileSync(root + '/home/private-key', 'SECRET_CANARY');
 fs.writeFileSync(root + '/scratch/private-java', 'SECRET_CANARY');
 fs.writeFileSync(root + '/results/failure.png', 'SECRET_CANARY');
@@ -390,7 +435,7 @@ process.exit(Number(process.env.TEST_MAESTRO_RESULT));
         GITHUB_REF: 'refs/heads/feature/adr-onboarding', GITHUB_REPOSITORY_OWNER: 'owner',
         GITHUB_ACTOR: 'owner', GITHUB_SHA: sourceSha, PAAD_LIVE_EXPECTED_SHA: sourceSha,
         PAAD_VARIANT: 'ci', PAAD_LIVE_CONFIG: JSON.stringify(fixture()),
-        MAESTRO_DEVICE_KEY: 'SECRET_CANARY',
+        MAESTRO_DEVICE_KEY: key,
         TEST_MAESTRO_RESULT: scenario.maestroResult, TEST_DIAGNOSTICS: scenario.diagnostics,
         TEST_CLEANUP_FAILURE: scenario.cleanupFailure,
       },
@@ -398,10 +443,12 @@ process.exit(Number(process.env.TEST_MAESTRO_RESULT));
     expect(result.error).toBeUndefined();
     expect(result.status === 0).toBe(scenario.expected === 'passed');
     expect(result.stdout + result.stderr).not.toContain('SECRET_CANARY');
+    expect(result.stdout + result.stderr).not.toContain(key);
     expect(fs.existsSync(path.join(directory, 'build/live-device-private'))).toBe(false);
     const raw = fs.readFileSync(path.join(directory, 'build/live-device-summary-android.json'), 'utf8');
     const report = JSON.parse(raw);
     expect(raw).not.toContain('SECRET_CANARY');
+    expect(raw).not.toContain(key);
     expect(report.uiResult).toBe(scenario.expected);
     expect(report.independentAzureVerification).toBe('pending');
     expect(report.diagnostics.availability).toBe(scenario.diagnostics === 'yes' ? 'available' : 'unavailable');
