@@ -111,6 +111,16 @@ test('never treats provisioning or local submission alone as confirmation', () =
   expect(inspectProof(config, 'android', targets, reader(assignment, twin, [])).complete).toBe(false);
 });
 
+test('distinguishes a missing model from a missing nonce without relaxing identity checks', () => {
+  expect(inspectProof(config, 'android', targets, reader(assignment, {...twin, modelId: null})))
+    .toEqual({complete: false, waitingFor: 'model-bearing Hub twin marker'});
+  expect(inspectProof(config, 'android', targets, reader(assignment, {...twin, proof: null})))
+    .toEqual({complete: false, waitingFor: 'exact mobile nonce'});
+  expect(() => inspectProof(config, 'android', targets, reader(
+    assignment, {...twin, modelId: 'dtmi:wrong:model;1', proof: null},
+  ))).toThrow('TWIN_IDENTITY_OR_MODEL_MISMATCH');
+});
+
 test('rejects wrong models and does not confirm ADR from registration ID', () => {
   expect(() => inspectProof(config, 'android', targets, reader(
     assignment, {...twin, modelId: 'dtmi:wrong:model;1'},

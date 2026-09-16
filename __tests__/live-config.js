@@ -251,6 +251,21 @@ test('iOS key injection uses isolated slow characters without revealing the valu
   expect(android.commands).toEqual([{inputText: '${MAESTRO_DEVICE_KEY}'}]);
 });
 
+test('both details presentations wait for the first model field before scrolling', () => {
+  const commands = yaml.loadAll(fs.readFileSync('.maestro/live-device.yaml', 'utf8'))[1];
+  const details = commands.flatMap((command, index) =>
+    command.tapOn?.id === 'connection-details' ? [index] : []);
+  expect(details).toHaveLength(2);
+  for (const index of details) {
+    expect(commands[index + 1]).toEqual({
+      extendedWaitUntil: {visible: {id: 'model-id'}, timeout: 15000},
+    });
+    expect(commands[index + 2]).toEqual({
+      assertVisible: {id: 'model-id', text: '${MAESTRO_MODEL_ID_PATTERN}'},
+    });
+  }
+});
+
 test('workflow gates every live job, scopes secrets after binary publication and whitelists uploads', () => {
   const workflow = yaml.load(fs.readFileSync('.github/workflows/live-device.yml', 'utf8'));
   expect(Object.keys(workflow.on)).toEqual(['push', 'workflow_dispatch']);

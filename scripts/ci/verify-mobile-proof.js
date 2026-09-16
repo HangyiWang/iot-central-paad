@@ -114,13 +114,13 @@ function inspectProof(config, platform, targets, read) {
     '--device-id', assignment.deviceId,
     '--auth-type', 'login',
   ], '{deviceId:deviceId,modelId:modelId,proof:properties.reported.paadProof}', true);
-  if (!twin || !twin.modelId || !twin.proof) {
+  if (!twin || !twin.modelId) {
     return {complete: false, waitingFor: 'model-bearing Hub twin marker'};
   }
   if (twin.deviceId !== assignment.deviceId || twin.modelId !== MODEL_ID) {
     throw new ProofError('TWIN_IDENTITY_OR_MODEL_MISMATCH');
   }
-  if (twin.proof.nonce !== item.nonce || twin.proof.platform !== platform) {
+  if (!twin.proof || twin.proof.nonce !== item.nonce || twin.proof.platform !== platform) {
     return {complete: false, waitingFor: 'exact mobile nonce'};
   }
   const matches = registryDevices(targets, read).filter(

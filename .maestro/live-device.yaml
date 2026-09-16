@@ -95,10 +95,10 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     text: ${MAESTRO_EXPECTED_HUB_PATTERN}
 - tapOn:
     id: connection-details
-- scrollUntilVisible:
-    element:
+# Wait for modal presentation before scrolling past its first field.
+- extendedWaitUntil:
+    visible:
       id: model-id
-    direction: DOWN
     timeout: 15000
 - assertVisible:
     id: model-id
@@ -181,10 +181,9 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     text: ${MAESTRO_EXPECTED_HUB_PATTERN}
 - tapOn:
     id: connection-details
-- scrollUntilVisible:
-    element:
+- extendedWaitUntil:
+    visible:
       id: model-id
-    direction: DOWN
     timeout: 15000
 - assertVisible:
     id: model-id
