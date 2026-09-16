@@ -119,4 +119,56 @@ describe('App startup', () => {
       expect(hasText('Scan QR code')).toBe(true);
     },
   );
+
+  it.each([
+    ['-34018', '-34018'],
+    ['fixture-sensitive-code', 'unknown code'],
+  ])(
+    'surfaces initialization failure safely and allows retry (%s)',
+    async (code, loggedCode) => {
+      const message = 'fixture-sensitive-credential-must-not-be-exposed';
+      const report = jest.spyOn(console, 'error').mockImplementation(() => {});
+      jest
+        .spyOn(Keychain, 'getGenericPassword')
+        .mockRejectedValueOnce(Object.assign(new Error(message), {code}));
+
+      await act(async () => {
+        app = renderer.create(<App />);
+      });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(2000);
+      });
+
+      expect(
+        app.root.findAllByProps({testID: 'startup-error'}).length,
+      ).toBeGreaterThan(0);
+      expect(report).toHaveBeenCalledWith(
+        'App initialization failed',
+        loggedCode,
+      );
+      expect(JSON.stringify(app.toJSON())).not.toContain(message);
+      expect(JSON.stringify(report.mock.calls)).not.toContain(message);
+      if (loggedCode === 'unknown code') {
+        expect(JSON.stringify(app.toJSON())).not.toContain(code);
+        expect(JSON.stringify(report.mock.calls)).not.toContain(code);
+      }
+      expect(Keychain.resetGenericPassword).not.toHaveBeenCalled();
+
+      await act(async () => {
+        press('startup-retry');
+      });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(2000);
+        await jest.runOnlyPendingTimersAsync();
+      });
+
+      expect(app.root.findAllByProps({testID: 'startup-error'})).toHaveLength(
+        0,
+      );
+      expect(hasText('Scan QR code')).toBe(true);
+      expect(Keychain.getGenericPassword).toHaveBeenCalledTimes(2);
+      expect(Keychain.setGenericPassword).not.toHaveBeenCalled();
+      expect(Keychain.resetGenericPassword).not.toHaveBeenCalled();
+    },
+  );
 });

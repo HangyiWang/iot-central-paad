@@ -5,11 +5,17 @@ const Strings = {
   Title: 'IoT Plug and Play',
   Core: {
     Back: 'Back',
+    Retry: 'Retry',
     Close: 'Close',
     Cancel: 'Cancel',
     Loading: 'Loading...',
     DisableSensor: 'Disable sensor',
     EnableSensor: 'Enable sensor',
+  },
+  Startup: {
+    Failed:
+      'Could not initialize the app. Your saved data has not been reset. Please retry.',
+    ErrorCode: 'Error code: {{0}}',
   },
   Settings: {
     Title: 'Settings',

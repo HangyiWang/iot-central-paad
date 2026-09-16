@@ -1,7 +1,13 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import React, {useEffect, useCallback, useContext, useMemo} from 'react';
+import React, {
+  useEffect,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
 import {Alert, Linking, Platform, View} from 'react-native';
 import LogoLight from './assets/IoT-Plug-And-Play_Dark.svg';
 import LogoDark from './assets/IoT-Plug-And-Play_Light.svg';
@@ -12,7 +18,8 @@ import {StateUpdater, StyleDefinition, ThemeMode} from './types';
 import {CircleSnail} from 'react-native-progress';
 import {useScreenDimensions} from './hooks/layout';
 import {StorageContext, ThemeContext} from 'contexts';
-import {Name} from 'components/typography';
+import {Name, Text} from 'components/typography';
+import Button from 'components/button';
 import VersionCheck from 'react-native-version-check';
 import Strings, {resolveString} from 'strings';
 
@@ -45,6 +52,10 @@ export function Welcome(props: {
   const {read, save, initialized} = useContext(StorageContext);
   const {screen} = useScreenDimensions();
   const {mode, theme} = useContext(ThemeContext);
+  const [initializationError, setInitializationError] = useState<string | null>(
+    null,
+  );
+  const [attempt, setAttempt] = useState(0);
 
   const style = useMemo<StyleDefinition>(
     () => ({
@@ -63,6 +74,12 @@ export function Welcome(props: {
       },
       spinner: {
         marginTop: 50,
+      },
+      error: {
+        marginHorizontal: 24,
+        marginVertical: 16,
+        textAlign: 'center',
+        color: theme.textColor,
       },
     }),
     [theme.backgroundColor, theme.textColor],
@@ -121,8 +138,33 @@ export function Welcome(props: {
   }, [initialized, setInitialized]);
   // init authentication
   useEffect(() => {
-    initDefaults();
-  }, [initDefaults]);
+    let active = true;
+    initDefaults().catch((error: unknown) => {
+      const code =
+        error !== null && typeof error === 'object' && 'code' in error
+          ? error.code
+          : undefined;
+      const safeCode =
+        (typeof code === 'number' && Number.isSafeInteger(code)) ||
+        (typeof code === 'string' && /^-?\d{1,10}$/.test(code))
+          ? String(code)
+          : null;
+      console.error('App initialization failed', safeCode ?? 'unknown code');
+      if (active) {
+        setInitializationError(
+          safeCode
+            ? `${Strings.Startup.Failed} ${resolveString(
+                Strings.Startup.ErrorCode,
+                safeCode,
+              )}`
+            : Strings.Startup.Failed,
+        );
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [initDefaults, attempt]);
 
   return (
     <View style={style.container}>
@@ -132,15 +174,34 @@ export function Welcome(props: {
         <LogoLight width={100} height={100} style={style.logo} />
       )}
       <Name style={style.name}>{title}</Name>
-      <CircleSnail
-        style={style.spinner}
-        size={Math.floor(screen.width / 8)}
-        indeterminate={true}
-        thickness={3}
-        color={theme.textColor}
-        spinDuration={1000}
-        duration={1000}
-      />
+      {initializationError ? (
+        <>
+          <Text
+            testID="startup-error"
+            accessibilityRole="alert"
+            style={style.error}>
+            {initializationError}
+          </Text>
+          <Button
+            testID="startup-retry"
+            title={Strings.Core.Retry}
+            onPress={() => {
+              setInitializationError(null);
+              setAttempt(current => current + 1);
+            }}
+          />
+        </>
+      ) : (
+        <CircleSnail
+          style={style.spinner}
+          size={Math.floor(screen.width / 8)}
+          indeterminate={true}
+          thickness={3}
+          color={theme.textColor}
+          spinDuration={1000}
+          duration={1000}
+        />
+      )}
     </View>
   );
 }
