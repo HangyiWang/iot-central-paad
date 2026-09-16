@@ -63,6 +63,10 @@ The phone model remains `dtmi:azureiot:PhoneAsADevice;2`. After connecting, comp
 the displayed assigned device and Hub with the actual DPS result. The assigned
 device ID is not assumed to equal the registration ID.
 
+The device protocols use DPS `2019-03-31` and IoT Hub `2021-04-12` (MQTT and
+file-upload APIs), matching the respective device SDK contracts. These are
+separate from the operator's ARM and namespace-management API versions.
+
 **Change connection method** exposes direct-Hub device connection strings and
 the explicitly labelled legacy enrollment-group path. Group keys are retained
 for compatibility, not recommended for new individual onboarding.
