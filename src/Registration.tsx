@@ -160,7 +160,12 @@ export const Registration = React.memo<{
       initialRouteName={
         client && client.isConnected() ? screens.MANUAL : screens.EMPTY
       }
-      screenOptions={{headerBackTitleVisible: false, headerMode: 'float'}}>
+      screenOptions={{
+        headerBackTitleVisible: false,
+        headerBackAccessibilityLabel: Strings.Core.Back,
+        headerBackTestID: 'registration-back',
+        headerMode: 'float',
+      }}>
       <Stack.Screen
         name={screens.EMPTY}
         options={() => ({
@@ -565,6 +570,7 @@ const EmptyClient = React.memo<{
       />
       <Button
         title={Strings.Registration.QRCode.Manually}
+        testID="registration-manual"
         onPress={() => navigation.navigate(screens.MANUAL)}
       />
       <Text style={style.footer}>

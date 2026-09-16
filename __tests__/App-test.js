@@ -51,6 +51,14 @@ describe('App startup', () => {
   const hasText = text =>
     app.root.findAllByType(Text).some(node => node.props.children === text);
 
+  const press = id => {
+    const control = app.root
+      .findAllByProps({testID: id})
+      .find(node => typeof node.props.onPress === 'function');
+    expect(control).toBeDefined();
+    control.props.onPress();
+  };
+
   it.each([
     ['com.microsoft.iotpnp', 2],
     ['com.microsoft.iotpnp.ci', 0],
@@ -96,6 +104,19 @@ describe('App startup', () => {
           packageName: 'com.microsoft.iotpnp',
         });
       }
+
+      await act(async () => {
+        press('registration-manual');
+        await jest.runOnlyPendingTimersAsync();
+      });
+      expect(hasText(Strings.Registration.Manual.Body.ConnectionInfo)).toBe(
+        true,
+      );
+      await act(async () => {
+        press('registration-back');
+        await jest.runOnlyPendingTimersAsync();
+      });
+      expect(hasText('Scan QR code')).toBe(true);
     },
   );
 });

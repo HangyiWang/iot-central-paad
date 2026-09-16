@@ -4,6 +4,7 @@
 const Strings = {
   Title: 'IoT Plug and Play',
   Core: {
+    Back: 'Back',
     Close: 'Close',
     Cancel: 'Cancel',
     Loading: 'Loading...',

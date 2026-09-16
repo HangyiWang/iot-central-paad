@@ -113,8 +113,8 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     env:
-      DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
-      IOS_SIMULATOR_DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      IOS_SIMULATOR_DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
       RCT_NEW_ARCH_ENABLED: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -140,9 +140,6 @@ jobs:
       - name: Install locked CocoaPods dependencies deliberately
         working-directory: ios
         run: bundle exec pod install --deployment
-      - name: Install the simulator runtime matching the baseline Xcode
-        timeout-minutes: 12
-        run: xcodebuild -downloadPlatform iOS
       - run: bash scripts/ci/build-ios.sh
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:

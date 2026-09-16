@@ -6,16 +6,19 @@ name: Credential-free bundled startup and manual-navigation smoke
     permissions:
       all: deny
 - extendedWaitUntil:
-    visible: ".*Start here.*"
+    visible:
+      id: registration-manual
     timeout: 60000
 - assertVisible: "IoT Plug and Play"
 - assertVisible: "Connect manually"
-- tapOn: "Connect manually"
+- tapOn:
+    id: registration-manual
 - assertVisible: "Manually connect"
 - assertVisible: "Connection info"
 - assertVisible: "Device ID"
 - assertVisible: "ID scope"
-- tapOn: "(Go back|Back)"
+- tapOn:
+    id: registration-back
 - assertVisible: ".*Start here.*"
 - assertVisible: "Connect manually"
 - stopApp
@@ -24,7 +27,8 @@ name: Credential-free bundled startup and manual-navigation smoke
     permissions:
       all: deny
 - extendedWaitUntil:
-    visible: ".*Start here.*"
+    visible:
+      id: registration-manual
     timeout: 60000
 - assertVisible: "IoT Plug and Play"
 - assertVisible: "Connect manually"
