@@ -28,7 +28,9 @@ const fixture = () => ({
   },
 });
 const sourceSha = 'a'.repeat(40);
-const mockEnvironment = {PATH: `${path.dirname(process.execPath)}:/usr/bin:/bin`};
+const mockEnvironment = {
+  PATH: `${path.dirname(process.execPath)}:/usr/bin:/bin`,
+};
 
 test('exports a fresh validated plain DTO for the independent operator verifier', () => {
   const input = fixture();
@@ -41,14 +43,17 @@ test('exports a fresh validated plain DTO for the independent operator verifier'
   expect(MODEL_ID).toBe('dtmi:azureiot:PhoneAsADevice;2');
 });
 
-test.each(['net', 'cn', 'us'])('accepts only Azure hostnames in %s cloud', suffix => {
-  const config = fixture();
-  config.provisioningHost = `global.azure-devices-provisioning.${suffix}`;
-  for (const name of ['lab-hub', 'lab-hub.device']) {
-    config.expectedHub = `${name}.azure-devices.${suffix}`;
-    expect(validateLiveConfig(config)).toEqual(config);
-  }
-});
+test.each(['net', 'cn', 'us'])(
+  'accepts only Azure hostnames in %s cloud',
+  suffix => {
+    const config = fixture();
+    config.provisioningHost = `global.azure-devices-provisioning.${suffix}`;
+    for (const name of ['lab-hub', 'lab-hub.device']) {
+      config.expectedHub = `${name}.azure-devices.${suffix}`;
+      expect(validateLiveConfig(config)).toEqual(config);
+    }
+  },
+);
 
 test.each([
   'https://global.azure-devices-provisioning.net',
@@ -60,9 +65,9 @@ test.each([
   '-global.azure-devices-provisioning.net',
   'GLOBAL.azure-devices-provisioning.net',
 ])('rejects invalid DPS hostname without reflecting it (%#)', host => {
-  expect(() => validateLiveConfig({...fixture(), provisioningHost: host})).toThrow(
-    'Invalid live configuration or invocation',
-  );
+  expect(() =>
+    validateLiveConfig({...fixture(), provisioningHost: host}),
+  ).toThrow('Invalid live configuration or invocation');
 });
 
 test.each([
@@ -83,19 +88,38 @@ test.each(['deviceKey', 'sas', 'connectionString', '__proto__', 'constructor'])(
   key => {
     for (const location of ['root', 'cases', 'case']) {
       const config = fixture();
-      const target = location === 'root' ? config : location === 'cases' ? config.cases : config.cases.android;
-      Object.defineProperty(target, key, {value: 'SECRET_CANARY', enumerable: true});
-      expect(() => validateLiveConfig(config)).toThrow('Invalid live configuration or invocation');
+      const target =
+        location === 'root'
+          ? config
+          : location === 'cases'
+          ? config.cases
+          : config.cases.android;
+      Object.defineProperty(target, key, {
+        value: 'SECRET_CANARY',
+        enumerable: true,
+      });
+      expect(() => validateLiveConfig(config)).toThrow(
+        'Invalid live configuration or invocation',
+      );
     }
   },
 );
 
 test.each([
-  null, [], 1, true, '{"deviceKey":"SECRET_CANARY"', 'x'.repeat(8193),
-  {...fixture(), schemaVersion: '1'}, {...fixture(), schemaVersion: 2},
-  {...fixture(), extra: true}, {...fixture(), scopeId: '0ne00AABBCC\nINJECT=x'},
+  null,
+  [],
+  1,
+  true,
+  '{"deviceKey":"SECRET_CANARY"',
+  'x'.repeat(8193),
+  {...fixture(), schemaVersion: '1'},
+  {...fixture(), schemaVersion: 2},
+  {...fixture(), extra: true},
+  {...fixture(), scopeId: '0ne00AABBCC\nINJECT=x'},
 ])('rejects malformed schema safely (%#)', value => {
-  expect(() => validateLiveConfig(value)).toThrow('Invalid live configuration or invocation');
+  expect(() => validateLiveConfig(value)).toThrow(
+    'Invalid live configuration or invocation',
+  );
 });
 
 test('requires selected cases and validates even unselected provided cases', () => {
@@ -109,11 +133,14 @@ test('requires selected cases and validates even unselected provided cases', () 
   expect(() => validateLiveConfig(config, 'android')).toThrow();
 });
 
-test.each(['registrationId', 'expectedDeviceId', 'nonce'])('requires unique %s', field => {
-  const config = fixture();
-  config.cases.ios[field] = config.cases.android[field];
-  expect(() => validateLiveConfig(config)).toThrow();
-});
+test.each(['registrationId', 'expectedDeviceId', 'nonce'])(
+  'requires unique %s',
+  field => {
+    const config = fixture();
+    config.cases.ios[field] = config.cases.android[field];
+    expect(() => validateLiveConfig(config)).toThrow();
+  },
+);
 
 test('also rejects cross-platform identity overlap', () => {
   const config = fixture();
@@ -124,7 +151,15 @@ test('also rejects cross-platform identity overlap', () => {
 test.each(['registrationId', 'expectedDeviceId', 'nonce'])(
   'rejects shell/env/regex/credential injection in %s',
   field => {
-    for (const value of ['ok\nEVIL=yes', '$(echo bad)', "x'; bad", '.*', 'SharedAccessSignature sr=secret', 'x'.repeat(129), '']) {
+    for (const value of [
+      'ok\nEVIL=yes',
+      '$(echo bad)',
+      "x'; bad",
+      '.*',
+      'SharedAccessSignature sr=secret',
+      'x'.repeat(129),
+      '',
+    ]) {
       const config = fixture();
       config.cases.android[field] = value;
       expect(() => validateLiveConfig(config)).toThrow();
@@ -160,11 +195,18 @@ test('rejects accessors and inherited/unknown fields without invoking them', () 
 test('case environment whitelists nonsecret variables and anchors literal expected values', () => {
   const env = caseEnvironment(fixture(), 'android');
   expect(Object.keys(env)).toEqual([
-    'MAESTRO_APP_ID', 'MAESTRO_PLATFORM', 'MAESTRO_PROVISIONING_HOST',
+    'MAESTRO_APP_ID',
+    'MAESTRO_PLATFORM',
+    'MAESTRO_PROVISIONING_HOST',
     'MAESTRO_PROVISIONING_HOST_PATTERN',
-    'MAESTRO_SCOPE_ID', 'MAESTRO_REGISTRATION_ID', 'MAESTRO_REGISTRATION_ID_PATTERN',
-    'MAESTRO_EXPECTED_DEVICE_ID_PATTERN', 'MAESTRO_EXPECTED_HUB_PATTERN',
-    'MAESTRO_NONCE', 'MAESTRO_NONCE_PATTERN', 'MAESTRO_MODEL_ID_PATTERN',
+    'MAESTRO_SCOPE_ID',
+    'MAESTRO_REGISTRATION_ID',
+    'MAESTRO_REGISTRATION_ID_PATTERN',
+    'MAESTRO_EXPECTED_DEVICE_ID_PATTERN',
+    'MAESTRO_EXPECTED_HUB_PATTERN',
+    'MAESTRO_NONCE',
+    'MAESTRO_NONCE_PATTERN',
+    'MAESTRO_MODEL_ID_PATTERN',
   ]);
   expect(env.MAESTRO_DEVICE_KEY).toBeUndefined();
   const pattern = new RegExp(env.MAESTRO_EXPECTED_DEVICE_ID_PATTERN);
@@ -173,53 +215,108 @@ test('case environment whitelists nonsecret variables and anchors literal expect
   expect(pattern.test('prefix-returned.android')).toBe(false);
   const hostPattern = new RegExp(env.MAESTRO_PROVISIONING_HOST_PATTERN);
   expect(hostPattern.test(fixture().provisioningHost)).toBe(true);
-  expect(hostPattern.test(fixture().provisioningHost + '-leftover')).toBe(false);
-  expect(hostPattern.test(fixture().provisioningHost.replace('.', 'X'))).toBe(false);
+  expect(hostPattern.test(fixture().provisioningHost + '-leftover')).toBe(
+    false,
+  );
+  expect(hostPattern.test(fixture().provisioningHost.replace('.', 'X'))).toBe(
+    false,
+  );
   const noncePattern = new RegExp(env.MAESTRO_NONCE_PATTERN);
   expect(noncePattern.test(fixture().cases.android.nonce)).toBe(true);
-  expect(noncePattern.test(fixture().cases.android.nonce + '-leftover')).toBe(false);
+  expect(noncePattern.test(fixture().cases.android.nonce + '-leftover')).toBe(
+    false,
+  );
   expect(() => caseEnvironment(fixture(), 'all')).toThrow();
 });
 
-test.each(['passed', 'failed'])('whitelisted %s report never claims cloud verification', uiResult => {
-  const report = createLiveReport(fixture(), 'android', {sourceSha, uiResult});
-  expect(Object.keys(report)).toEqual([
-    'schemaVersion', 'sourceSha', 'platform', 'modelId', 'provisioningHost',
-    'scopeId', 'registrationId', 'expectedDeviceId', 'expectedHub', 'nonce',
-    'uiResult', 'independentAzureVerification', 'evidenceScope', 'registryVerification',
-    'diagnostics',
-  ]);
-  expect(report).toMatchObject({
-    sourceSha, platform: 'android', uiResult,
-    expectedDeviceId: 'returned.android',
-    independentAzureVerification: 'pending',
-    registryVerification: 'Not checked',
-  });
-  expect(report.evidenceScope).toContain('not a cloud ACK');
-  expect(() => createLiveReport(fixture(), 'android', {sourceSha, uiResult, deviceKey: 'SECRET_CANARY'})).toThrow();
-  expect(() => createLiveReport(fixture(), 'android', {sourceSha: 'bad', uiResult})).toThrow();
-});
+test.each(['passed', 'failed'])(
+  'whitelisted %s report never claims cloud verification',
+  uiResult => {
+    const report = createLiveReport(fixture(), 'android', {
+      sourceSha,
+      uiResult,
+    });
+    expect(Object.keys(report)).toEqual([
+      'schemaVersion',
+      'sourceSha',
+      'platform',
+      'modelId',
+      'provisioningHost',
+      'scopeId',
+      'registrationId',
+      'expectedDeviceId',
+      'expectedHub',
+      'nonce',
+      'uiResult',
+      'independentAzureVerification',
+      'evidenceScope',
+      'registryVerification',
+      'diagnostics',
+    ]);
+    expect(report).toMatchObject({
+      sourceSha,
+      platform: 'android',
+      uiResult,
+      expectedDeviceId: 'returned.android',
+      independentAzureVerification: 'pending',
+      registryVerification: 'Not checked',
+    });
+    expect(report.evidenceScope).toContain('not a cloud ACK');
+    expect(() =>
+      createLiveReport(fixture(), 'android', {
+        sourceSha,
+        uiResult,
+        deviceKey: 'SECRET_CANARY',
+      }),
+    ).toThrow();
+    expect(() =>
+      createLiveReport(fixture(), 'android', {sourceSha: 'bad', uiResult}),
+    ).toThrow();
+  },
+);
 
 test('CLI rejects invalid JSON without raw parser errors or inherited secret values', () => {
-  const result = spawnSync(process.execPath, ['scripts/ci/live-config.js', 'env', 'android'], {
-    encoding: 'utf8',
-    env: {...mockEnvironment, PAAD_LIVE_CONFIG: '{"SECRET_CANARY"', MAESTRO_DEVICE_KEY: 'KEY_CANARY'},
-  });
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/ci/live-config.js', 'env', 'android'],
+    {
+      encoding: 'utf8',
+      env: {
+        ...mockEnvironment,
+        PAAD_LIVE_CONFIG: '{"SECRET_CANARY"',
+        MAESTRO_DEVICE_KEY: 'KEY_CANARY',
+      },
+    },
+  );
   expect(result.status).toBe(1);
   expect(result.stdout).toBe('');
-  expect(result.stderr).toBe('Live configuration rejected; consult --help. No input was logged.\n');
+  expect(result.stderr).toBe(
+    'Live configuration rejected; consult --help. No input was logged.\n',
+  );
 });
 
 test('CLI report serializes only whitelisted configuration after an explicit result', () => {
-  const result = spawnSync(process.execPath, ['scripts/ci/live-config.js', 'report', 'ios', 'passed'], {
-    encoding: 'utf8',
-    env: {...mockEnvironment, PAAD_LIVE_CONFIG: JSON.stringify(fixture()), GITHUB_SHA: sourceSha, MAESTRO_DEVICE_KEY: 'KEY_CANARY'},
-  });
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/ci/live-config.js', 'report', 'ios', 'passed'],
+    {
+      encoding: 'utf8',
+      env: {
+        ...mockEnvironment,
+        PAAD_LIVE_CONFIG: JSON.stringify(fixture()),
+        GITHUB_SHA: sourceSha,
+        MAESTRO_DEVICE_KEY: 'KEY_CANARY',
+      },
+    },
+  );
   expect(result.status).toBe(0);
-  expect(JSON.parse(result.stdout)).toEqual(createLiveReport(fixture(), 'ios', {
-    sourceSha, uiResult: 'passed',
-    diagnostics: {availability: 'unavailable', reason: 'read-failed'},
-  }));
+  expect(JSON.parse(result.stdout)).toEqual(
+    createLiveReport(fixture(), 'ios', {
+      sourceSha,
+      uiResult: 'passed',
+      diagnostics: {availability: 'unavailable', reason: 'read-failed'},
+    }),
+  );
   expect(result.stdout).not.toContain('KEY_CANARY');
 });
 
@@ -230,31 +327,44 @@ test('live flow does not capture screenshots, simulate cloud, or use key command
   expect(flow).toContain('inputText: ${MAESTRO_DEVICE_KEY}');
   expect(flow).toContain('clearState: false');
   expect(flow).toContain('text: "^Submitted locally$"');
-  expect(smoke).not.toMatch(/-e\s+(?:MAESTRO_)?DEVICE_KEY|set -x|printenv|logcat -d/);
+  expect(smoke).not.toMatch(
+    /-e\s+(?:MAESTRO_)?DEVICE_KEY|set -x|printenv|logcat -d/,
+  );
   expect(smoke).toContain("timeout: 900000, killSignal: 'SIGKILL'");
 });
 
 test('iOS key injection uses isolated slow characters without revealing the value', () => {
-  const commands = yaml.loadAll(fs.readFileSync('.maestro/live-device.yaml', 'utf8'))[1];
-  const ios = commands.find(command => command.runFlow?.when?.platform === 'iOS').runFlow;
+  const commands = yaml.loadAll(
+    fs.readFileSync('.maestro/live-device.yaml', 'utf8'),
+  )[1];
+  const ios = commands.find(
+    command => command.runFlow?.when?.platform === 'iOS',
+  ).runFlow;
   expect(ios.commands).toEqual([
     {evalScript: '${output.keyIndex = 0}'},
-    {repeat: {
-      times: '${MAESTRO_DEVICE_KEY.length}',
-      commands: [
-        {inputText: '${MAESTRO_DEVICE_KEY.charAt(output.keyIndex)}'},
-        {evalScript: '${output.keyIndex = output.keyIndex + 1}'},
-      ],
-    }},
+    {
+      repeat: {
+        times: '${MAESTRO_DEVICE_KEY.length}',
+        commands: [
+          {inputText: '${MAESTRO_DEVICE_KEY.charAt(output.keyIndex)}'},
+          {evalScript: '${output.keyIndex = output.keyIndex + 1}'},
+        ],
+      },
+    },
   ]);
-  const android = commands.find(command => command.runFlow?.when?.platform === 'Android').runFlow;
+  const android = commands.find(
+    command => command.runFlow?.when?.platform === 'Android',
+  ).runFlow;
   expect(android.commands).toEqual([{inputText: '${MAESTRO_DEVICE_KEY}'}]);
 });
 
 test('both details presentations wait for the first model field before scrolling', () => {
-  const commands = yaml.loadAll(fs.readFileSync('.maestro/live-device.yaml', 'utf8'))[1];
+  const commands = yaml.loadAll(
+    fs.readFileSync('.maestro/live-device.yaml', 'utf8'),
+  )[1];
   const details = commands.flatMap((command, index) =>
-    command.tapOn?.id === 'connection-details' ? [index] : []);
+    command.tapOn?.id === 'connection-details' ? [index] : [],
+  );
   expect(details).toHaveLength(2);
   for (const index of details) {
     expect(commands[index + 1]).toEqual({
@@ -266,46 +376,104 @@ test('both details presentations wait for the first model field before scrolling
   }
 });
 
+test('assigned identity waits retain exact selectors and the shared connection deadline', () => {
+  const commands = yaml.loadAll(
+    fs.readFileSync('.maestro/live-device.yaml', 'utf8'),
+  )[1];
+  expect(commands).toContainEqual({
+    extendedWaitUntil: {
+      notVisible: {id: 'registration-manual'},
+      timeout: 180000,
+    },
+  });
+  for (const [id, text] of [
+    ['assigned-device-id', '${MAESTRO_EXPECTED_DEVICE_ID_PATTERN}'],
+    ['assigned-hub', '${MAESTRO_EXPECTED_HUB_PATTERN}'],
+  ]) {
+    const waits = commands.filter(
+      command => command.extendedWaitUntil?.visible?.id === id,
+    );
+    expect(waits).toEqual(
+      Array(2).fill({
+        extendedWaitUntil: {
+          visible: {id, text},
+          timeout: 180000,
+        },
+      }),
+    );
+    expect(commands.some(command => command.assertVisible?.id === id)).toBe(
+      false,
+    );
+  }
+});
+
 test('workflow gates every live job, scopes secrets after binary publication and whitelists uploads', () => {
-  const workflow = yaml.load(fs.readFileSync('.github/workflows/live-device.yml', 'utf8'));
+  const workflow = yaml.load(
+    fs.readFileSync('.github/workflows/live-device.yml', 'utf8'),
+  );
   expect(Object.keys(workflow.on)).toEqual(['push', 'workflow_dispatch']);
   expect(workflow.on.push).toEqual({
     branches: ['feature/adr-onboarding'],
     paths: ['.github/workflows/live-device.yml'],
   });
-  expect(workflow.jobs.authorization.if).toBe("github.event_name == 'workflow_dispatch'");
-  expect(workflow.jobs['register-manual-entrypoint'].if).toBe("github.event_name == 'push'");
-  expect(JSON.stringify(workflow.jobs['register-manual-entrypoint'])).not.toContain('secrets.');
+  expect(workflow.jobs.authorization.if).toBe(
+    "github.event_name == 'workflow_dispatch'",
+  );
+  expect(workflow.jobs['register-manual-entrypoint'].if).toBe(
+    "github.event_name == 'push'",
+  );
+  expect(
+    JSON.stringify(workflow.jobs['register-manual-entrypoint']),
+  ).not.toContain('secrets.');
   expect(Object.keys(workflow.on.workflow_dispatch.inputs)).toEqual([
-    'platform', 'confirm_live', 'expected_sha', 'config',
+    'platform',
+    'confirm_live',
+    'expected_sha',
+    'config',
   ]);
   expect(workflow.env.MAESTRO_DEVICE_KEY).toBeUndefined();
   for (const platform of ['android', 'ios']) {
     const job = workflow.jobs[platform];
     expect(job.needs).toBe('authorization');
     expect(job['timeout-minutes']).toBeLessThanOrEqual(45);
-    const secretSteps = job.steps.filter(step => JSON.stringify(step).includes('secrets.'));
+    const secretSteps = job.steps.filter(step =>
+      JSON.stringify(step).includes('secrets.'),
+    );
     expect(secretSteps).toHaveLength(1);
     const secretStep = secretSteps[0];
     expect(secretStep['timeout-minutes']).toBe(20);
     expect(secretStep.env.MAESTRO_DEVICE_KEY).toBe(
       '${{ secrets.PAAD_LIVE_' + platform.toUpperCase() + '_DEVICE_KEY }}',
     );
-    const buildIndex = job.steps.findIndex(step => step.run === `bash scripts/ci/build-${platform}.sh`);
+    const buildIndex = job.steps.findIndex(
+      step => step.run === `bash scripts/ci/build-${platform}.sh`,
+    );
     expect(buildIndex).toBeGreaterThan(-1);
-    const identityIndex = job.steps.findIndex(step => step.run === 'bash scripts/ci/identity.sh');
+    const identityIndex = job.steps.findIndex(
+      step => step.run === 'bash scripts/ci/identity.sh',
+    );
     expect(identityIndex).toBeGreaterThan(-1);
     expect(identityIndex).toBeLessThan(buildIndex);
     expect(job.steps.indexOf(secretStep)).toBeGreaterThan(buildIndex);
-    const uploads = job.steps.filter(step => step.uses?.startsWith('actions/upload-artifact@'));
+    const uploads = job.steps.filter(step =>
+      step.uses?.startsWith('actions/upload-artifact@'),
+    );
     expect(uploads).toHaveLength(2);
     expect(job.steps.indexOf(uploads[0])).toBeGreaterThan(buildIndex);
-    expect(job.steps.indexOf(uploads[0])).toBeLessThan(job.steps.indexOf(secretStep));
+    expect(job.steps.indexOf(uploads[0])).toBeLessThan(
+      job.steps.indexOf(secretStep),
+    );
     expect(uploads[0].with.path.trim().split('\n')).toEqual([
-      `build/ci-artifacts/${platform === 'android' ? 'foundation-ci.apk' : 'foundation-simulator.app.zip'}`,
+      `build/ci-artifacts/${
+        platform === 'android'
+          ? 'foundation-ci.apk'
+          : 'foundation-simulator.app.zip'
+      }`,
       'build/ci-artifacts/identity.txt',
     ]);
-    expect(uploads[1].with.path).toBe(`build/live-device-summary-${platform}.json`);
+    expect(uploads[1].with.path).toBe(
+      `build/live-device-summary-${platform}.json`,
+    );
     for (const upload of uploads) expect(upload.with['retention-days']).toBe(3);
   }
 });
@@ -317,116 +485,195 @@ test.each([
   ['GITHUB_ACTOR', 'not-owner'],
   ['PAAD_LIVE_EXPECTED_SHA', 'b'.repeat(40)],
   ['GITHUB_SHA', 'invalid'],
-])('shell gate fails closed before any device access when %s is unauthorized', (name, value) => {
-  const result = spawnSync('bash', ['scripts/ci/smoke-live-device.sh', 'android'], {
-    encoding: 'utf8',
-    env: {
-      ...mockEnvironment,
-      GITHUB_EVENT_NAME: 'workflow_dispatch',
-      PAAD_LIVE_CONFIRM: 'true',
-      GITHUB_REF: 'refs/heads/feature/adr-onboarding',
-      GITHUB_REPOSITORY_OWNER: 'owner',
-      GITHUB_ACTOR: 'owner',
-      GITHUB_SHA: sourceSha,
-      PAAD_LIVE_EXPECTED_SHA: sourceSha,
-      PAAD_VARIANT: 'ci',
-      PAAD_LIVE_CONFIG: 'INVALID_INPUT_CANARY',
-      MAESTRO_DEVICE_KEY: 'KEY_CANARY',
-      [name]: value,
-    },
-  });
-  expect(result.status).toBe(1);
-  expect(result.stdout).toBe('');
-  expect(result.stderr).toBe('Live smoke authorization rejected.\n');
-});
+])(
+  'shell gate fails closed before any device access when %s is unauthorized',
+  (name, value) => {
+    const result = spawnSync(
+      'bash',
+      ['scripts/ci/smoke-live-device.sh', 'android'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...mockEnvironment,
+          GITHUB_EVENT_NAME: 'workflow_dispatch',
+          PAAD_LIVE_CONFIRM: 'true',
+          GITHUB_REF: 'refs/heads/feature/adr-onboarding',
+          GITHUB_REPOSITORY_OWNER: 'owner',
+          GITHUB_ACTOR: 'owner',
+          GITHUB_SHA: sourceSha,
+          PAAD_LIVE_EXPECTED_SHA: sourceSha,
+          PAAD_VARIANT: 'ci',
+          PAAD_LIVE_CONFIG: 'INVALID_INPUT_CANARY',
+          MAESTRO_DEVICE_KEY: 'KEY_CANARY',
+          [name]: value,
+        },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('Live smoke authorization rejected.\n');
+  },
+);
 
 test.each([
   'KEY_CANARY',
   Buffer.alloc(15).toString('base64'),
   Buffer.alloc(32).toString('base64') + '\n',
-])('invalid dedicated input is rejected before accessing a device (%#)', key => {
-  const result = spawnSync('bash', ['scripts/ci/smoke-live-device.sh', 'ios'], {
-    encoding: 'utf8',
-    env: {
-      ...mockEnvironment,
-      GITHUB_EVENT_NAME: 'workflow_dispatch',
-      PAAD_LIVE_CONFIRM: 'true',
-      GITHUB_REF: 'refs/heads/feature/adr-onboarding',
-      GITHUB_REPOSITORY_OWNER: 'owner',
-      GITHUB_ACTOR: 'owner',
-      GITHUB_SHA: sourceSha,
-      PAAD_LIVE_EXPECTED_SHA: sourceSha,
-      PAAD_VARIANT: 'ci',
-      PAAD_LIVE_CONFIG: JSON.stringify(fixture()),
-      MAESTRO_DEVICE_KEY: key,
-    },
-  });
-  expect(result.status).toBe(1);
-  expect(result.stdout).toBe('');
-  expect(result.stderr).toBe('Dedicated device input is not canonical Base64 key material.\n');
-  expect(result.stderr).not.toContain(key);
-});
+])(
+  'invalid dedicated input is rejected before accessing a device (%#)',
+  key => {
+    const result = spawnSync(
+      'bash',
+      ['scripts/ci/smoke-live-device.sh', 'ios'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...mockEnvironment,
+          GITHUB_EVENT_NAME: 'workflow_dispatch',
+          PAAD_LIVE_CONFIRM: 'true',
+          GITHUB_REF: 'refs/heads/feature/adr-onboarding',
+          GITHUB_REPOSITORY_OWNER: 'owner',
+          GITHUB_ACTOR: 'owner',
+          GITHUB_SHA: sourceSha,
+          PAAD_LIVE_EXPECTED_SHA: sourceSha,
+          PAAD_VARIANT: 'ci',
+          PAAD_LIVE_CONFIG: JSON.stringify(fixture()),
+          MAESTRO_DEVICE_KEY: key,
+        },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe(
+      'Dedicated device input is not canonical Base64 key material.\n',
+    );
+    expect(result.stderr).not.toContain(key);
+  },
+);
 
 test('report sanitizes nested diagnostics and never upgrades a failed UI result', () => {
   const diagnostics = {
     availability: 'available',
-    failedCommands: [{
-      sequenceNumber: 42, commandKind: 'assertConditionCommand', targetId: 'connection-status',
-      inputText: 'SECRET_CANARY', error: {message: 'SECRET_CANARY'},
-    }],
-    ui: {connectionErrorCode: 'AUTHENTICATION_FAILED', connectionServiceCode: 401002,
-      proofStatus: 'SECRET_CANARY', message: 'SECRET_CANARY'},
+    failedCommands: [
+      {
+        sequenceNumber: 42,
+        commandKind: 'assertConditionCommand',
+        targetId: 'connection-status',
+        inputText: 'SECRET_CANARY',
+        error: {message: 'SECRET_CANARY'},
+      },
+    ],
+    ui: {
+      connectionErrorCode: 'AUTHENTICATION_FAILED',
+      connectionServiceCode: 401002,
+      proofStatus: 'SECRET_CANARY',
+      message: 'SECRET_CANARY',
+    },
     env: {MAESTRO_DEVICE_KEY: 'SECRET_CANARY'},
   };
-  const report = createLiveReport(fixture(), 'ios', {sourceSha, uiResult: 'failed', diagnostics});
+  const report = createLiveReport(fixture(), 'ios', {
+    sourceSha,
+    uiResult: 'failed',
+    diagnostics,
+  });
   expect(JSON.stringify(report)).not.toContain('SECRET_CANARY');
   expect(report.uiResult).toBe('failed');
   expect(report.independentAzureVerification).toBe('pending');
   expect(report.diagnostics.ui).toEqual({
-    connectionErrorCode: 'AUTHENTICATION_FAILED', connectionServiceCode: 401002,
+    connectionErrorCode: 'AUTHENTICATION_FAILED',
+    connectionServiceCode: 401002,
   });
-  expect(createLiveReport(fixture(), 'ios', {sourceSha, uiResult: 'failed'}).diagnostics)
-    .toEqual({availability: 'unavailable'});
+  expect(
+    createLiveReport(fixture(), 'ios', {sourceSha, uiResult: 'failed'})
+      .diagnostics,
+  ).toEqual({availability: 'unavailable'});
 });
 
 test('cleanup and launcher stay private, owned and do not silence simulator cleanup failure', () => {
   const smoke = fs.readFileSync('scripts/ci/smoke-live-device.sh', 'utf8');
-  const workflow = yaml.load(fs.readFileSync('.github/workflows/live-device.yml', 'utf8'));
-  const cleanup = workflow.jobs.ios.steps.find(step => step.name === "Remove only this job's dedicated simulator");
+  const workflow = yaml.load(
+    fs.readFileSync('.github/workflows/live-device.yml', 'utf8'),
+  );
+  const cleanup = workflow.jobs.ios.steps.find(
+    step => step.name === "Remove only this job's dedicated simulator",
+  );
   expect(cleanup.run).not.toContain('|| true');
   expect(cleanup.run).toContain('::warning::');
   expect(smoke).toContain('maestro="$PWD/build/ci-tools/maestro/bin/maestro"');
   expect(smoke).toContain('HOME="$private/home" TMPDIR="$private/scratch"');
   expect(smoke).toContain('stat.dev}:${stat.ino}');
-  expect(smoke.indexOf('node scripts/ci/live-diagnostics.js')).toBeLessThan(smoke.indexOf('shell am force-stop'));
-  expect(smoke.indexOf('node scripts/ci/live-diagnostics.js')).toBeLessThan(smoke.indexOf('fs.rmSync(root'));
+  expect(smoke.indexOf('node scripts/ci/live-diagnostics.js')).toBeLessThan(
+    smoke.indexOf('shell am force-stop'),
+  );
+  expect(smoke.indexOf('node scripts/ci/live-diagnostics.js')).toBeLessThan(
+    smoke.indexOf('fs.rmSync(root'),
+  );
   expect(smoke).not.toContain('rm -rf');
-  const iosSelection = smoke.slice(smoke.indexOf('candidate="${IOS_SIMULATOR_UDID'));
-  expect(iosSelection.indexOf('[[ "$candidate" =~')).toBeLessThan(iosSelection.indexOf('device="$candidate"'));
+  const iosSelection = smoke.slice(
+    smoke.indexOf('candidate="${IOS_SIMULATOR_UDID'),
+  );
+  expect(iosSelection.indexOf('[[ "$candidate" =~')).toBeLessThan(
+    iosSelection.indexOf('device="$candidate"'),
+  );
 });
 
 test.each([
-  {maestroResult: '0', diagnostics: 'yes', cleanupFailure: 'no', expected: 'passed'},
-  {maestroResult: '7', diagnostics: 'yes', cleanupFailure: 'no', expected: 'failed'},
-  {maestroResult: '7', diagnostics: 'no', cleanupFailure: 'no', expected: 'failed'},
-  {maestroResult: '0', diagnostics: 'yes', cleanupFailure: 'yes', expected: 'failed'},
-])('mock-only smoke preserves outcome and removes all private state (%#)', scenario => {
-  const key = Buffer.from('SECRET_CANARY'.repeat(3)).toString('base64');
-  const directory = `.live-smoke-fixture-${process.pid}-${scenario.maestroResult}-${scenario.diagnostics}-${scenario.cleanupFailure}`;
-  fs.mkdirSync(directory, {mode: 0o700});
-  try {
-    for (const child of ['scripts/ci', 'bin', 'build/ci-tools/maestro/bin']) {
-      fs.mkdirSync(path.join(directory, child), {recursive: true});
-    }
-    for (const file of ['smoke-live-device.sh', 'live-config.js', 'live-diagnostics.js']) {
-      fs.copyFileSync(`scripts/ci/${file}`, path.join(directory, 'scripts/ci', file));
-    }
-    fs.writeFileSync(path.join(directory, 'bin/adb'), `#!/bin/bash
+  {
+    maestroResult: '0',
+    diagnostics: 'yes',
+    cleanupFailure: 'no',
+    expected: 'passed',
+  },
+  {
+    maestroResult: '7',
+    diagnostics: 'yes',
+    cleanupFailure: 'no',
+    expected: 'failed',
+  },
+  {
+    maestroResult: '7',
+    diagnostics: 'no',
+    cleanupFailure: 'no',
+    expected: 'failed',
+  },
+  {
+    maestroResult: '0',
+    diagnostics: 'yes',
+    cleanupFailure: 'yes',
+    expected: 'failed',
+  },
+])(
+  'mock-only smoke preserves outcome and removes all private state (%#)',
+  scenario => {
+    const key = Buffer.from('SECRET_CANARY'.repeat(3)).toString('base64');
+    const directory = `.live-smoke-fixture-${process.pid}-${scenario.maestroResult}-${scenario.diagnostics}-${scenario.cleanupFailure}`;
+    fs.mkdirSync(directory, {mode: 0o700});
+    try {
+      for (const child of ['scripts/ci', 'bin', 'build/ci-tools/maestro/bin']) {
+        fs.mkdirSync(path.join(directory, child), {recursive: true});
+      }
+      for (const file of [
+        'smoke-live-device.sh',
+        'live-config.js',
+        'live-diagnostics.js',
+      ]) {
+        fs.copyFileSync(
+          `scripts/ci/${file}`,
+          path.join(directory, 'scripts/ci', file),
+        );
+      }
+      fs.writeFileSync(
+        path.join(directory, 'bin/adb'),
+        `#!/bin/bash
 if [[ "$1" = devices ]]; then printf 'emulator-5554\\tdevice\\n'; exit 0; fi
 if [[ "$TEST_CLEANUP_FAILURE" = yes && "$*" = *"pm clear"* ]]; then exit 1; fi
 echo SECRET_CANARY
-`, {mode: 0o700});
-    fs.writeFileSync(path.join(directory, 'build/ci-tools/maestro/bin/maestro'), `#!/usr/bin/env node
+`,
+        {mode: 0o700},
+      );
+      fs.writeFileSync(
+        path.join(directory, 'build/ci-tools/maestro/bin/maestro'),
+        `#!/usr/bin/env node
 const fs = require('node:fs'), path = require('node:path');
 const root = process.env.PAAD_LIVE_PRIVATE;
 if (process.env.HOME !== root + '/home' || process.env.TMPDIR !== root + '/scratch' ||
@@ -443,34 +690,56 @@ if (process.env.TEST_DIAGNOSTICS === 'yes') {
   }]));
 }
 process.exit(Number(process.env.TEST_MAESTRO_RESULT));
-`, {mode: 0o700});
-    const result = spawnSync('/bin/bash', ['scripts/ci/smoke-live-device.sh', 'android'], {
-      cwd: directory, encoding: 'utf8', timeout: 20000,
-      env: {
-        ...mockEnvironment,
-        PATH: `${path.resolve(directory, 'bin')}:${mockEnvironment.PATH}`,
-        GITHUB_EVENT_NAME: 'workflow_dispatch', PAAD_LIVE_CONFIRM: 'true',
-        GITHUB_REF: 'refs/heads/feature/adr-onboarding', GITHUB_REPOSITORY_OWNER: 'owner',
-        GITHUB_ACTOR: 'owner', GITHUB_SHA: sourceSha, PAAD_LIVE_EXPECTED_SHA: sourceSha,
-        PAAD_VARIANT: 'ci', PAAD_LIVE_CONFIG: JSON.stringify(fixture()),
-        MAESTRO_DEVICE_KEY: key,
-        TEST_MAESTRO_RESULT: scenario.maestroResult, TEST_DIAGNOSTICS: scenario.diagnostics,
-        TEST_CLEANUP_FAILURE: scenario.cleanupFailure,
-      },
-    });
-    expect(result.error).toBeUndefined();
-    expect(result.status === 0).toBe(scenario.expected === 'passed');
-    expect(result.stdout + result.stderr).not.toContain('SECRET_CANARY');
-    expect(result.stdout + result.stderr).not.toContain(key);
-    expect(fs.existsSync(path.join(directory, 'build/live-device-private'))).toBe(false);
-    const raw = fs.readFileSync(path.join(directory, 'build/live-device-summary-android.json'), 'utf8');
-    const report = JSON.parse(raw);
-    expect(raw).not.toContain('SECRET_CANARY');
-    expect(raw).not.toContain(key);
-    expect(report.uiResult).toBe(scenario.expected);
-    expect(report.independentAzureVerification).toBe('pending');
-    expect(report.diagnostics.availability).toBe(scenario.diagnostics === 'yes' ? 'available' : 'unavailable');
-  } finally {
-    fs.rmSync(directory, {recursive: true});
-  }
-});
+`,
+        {mode: 0o700},
+      );
+      const result = spawnSync(
+        '/bin/bash',
+        ['scripts/ci/smoke-live-device.sh', 'android'],
+        {
+          cwd: directory,
+          encoding: 'utf8',
+          timeout: 20000,
+          env: {
+            ...mockEnvironment,
+            PATH: `${path.resolve(directory, 'bin')}:${mockEnvironment.PATH}`,
+            GITHUB_EVENT_NAME: 'workflow_dispatch',
+            PAAD_LIVE_CONFIRM: 'true',
+            GITHUB_REF: 'refs/heads/feature/adr-onboarding',
+            GITHUB_REPOSITORY_OWNER: 'owner',
+            GITHUB_ACTOR: 'owner',
+            GITHUB_SHA: sourceSha,
+            PAAD_LIVE_EXPECTED_SHA: sourceSha,
+            PAAD_VARIANT: 'ci',
+            PAAD_LIVE_CONFIG: JSON.stringify(fixture()),
+            MAESTRO_DEVICE_KEY: key,
+            TEST_MAESTRO_RESULT: scenario.maestroResult,
+            TEST_DIAGNOSTICS: scenario.diagnostics,
+            TEST_CLEANUP_FAILURE: scenario.cleanupFailure,
+          },
+        },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.status === 0).toBe(scenario.expected === 'passed');
+      expect(result.stdout + result.stderr).not.toContain('SECRET_CANARY');
+      expect(result.stdout + result.stderr).not.toContain(key);
+      expect(
+        fs.existsSync(path.join(directory, 'build/live-device-private')),
+      ).toBe(false);
+      const raw = fs.readFileSync(
+        path.join(directory, 'build/live-device-summary-android.json'),
+        'utf8',
+      );
+      const report = JSON.parse(raw);
+      expect(raw).not.toContain('SECRET_CANARY');
+      expect(raw).not.toContain(key);
+      expect(report.uiResult).toBe(scenario.expected);
+      expect(report.independentAzureVerification).toBe('pending');
+      expect(report.diagnostics.availability).toBe(
+        scenario.diagnostics === 'yes' ? 'available' : 'unavailable',
+      );
+    } finally {
+      fs.rmSync(directory, {recursive: true});
+    }
+  },
+);
