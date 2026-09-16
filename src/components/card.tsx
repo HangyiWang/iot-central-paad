@@ -1,27 +1,20 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import React, {useRef, useState, useEffect, useMemo} from 'react';
+import React, {useState, useEffect, useMemo} from 'react';
 import {CardProps, IconProps, Icon, Input} from '@rneui/themed';
 import {
   View,
-  ColorValue,
   TouchableOpacity,
   TouchableOpacityProps,
-  ViewStyle,
+  StyleSheet,
 } from 'react-native';
 import {Button} from 'components';
-import {
-  Text,
-  Name,
-  Headline,
-  getRandomColor,
-  bytesToSize,
-  normalize,
-} from './typography';
+import {Text, Name, Headline, bytesToSize} from './typography';
 import {DataType, ItemProps, StyleDefinition} from 'types';
 import {useTheme} from 'hooks';
 import Strings from 'strings';
+import {cardTint, palette} from '../theme/palette';
 
 type EditCallback = (value: any) => void | Promise<void>;
 
@@ -39,6 +32,7 @@ export function Card(
       onEdit?: EditCallback;
       availability?: ItemProps['availability'];
       simulated?: boolean;
+      accentKey?: string;
     },
 ) {
   const {
@@ -54,51 +48,48 @@ export function Card(
     dataType,
     availability,
     simulated,
+    accentKey,
     ...otherProps
   } = props;
-  const {dark, colors} = useTheme();
-
-  const textColor = enabled ? colors.text : '#9490a9';
-  const barColor = useRef(getRandomColor() as ColorValue);
-  const iconStyle: ViewStyle = {
-    alignSelf: 'flex-end',
-    justifyContent: 'flex-end',
-  };
+  const {dark} = useTheme();
+  const colors = palette(dark);
+  const textColor = enabled ? colors.text : colors.muted;
+  const tint = cardTint(accentKey ?? props.title ?? '', dark);
   const styles = useMemo<StyleDefinition>(
     () => ({
       container: {
-        backgroundColor: colors.card,
-        flex: 1,
-        height: 200,
-        padding: 25,
-        margin: 10,
-        borderRadius: 20,
-        ...(!dark
-          ? {
-              shadowColor: "'rgba(0, 0, 0, 0.14)'",
-              shadowOffset: {
-                width: 0,
-                height: 3,
-              },
-              shadowOpacity: 0.8,
-              shadowRadius: 3.84,
-              elevation: 5,
-            }
-          : {}),
+        backgroundColor: enabled ? tint : colors.surface,
+        flexGrow: 1,
+        flexShrink: 1,
+        minWidth: 0,
+        minHeight: 140,
+        padding: 20,
+        marginBottom: 12,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: enabled ? tint : colors.border,
       },
-      content: {flex: 1, position: 'relative'},
-      enabled: {
-        backgroundColor: enabled ? barColor.current : 'white',
-        width: '60%',
-        height: 5,
-        marginBottom: 20,
-        borderRadius: 5,
+      content: {flexDirection: 'row', alignItems: 'flex-start', gap: 16},
+      icon: {
+        width: 42,
+        height: 42,
+        borderRadius: 16,
+        backgroundColor: colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
       },
-      cardBody: {flex: 2},
-      cardValues: {flexDirection: 'row', paddingVertical: 10},
-      unit: {color: '#9490a9', alignSelf: 'flex-end'},
+      cardBody: {flex: 1, minWidth: 0, gap: 8},
+      cardValues: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'baseline',
+        gap: 6,
+      },
+      unit: {color: colors.muted, fontSize: 13, fontWeight: '400'},
+      status: {fontSize: 13, color: colors.muted},
+      simulated: {fontSize: 12, fontWeight: '600', color: colors.primary},
     }),
-    [colors.card, dark, enabled],
+    [colors, enabled, tint],
   );
 
   return (
@@ -109,28 +100,31 @@ export function Card(
       onPress={onPress}
       onLongPress={onLongPress}>
       <View style={styles.content}>
-        {enabled && <View style={styles.enabled} />}
-        {/* round checkbox for enable/disable */}
-        {/* {onToggle && (
-          <CheckBox
-            center
-            checkedIcon="dot-circle-o"
-            uncheckedIcon="circle-o"
-            checked={enabled}
-            containerStyle={checkboxStyle}
-            onPress={onToggle}
-          />
-        )} */}
-
+        {icon && (
+          <View
+            style={styles.icon}
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants">
+            <Icon
+              name={icon.name}
+              type={icon.type}
+              size={22}
+              color={textColor}
+            />
+          </View>
+        )}
         <View style={styles.cardBody}>
           <Name style={{color: textColor}}>{otherProps.title}</Name>
-          {simulated && <Text>{Strings.Sensors.Simulated}</Text>}
+          {simulated && (
+            <Text style={styles.simulated}>{Strings.Sensors.Simulated}</Text>
+          )}
           {!enabled ? (
-            <Text>{Strings.Sensors.Disabled}</Text>
+            <Text style={styles.status}>{Strings.Sensors.Disabled}</Text>
           ) : availability === 'unavailable' ? (
-            <Text>{Strings.Sensors.Unavailable}</Text>
+            <Text style={styles.status}>{Strings.Sensors.Unavailable}</Text>
           ) : availability === 'checking' ? (
-            <Text>{Strings.Sensors.Checking}</Text>
+            <Text style={styles.status}>{Strings.Sensors.Checking}</Text>
           ) : typeof value === 'function' ? (
             value()
           ) : (
@@ -143,18 +137,17 @@ export function Card(
                 onEdit={onEdit}
                 textColor={textColor}
               />
-              {unit && enabled && (
-                <Headline style={styles.unit}>{unit}</Headline>
-              )}
+              {unit && enabled && <Text style={styles.unit}>{unit}</Text>}
             </View>
           )}
         </View>
-        {icon && (
+        {onPress && (
           <Icon
-            name={icon.name}
-            type={icon.type}
-            style={iconStyle}
-            color="#9490a9"
+            name="chevron-forward"
+            type="ionicon"
+            size={18}
+            color={colors.muted}
+            accessible={false}
           />
         )}
       </View>
@@ -172,9 +165,14 @@ const Value = React.memo<{
 }>(({value, enabled, editable, onEdit, textColor, type}) => {
   const [edited, setEdited] = useState(value);
   const styles: StyleDefinition = {
-    container: {flex: 1, alignItems: 'center'},
-    editInput: {maxHeight: 50, marginBottom: 5},
-    stringVal: {fontSize: normalize(20), marginEnd: 5, color: textColor},
+    container: {flex: 1, minWidth: 0},
+    editInput: {paddingHorizontal: 0, marginBottom: 4},
+    stringVal: {
+      fontSize: 23,
+      fontWeight: '600',
+      color: textColor,
+      fontVariant: ['tabular-nums'],
+    },
   };
 
   useEffect(() => {
@@ -195,8 +193,8 @@ const Value = React.memo<{
 
   if (type === 'object') {
     return (
-      <View>
-        {Object.keys(value).map((v, i) => {
+      <View style={valueStyles.measurements}>
+        {Object.keys(value).map(v => {
           let strVal: string = value[v] == null ? 'N/A' : String(value[v]);
           if (typeof value[v] === 'number') {
             strVal = (value[v] as number).toLocaleString(undefined, {
@@ -204,9 +202,14 @@ const Value = React.memo<{
             });
           }
           return (
-            <Text key={`data-${i}`} style={{color: textColor}}>
-              {v}: {strVal}
-            </Text>
+            <View key={v} style={valueStyles.measurement}>
+              <Text style={[valueStyles.measurementLabel, {color: textColor}]}>
+                {v}
+              </Text>
+              <Text style={[valueStyles.measurementValue, {color: textColor}]}>
+                {strVal}
+              </Text>
+            </View>
           );
         })}
       </View>
@@ -243,12 +246,18 @@ const Value = React.memo<{
         </View>
       );
     } else {
-      return (
-        <Headline style={styles.stringVal}>
-          {/* {strVal.length > 6 ? `${strVal.substring(0, 6)}...` : strVal} */}
-          {strVal}
-        </Headline>
-      );
+      return <Headline style={styles.stringVal}>{strVal}</Headline>;
     }
   }
+});
+
+const valueStyles = StyleSheet.create({
+  measurements: {flexDirection: 'row', flexWrap: 'wrap', gap: 14},
+  measurement: {minWidth: 54, maxWidth: '100%', gap: 2},
+  measurementLabel: {fontSize: 12, lineHeight: 17},
+  measurementValue: {
+    fontSize: 17,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
 });

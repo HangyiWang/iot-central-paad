@@ -1,0 +1,155 @@
+import React from 'react';
+import renderer, {act} from 'react-test-renderer';
+import * as Native from 'react-native';
+import CardView from '../src/CardView';
+import {Headline, Detail, Name, Text} from '../src/components/typography';
+import {cardTint, palette} from '../src/theme/palette';
+
+jest.mock('../src/hooks', () => ({
+  useTheme: () => ({
+    dark: false,
+    colors: {text: '#17252A', card: '#FFFFFF', background: '#F5F4F0'},
+  }),
+}));
+jest.mock('../src/components/card', () => ({Card: 'Card'}));
+jest.mock('../src/components/bottomPopup', () => 'BottomPopup');
+jest.mock('@rneui/themed', () => {
+  const React = require('react');
+  const ListItem = props =>
+    React.createElement('ListItem', props, props.children);
+  ListItem.Content = 'ListItemContent';
+  ListItem.Title = 'ListItemTitle';
+  return {Text: 'NativeText', ListItem};
+});
+
+let view;
+afterEach(() => {
+  act(() => view?.unmount());
+  view = undefined;
+  jest.restoreAllMocks();
+});
+
+test.each([Headline, Detail, Name, Text])(
+  'typography keeps native scaling and forwards accessibility/value IDs (%#)',
+  Component => {
+    act(() => {
+      view = renderer.create(
+        <Component testID="value-only" accessibilityRole="header" selectable>
+          exact-value
+        </Component>,
+      );
+    });
+    const node = view.root.findByType('NativeText');
+    expect(node.props).toMatchObject({
+      testID: 'value-only',
+      accessibilityRole: 'header',
+      selectable: true,
+      children: 'exact-value',
+    });
+    expect(node.props.allowFontScaling).not.toBe(false);
+    expect(node.props.maxFontSizeMultiplier).toBeUndefined();
+  },
+);
+
+const item = id => ({
+  id,
+  name: id,
+  value: 12.5,
+  dataType: 'number',
+  enabled: true,
+  simulated: false,
+});
+
+test.each([
+  [390, 1, 1],
+  [800, 1, 2],
+  [800, 2, 1],
+])(
+  'readings use a readable responsive layout at width %s / font scale %s',
+  (width, fontScale, columns) => {
+    const dimensions = jest
+      .spyOn(require('react-native'), 'useWindowDimensions')
+      .mockReturnValue({
+        width,
+        fontScale,
+        height: 900,
+        scale: 2,
+      });
+    const items = Array.from({length: 6}, (_, index) =>
+      item(`sensor-${index}`),
+    );
+    act(() => {
+      view = renderer.create(
+        <CardView items={items} componentName="Telemetry" />,
+      );
+    });
+    const list = view.root.findByType(Native.FlatList);
+    expect(dimensions).toHaveBeenCalled();
+    expect(list.props.numColumns).toBe(columns);
+    expect(
+      list.props.renderItem({item: items[0], index: 0}).props.accentKey,
+    ).toBe(items[0].id);
+    const instance = list.instance;
+    act(() => {
+      view.update(
+        <CardView
+          items={[...items, item('extra')]}
+          componentName="Telemetry"
+        />,
+      );
+    });
+    expect(view.root.findByType(Native.FlatList).instance).toBe(instance);
+  },
+);
+
+function luminance(hex) {
+  const channels = hex
+    .slice(1)
+    .match(/../g)
+    .map(value => {
+      const channel = parseInt(value, 16) / 255;
+      return channel <= 0.04045
+        ? channel / 12.92
+        : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+test.each([false, true])(
+  'pastel surfaces retain readable text and controls in dark=%s',
+  dark => {
+    const colors = palette(dark);
+    const pairs = [
+      ...[
+        colors.surface,
+        colors.background,
+        colors.inset,
+        ...colors.tints,
+      ].flatMap(background => [
+        [colors.text, background],
+        [colors.muted, background],
+      ]),
+      [colors.onPrimary, colors.primary],
+      [colors.positive, colors.positiveSurface],
+      [colors.danger, colors.dangerSurface],
+    ];
+    for (const [foreground, background] of pairs) {
+      const a = luminance(foreground);
+      const b = luminance(background);
+      expect(
+        (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+    for (const background of [colors.surface, colors.inset]) {
+      const a = luminance(colors.controlBorder);
+      const b = luminance(background);
+      expect(
+        (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+      ).toBeGreaterThanOrEqual(3);
+    }
+    expect(cardTint('accelerometer', dark)).toBe(
+      cardTint('accelerometer', dark),
+    );
+    expect(colors.tints).toContain(cardTint('accelerometer', dark));
+  },
+);

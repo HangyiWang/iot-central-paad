@@ -111,6 +111,7 @@ export type ItemProps = {
   enabled: boolean;
   simulated: boolean;
   availability?: 'checking' | 'available' | 'unavailable';
+  editable?: boolean;
   retry?(): void;
   enable(value?: boolean): void;
   sendInterval(value: number): void;

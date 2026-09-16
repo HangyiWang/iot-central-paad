@@ -10,6 +10,7 @@ import {
 } from '@react-navigation/native';
 import {createTheme, ThemeProvider as UIThemeProvider} from '@rneui/themed';
 import {ThemeMode} from 'types';
+import {palette} from '../theme/palette';
 
 export interface ITheme {
   backgroundColor: string;
@@ -29,15 +30,16 @@ const ThemeProvider: React.FC<{children: React.ReactNode}> = ({children}) => {
     mode === ThemeMode.DARK || (mode === ThemeMode.DEVICE && system === 'dark');
   const navigationTheme = useMemo(() => {
     const base = dark ? DarkTheme : DefaultTheme;
+    const colors = palette(dark);
     return {
       ...base,
       colors: {
         ...base.colors,
-        primary: dark ? '#72D5C2' : '#166B72',
-        background: dark ? '#111D22' : '#F5F4F0',
-        card: dark ? '#1B2A30' : '#FFFFFF',
-        text: dark ? '#F0F4F3' : '#17252A',
-        border: dark ? '#33464A' : '#D5DCDA',
+        primary: colors.primary,
+        background: colors.background,
+        card: colors.surface,
+        text: colors.text,
+        border: colors.border,
       },
     };
   }, [dark]);
@@ -45,8 +47,16 @@ const ThemeProvider: React.FC<{children: React.ReactNode}> = ({children}) => {
     () =>
       createTheme({
         mode: dark ? 'dark' : 'light',
-        lightColors: {primary: '#166B72', background: '#FFFFFF'},
-        darkColors: {primary: '#72D5C2', background: '#1B2A30'},
+        lightColors: {
+          primary: palette(false).primary,
+          background: palette(false).surface,
+          grey3: palette(false).muted,
+        },
+        darkColors: {
+          primary: palette(true).primary,
+          background: palette(true).surface,
+          grey3: palette(true).muted,
+        },
       }),
     [dark],
   );

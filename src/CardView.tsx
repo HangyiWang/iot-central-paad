@@ -2,7 +2,13 @@
 // Licensed under the MIT License.
 
 import React from 'react';
-import {View, FlatList, ViewStyle, TextStyle} from 'react-native';
+import {
+  View,
+  FlatList,
+  ViewStyle,
+  TextStyle,
+  useWindowDimensions,
+} from 'react-native';
 import {ListItem} from '@rneui/themed';
 import Strings from 'strings';
 import {ItemProps, Literal} from 'types';
@@ -25,9 +31,13 @@ const CardView = React.memo<{
     undefined,
   );
   const {colors} = useTheme();
+  const {width, fontScale} = useWindowDimensions();
+  const columns = width >= 700 && fontScale <= 1.3 ? 2 : 1;
   const styles = React.useMemo<Literal<ViewStyle | TextStyle>>(
     () => ({
-      container: {flex: 1, paddingVertical: 10},
+      container: {flex: 1, backgroundColor: colors.background},
+      list: {paddingHorizontal: 20, paddingTop: 16, paddingBottom: 28},
+      columns: {gap: 12},
       listItem: {
         backgroundColor: colors.card,
       },
@@ -54,12 +64,15 @@ const CardView = React.memo<{
   return (
     <View style={styles.container}>
       <FlatList
-        key={`flatlist-${componentName}-${items.length}`}
-        numColumns={items.length > 4 ? 2 : 1}
+        key={`flatlist-${componentName}-${columns}`}
+        numColumns={columns}
+        contentContainerStyle={styles.list}
+        columnWrapperStyle={columns === 2 ? styles.columns : undefined}
+        showsVerticalScrollIndicator={false}
         data={items}
         keyExtractor={item => item.id}
         renderItem={getCard(
-          componentName,
+          columns,
           onItemPress,
           onItemLongPress ? onCardLongPress : undefined,
           onEdit,
@@ -111,15 +124,16 @@ const CardView = React.memo<{
 
 const getCard =
   (
-    componentName?: string,
+    columns: number,
     onItemPress?: CardPressCallback,
     onItemLongPress?: CardPressCallback,
     onEdit?: CardEditCallback,
   ) =>
-  ({item, index}: {item: ItemProps; index: number}) =>
+  ({item}: {item: ItemProps}) =>
     (
       <Card
-        key={`${componentName ?? 'card'}-${index}`}
+        containerStyle={columns === 2 ? {flexBasis: 0} : undefined}
+        accentKey={item.id}
         title={item.name}
         value={item.value}
         unit={item.unit}
@@ -127,7 +141,7 @@ const getCard =
         enabled={item.enabled}
         availability={item.availability}
         simulated={item.simulated}
-        editable={(item as any).editable}
+        editable={item.editable}
         icon={item.icon}
         // onToggle={() => item.enable(!item.enabled)}
         onLongPress={onItemLongPress && onItemLongPress.bind(null, item)} // edit card
