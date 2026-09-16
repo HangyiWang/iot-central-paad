@@ -164,6 +164,57 @@ test.each([401, 403])(
   },
 );
 
+test.each([
+  ['errorCode', 400123],
+  ['code', 400124],
+  ['errorCode', '400123'],
+  ['code', '400124'],
+  ['errorCode', undefined],
+  ['code', undefined],
+])(
+  'HTTP failures retain only a numeric DPS error code (%#)',
+  async (field, serviceCode) => {
+    const http = jest.fn(async () =>
+      response(400, {[field]: serviceCode, message: key, trackingId: key}),
+    );
+    const error = await createDeviceClient(credentials, {http})
+      .connect()
+      .catch(e => e);
+    expect(error).toMatchObject({code: 'PROVISIONING_FAILED', status: 400});
+    expect(error.serviceCode).toBe(
+      typeof serviceCode === 'number' ? serviceCode : undefined,
+    );
+    expect(JSON.stringify(error)).not.toContain(key);
+    expect(createLegacyHub).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  },
+);
+
+test.each(['syntax', 'shape', 'read'])(
+  'an unusable HTTP error body is still a safe failure (%s)',
+  async kind => {
+    const result = response(412, key);
+    if (kind !== 'shape') {
+      result.json = async () => {
+        throw kind === 'syntax' ? new SyntaxError(key) : new Error(key);
+      };
+    }
+    const error = await createDeviceClient(credentials, {
+      http: jest.fn(async () => result),
+    })
+      .connect()
+      .catch(e => e);
+    expect(error.code).toBe(
+      kind === 'read' ? 'NETWORK_ERROR' : 'PROVISIONING_FAILED',
+    );
+    if (kind !== 'read') expect(error.status).toBe(412);
+    expect(JSON.stringify(error)).not.toContain(key);
+    expect(String(error)).not.toContain(key);
+    expect(createLegacyHub).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  },
+);
+
 test('failed service operation exposes only numeric code and operationId', async () => {
   const http = jest.fn(async () =>
     response(200, {

@@ -4,7 +4,12 @@ import {
   validateDeviceId,
   validateHost,
 } from './credentials';
-import {ConnectionError, safeOperationId} from './errors';
+import {
+  ConnectionError,
+  safeError,
+  safeNumber,
+  safeOperationId,
+} from './errors';
 import {bounded, checkAbort, request, wait} from './http';
 import {
   DeviceCredentials,
@@ -86,11 +91,25 @@ export async function provision(
       continue;
     }
     if (![200, 202].includes(response.status)) {
+      let serviceCode: number | undefined;
+      try {
+        const body = record(await bounded(response.json(), signal));
+        serviceCode = safeNumber(body.errorCode) ?? safeNumber(body.code);
+      } catch (error) {
+        checkAbort(signal);
+        // An absent/malformed error body must not hide the HTTP failure.
+        if (
+          !(error instanceof SyntaxError) &&
+          !(error instanceof ConnectionError && error.code === 'INVALID_RESPONSE')
+        ) {
+          throw safeError(error, 'NETWORK_ERROR');
+        }
+      }
       throw new ConnectionError(
         [401, 403].includes(response.status)
           ? 'AUTHENTICATION_FAILED'
           : 'PROVISIONING_FAILED',
-        {status: response.status, operationId},
+        {status: response.status, operationId, serviceCode},
       );
     }
     let body: Record<string, unknown>;
