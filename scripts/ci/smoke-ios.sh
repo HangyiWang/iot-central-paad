@@ -6,12 +6,12 @@ xcrun simctl boot "$IOS_SIMULATOR_UDID"
 printf 'IOS_SIMULATOR_STARTED=1\n' >> "$GITHUB_ENV"
 xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b
 xcrun simctl install "$IOS_SIMULATOR_UDID" \
-  build/ios-derived/Build/Products/Release-iphonesimulator/IoT_PnP.app
+  build/ios-derived/Build/Products/Release-iphonesimulator/IoTPnP.app
 collect_evidence() {
   result=$?
   trap - EXIT
   if ! xcrun simctl spawn "$IOS_SIMULATOR_UDID" log show --style compact \
-    --last 5m --predicate 'process == "IoT_PnP" OR ((process == "SpringBoard" OR process == "runningboardd" OR process == "CoreSimulatorBridge") AND eventMessage CONTAINS "com.microsoft.iotpnp.ci")' \
+    --last 5m --predicate 'process == "IoTPnP" OR ((process == "SpringBoard" OR process == "runningboardd" OR process == "CoreSimulatorBridge") AND eventMessage CONTAINS "com.microsoft.iotpnp.ci")' \
     > build/ci-artifacts/ios-runtime.log; then
     echo 'Could not capture iOS runtime diagnostics' >&2
     result=1

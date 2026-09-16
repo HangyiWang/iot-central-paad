@@ -27,6 +27,7 @@ export type FormItem = {
   }[];
   value?: string;
   readonly?: boolean;
+  secure?: boolean;
 };
 
 function initValues(items: FormItem[]): {[itemId: string]: string} {
@@ -53,7 +54,8 @@ type FormProps = {
 const Form = React.memo<FormProps>(
   ({title, items, submit, submitAction, onSubmit}) => {
     const [values, setValues] = React.useState<{[itemId: string]: string}>({});
-    const {dark, colors} = useTheme();
+    const [revealed, setRevealed] = React.useState<Record<string, boolean>>({});
+    const {colors} = useTheme();
 
     // fire if initial items change
     React.useEffect(() => {
@@ -83,9 +85,7 @@ const Form = React.memo<FormProps>(
     );
 
     return (
-      <TouchableWithoutFeedback
-        accessible={false}
-        onPress={Keyboard.dismiss}>
+      <TouchableWithoutFeedback accessible={false} onPress={Keyboard.dismiss}>
         <View>
           {title && <Name style={styles.title}>{title}</Name>}
           {items.map((item, index) => {
@@ -111,7 +111,13 @@ const Form = React.memo<FormProps>(
               <Input
                 shake={() => null}
                 key={`formitem-${index}`}
-                multiline={item.multiline}
+                testID={`connection-${item.id}`}
+                multiline={item.multiline && !item.secure}
+                secureTextEntry={item.secure && !revealed[item.id]}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
+                textContentType="none"
                 value={values[item.id]}
                 label={item.label}
                 labelStyle={styles.label}
@@ -132,7 +138,30 @@ const Form = React.memo<FormProps>(
                   paddingBottom: 0,
                   textAlignVertical: item.multiline ? 'top' : 'center',
                 }}
-                placeholderTextColor={dark ? '#444' : '#BBB'}
+                placeholderTextColor={colors.secondary}
+                rightIcon={
+                  item.secure
+                    ? {
+                        name: revealed[item.id]
+                          ? 'eye-off-outline'
+                          : 'eye-outline',
+                        type: 'ionicon',
+                        accessibilityLabel: revealed[item.id]
+                          ? 'Hide credential'
+                          : 'Show credential',
+                        containerStyle: {
+                          minWidth: 44,
+                          minHeight: 44,
+                          justifyContent: 'center',
+                        },
+                        onPress: () =>
+                          setRevealed(current => ({
+                            ...current,
+                            [item.id]: !current[item.id],
+                          })),
+                      }
+                    : undefined
+                }
                 onChangeText={text =>
                   setValues(current => ({...current, [item.id]: text}))
                 }

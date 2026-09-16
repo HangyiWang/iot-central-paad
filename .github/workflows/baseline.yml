@@ -1,4 +1,4 @@
-name: BASELINE - RN 0.75 bundled startup
+name: FOUNDATION - Expo 57 bundled native startup
 
 on:
   push:
@@ -21,12 +21,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: baseline-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: foundation-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
   CI: "true"
-  PAAD_SKIP_POD_INSTALL: "1"
+  PAAD_VARIANT: ci
+  EXPO_NO_TELEMETRY: "1"
   MAESTRO_CLI_NO_ANALYTICS: "1"
   MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true"
   PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -46,12 +47,21 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.19.4"
+          node-version: "24.19.0"
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: bash scripts/ci/identity.sh
+      - run: npx expo install --check
+      - run: node scripts/ci/check-native-config.js
       - run: npm run lint
       - run: npm test -- --runInBand
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: foundation-javascript-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/ci-artifacts/
+          retention-days: 3
+          if-no-files-found: warn
 
   android:
     name: Android bundled CI APK and Maestro
@@ -65,7 +75,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.19.4"
+          node-version: "24.19.0"
           cache: npm
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
@@ -73,8 +83,9 @@ jobs:
           java-version: "17"
       - run: npm ci --no-audit --no-fund
       - run: bash scripts/ci/identity.sh
-      - name: Install the baseline Android SDK and NDK
-        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"'
+      - run: npm run prebuild:ci -- --platform android
+      - name: Install the matched Android SDK and NDK
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006"'
       - run: bash scripts/ci/build-android.sh
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
@@ -90,7 +101,7 @@ jobs:
         timeout-minutes: 12
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
-          api-level: 34
+          api-level: 36
           target: default
           arch: x86_64
           profile: pixel_6
@@ -103,7 +114,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: baseline-android-${{ github.sha }}-${{ github.run_attempt }}
+          name: foundation-android-${{ github.sha }}-${{ github.run_attempt }}
           path: build/ci-artifacts/
           retention-days: 3
           if-no-files-found: warn
@@ -112,36 +123,33 @@ jobs:
     name: iOS bundled Simulator and Maestro
     if: github.event_name != 'workflow_dispatch' || inputs.platform != 'android'
     needs: javascript
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     env:
-      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
-      IOS_SIMULATOR_DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
-      RCT_NEW_ARCH_ENABLED: "0"
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      IOS_SIMULATOR_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      RCT_NEW_ARCH_ENABLED: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.19.4"
+          node-version: "24.19.0"
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: bash scripts/ci/identity.sh
+      - run: npm run prebuild:ci -- --platform ios
       - uses: ruby/setup-ruby@984c0c890880bbf811283d6f09c4607c62d210a4 # v1
         with:
           ruby-version: "3.3.8"
           bundler: "2.5.23"
           bundler-cache: true
       - run: cp Gemfile.lock build/ci-artifacts/Gemfile.lock
-      - name: Explicit CocoaPods lock refresh
-        if: github.event_name == 'workflow_dispatch' && inputs.refresh_pod_lock
-        working-directory: ios
-        run: bundle exec pod install
-      - run: cp ios/Podfile.lock build/ci-artifacts/Podfile.lock
       - name: Install locked CocoaPods dependencies deliberately
-        working-directory: ios
-        run: bundle exec pod install --deployment
+        env:
+          PAAD_REFRESH_POD_LOCK: ${{ github.event_name == 'workflow_dispatch' && inputs.refresh_pod_lock && '1' || '0' }}
+        run: bash scripts/ci/install-pods.sh
       - run: bash scripts/ci/build-ios.sh
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
@@ -157,7 +165,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: baseline-ios-${{ github.sha }}-${{ github.run_attempt }}
+          name: foundation-ios-${{ github.sha }}-${{ github.run_attempt }}
           path: build/ci-artifacts/
           retention-days: 3
           if-no-files-found: warn

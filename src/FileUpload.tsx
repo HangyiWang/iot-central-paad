@@ -9,12 +9,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {
-  Callback,
-  ImageLibraryOptions,
-  launchCamera,
-  launchImageLibrary,
-} from 'react-native-image-picker';
+import * as ImagePicker from 'expo-image-picker';
 import {View} from 'react-native-animatable';
 import {Card} from './components/card';
 import {useScreenDimensions} from './hooks/layout';
@@ -27,12 +22,13 @@ import {
   useBoolean,
   useTheme,
 } from 'hooks';
-import {Platform, Linking, ViewStyle, TextStyle} from 'react-native';
+import {Alert, Platform, Linking, ViewStyle, TextStyle} from 'react-native';
 import {LogsContext} from './contexts/logs';
 import Strings from 'strings';
 import BottomPopup from 'components/bottomPopup';
 import {CircleSnail} from 'react-native-progress';
 import {Literal, StyleDefinition} from 'types';
+import {acquireCamera} from './tools/Torch';
 
 const getCardValue = ({
   uploading,
@@ -74,6 +70,14 @@ export default function FileUpload() {
 
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('');
+  const busy = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const styles = useMemo<Literal<ViewStyle | TextStyle>>(
     () => ({
@@ -112,78 +116,98 @@ export default function FileUpload() {
     [colors, screen],
   );
 
-  useEffect(() => {
-    setuploadStatus(undefined);
-  }, [uploading]);
-
   const startUpload = useCallback(
-    (fn: (options: ImageLibraryOptions, callback: Callback) => void) => {
-      fn(
-        {
-          mediaType: 'photo',
-          includeBase64: true, //TODO: remove and use uri
-        },
-        async response => {
-          setShowSelector.False();
-          if (response.didCancel) {
-            console.log('User cancelled');
-          } else if (response.errorMessage) {
-            console.log('ImagePicker Error: ', response.errorMessage);
-          } else {
-            // send response data
-
-            const rawFileType = response.assets?.[0].type;
-            let fileType = 'image/jpeg';
-
-            // There is a bug with the image picker (at least on iOS) that causes the type for .jpg images to come back as 'image/jpg'
-            // which is invalid and will cause any mime type parsing to misidentify the file type
-            // Bug: https://github.com/react-native-image-picker/react-native-image-picker/issues/1856
-            if (rawFileType && rawFileType !== 'image/jpg') {
-              fileType = rawFileType;
-            }
-
-            let curfileName = response.assets?.[0].fileName;
-            if (!curfileName && Platform.OS === 'ios') {
-              curfileName = response.assets?.[0].uri?.split('/').pop();
-            }
-            try {
-              append({
-                eventName: 'FILE UPLOAD',
-                eventData: `Starting upload of file ${curfileName}`,
-              });
-              setFileName(curfileName!);
-              setFileSize(formatBytes(response.assets?.[0].fileSize!));
-              setUploading.True();
-              // await new Promise(r => setTimeout(r, 6000));
-              const res = await client?.uploadFile(
-                curfileName as string,
-                fileType,
-                response.assets?.[0].base64,
-                'base64',
-              );
-              if (res && res.status >= 200 && res.status < 300) {
-                append({
-                  eventName: 'FILE UPLOAD',
-                  eventData: `Successfully uploaded ${curfileName}`,
-                });
-                setuploadStatus(true);
-              } else {
-                append({
-                  eventName: 'FILE UPLOAD',
-                  eventData: `Error uploading ${curfileName}${
-                    res?.errorMessage ? `. Reason:${res?.errorMessage}` : '.'
-                  }`,
-                });
-                setuploadStatus(false);
-              }
-            } catch (e) {
-              console.log(e);
-            }
+    async (source: 'camera' | 'library') => {
+      if (busy.current) {
+        return;
+      }
+      busy.current = true;
+      setShowSelector.False();
+      let release: (() => void) | undefined;
+      try {
+        if (!client || simulated) {
+          Alert.alert(Strings.FileUpload.NotAvailable);
+          return;
+        }
+        if (source === 'camera') {
+          release = acquireCamera('photo');
+          let permission = await ImagePicker.getCameraPermissionsAsync();
+          if (!permission.granted && permission.canAskAgain) {
+            permission = await ImagePicker.requestCameraPermissionsAsync();
           }
-        },
-      );
+          if (!permission.granted) {
+            Alert.alert(
+              Strings.FileUpload.NotAvailable,
+              'Allow camera access in Settings to take a photo.',
+            );
+            return;
+          }
+        }
+        if (!mounted.current) {
+          return;
+        }
+        // The system photo picker grants access only to the selected image;
+        // no broad photo-library permission is necessary.
+        const response = await (source === 'camera'
+          ? ImagePicker.launchCameraAsync
+          : ImagePicker.launchImageLibraryAsync)({
+          mediaTypes: ['images'],
+          base64: true,
+          quality: 0.9,
+        });
+        release?.();
+        release = undefined;
+        if (response.canceled || !mounted.current) {
+          return;
+        }
+        const asset = response.assets[0];
+        if (!asset?.base64) {
+          throw new Error('Selected image has no data');
+        }
+        // Expo's base64 representation is JPEG even when the original asset
+        // was HEIC/PNG. Match both the MIME type and upload filename to it.
+        const name =
+          (asset.fileName || 'photo').replace(/\.[^.]+$/, '') + '.jpg';
+        setFileName(name);
+        setFileSize(formatBytes(Math.floor((asset.base64.length * 3) / 4)));
+        setuploadStatus(undefined);
+        setUploading.True();
+        append({eventName: 'FILE UPLOAD', eventData: 'Starting image upload'});
+        const result = await client.uploadFile(
+          name,
+          'image/jpeg',
+          asset.base64,
+          'base64',
+        );
+        const succeeded =
+          !!result && result.status >= 200 && result.status < 300;
+        append({
+          eventName: 'FILE UPLOAD',
+          eventData: succeeded
+            ? 'Image upload completed'
+            : 'Image upload failed',
+        });
+        if (mounted.current) {
+          setuploadStatus(succeeded);
+        }
+      } catch {
+        append({
+          eventName: 'FILE UPLOAD',
+          eventData: 'Image selection or upload failed',
+        });
+        if (mounted.current) {
+          setuploadStatus(false);
+          Alert.alert(
+            Strings.FileUpload.NotAvailable,
+            'Unable to select or upload the image. Please retry.',
+          );
+        }
+      } finally {
+        release?.();
+        busy.current = false;
+      }
     },
-    [setShowSelector, setUploading, append, client],
+    [setShowSelector, setUploading, append, client, simulated],
   );
 
   if (simulated) {
@@ -232,7 +256,7 @@ export default function FileUpload() {
         onDismiss={() => setShowSelector.False()}>
         <ListItem
           onPress={() => {
-            startUpload(launchImageLibrary);
+            void startUpload('library');
           }}
           containerStyle={styles.listItem}>
           <ListItem.Content>
@@ -243,7 +267,7 @@ export default function FileUpload() {
         </ListItem>
         <ListItem
           onPress={() => {
-            startUpload(launchCamera);
+            void startUpload('camera');
           }}
           containerStyle={styles.listItem}>
           <ListItem.Content>
@@ -298,8 +322,6 @@ function UploadProgress(props: {
   const {screen} = useScreenDimensions();
   const [showResult, setShowResult] = useState(false);
 
-  const intid = useRef<number>();
-
   const style = useMemo<StyleDefinition>(
     () => ({
       spinner: {
@@ -328,12 +350,10 @@ function UploadProgress(props: {
     if (uploadStatus !== undefined) {
       setShowResult(true);
       // wait before go back to standard screen
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         setUploading.False();
       }, 3000);
-
-      // @ts-ignore
-      clearInterval(intid.current);
+      return () => clearTimeout(timeout);
     }
   }, [uploadStatus, setUploading]);
 
@@ -380,9 +400,6 @@ function UploadProgress(props: {
         />
       </View>
       <View style={style.details}>
-        <Text style={style.cancel} onPress={setUploading.False}>
-          {Strings.Core.Cancel}
-        </Text>
         <Text style={{}}>{filename}</Text>
       </View>
     </View>

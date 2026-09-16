@@ -130,7 +130,9 @@ export function Welcome(props: {
           save,
         );
       }
-    } catch (e) {}
+    } catch {
+      console.warn('App-store update availability could not be checked.');
+    }
   }, [read, save]);
 
   useEffect(() => {

@@ -25,7 +25,8 @@ import {
   IIoTCProperty,
   IOTC_EVENTS,
   IIoTCClient,
-} from 'react-native-azure-iotcentral-client';
+  ConnectionError,
+} from './connection';
 
 import Strings, {resolveString} from 'strings';
 import {
@@ -266,14 +267,21 @@ const Root = React.memo<{
 
   const onPropUpdate = useCallback(
     async (prop: IIoTCProperty) => {
-      let {name, value} = prop;
-      if (value.__t === 'c') {
-        // inside a component: TODO: change sdk
-        name = Object.keys(value).filter(v => v !== '__t')[0];
-        value = value[name];
+      const {name, value} = prop;
+      if (
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        value.__t === 'c'
+      ) {
+        for (const [field, entry] of Object.entries(value)) {
+          if (field !== '__t') {
+            updateProperty(field, entry);
+          }
+        }
+      } else {
+        updateProperty(name, value);
       }
-      console.log(`Prop received ${name}:${JSON.stringify(value)}`);
-      updateProperty(name, value);
       await prop.ack();
     },
     [updateProperty],
@@ -396,8 +404,11 @@ const Root = React.memo<{
                   componentName="Property"
                   onEdit={async (item, value) => {
                     try {
-                      await iotcentralClient?.sendProperty({
-                        [item.id]: value,
+                      if (!iotcentralClient?.isConnected()) {
+                        throw new ConnectionError('NOT_CONNECTED');
+                      }
+                      await iotcentralClient.sendProperty({
+                        [PROPERTY]: {__t: 'c', [item.id]: value},
                       });
                       Alert.alert(
                         'Property',
@@ -407,7 +418,7 @@ const Root = React.memo<{
                         ),
                         [{text: 'OK'}],
                       );
-                    } catch (e) {
+                    } catch {
                       Alert.alert(
                         'Property',
                         resolveString(

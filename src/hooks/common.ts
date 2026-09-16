@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import {useNavigation} from '@react-navigation/native';
-import {defaults} from 'contexts/defaults';
+import {StorageContext} from '../contexts/storage';
 import {
   Properties as PropertiesData,
   getDeviceInfo,
@@ -49,7 +49,7 @@ export function useLogger(): [TimedLog, (logItem: LogItem) => void] {
 export function usePrevious<T>(value: T) {
   // The ref object is a generic container whose current property is mutable ...
   // ... and can hold any value, similar to an instance property on a class
-  const ref = useRef<T>();
+  const ref = useRef<T | undefined>(undefined);
 
   // Store current value in ref
   useEffect(() => {
@@ -112,6 +112,7 @@ export function useSensors(): [
   EventManagementFN,
   EventManagementFN,
 ] {
+  const {simulated} = useContext(StorageContext);
   const [sensors, setSensors] = useState<ItemProps[]>(
     (
       [
@@ -127,7 +128,7 @@ export function useSensors(): [
             }),
           },
           enabled: true, // TODO: auto-enable based on settings,
-          simulated: defaults.emulator,
+          simulated,
         },
         {
           id: AVAILABLE_SENSORS.GYROSCOPE,
@@ -142,7 +143,7 @@ export function useSensors(): [
               default: 'ionicon',
             }),
           },
-          simulated: defaults.emulator,
+          simulated,
         },
         {
           id: AVAILABLE_SENSORS.MAGNETOMETER,
@@ -153,7 +154,7 @@ export function useSensors(): [
             name: 'magnet-outline',
             type: 'ionicon',
           },
-          simulated: defaults.emulator,
+          simulated,
         },
         {
           id: AVAILABLE_SENSORS.BAROMETER,
@@ -164,7 +165,7 @@ export function useSensors(): [
             name: 'weather-partly-cloudy',
             type: 'material-community',
           },
-          simulated: defaults.emulator,
+          simulated,
         },
         {
           id: AVAILABLE_SENSORS.GEOLOCATION,
@@ -175,14 +176,14 @@ export function useSensors(): [
             name: 'location-outline',
             type: 'ionicon',
           },
-          simulated: defaults.emulator,
+          simulated,
         },
         {
           id: AVAILABLE_SENSORS.BATTERY,
           name: 'Battery level',
           dataType: 'number',
           enabled: true, // TODO: auto-enable based on settings,
-          simulated: defaults.emulator,
+          simulated,
           icon: {
             name: Platform.select({
               android: 'battery-medium',

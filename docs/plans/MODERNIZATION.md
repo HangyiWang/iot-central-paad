@@ -1,6 +1,6 @@
 # PAAD modernization plan
 
-Status: M0 baseline and dual-platform CI complete; M1 Expo foundation pending.
+Status: M0 complete; M1 modern app integrated, awaiting modern native CI.
 Date: 2026-09-15. Branch: `modernize/paad-foundation`.
 Base: fork `master` at `2549196`.
 

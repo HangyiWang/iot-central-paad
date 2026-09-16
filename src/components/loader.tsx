@@ -54,39 +54,39 @@ export function Loader(props: ILoaderProps) {
   return <InnerLoader colors={colors} dark={dark} {...props} {...screen} />;
 }
 
-const InnerLoader = React.memo<ILoaderProps & Theme & ScaledSize>(
-  ({message, buttons, height, colors, style}) => {
-    const styles = useMemo<StyleDefinition>(
-      () => ({
-        body: {height: height / 4, padding: 0, backgroundColor: colors.card},
-        box: {flex: 2, justifyContent: 'center', alignItems: 'center'},
-        message: {marginTop: 20},
-        buttonsBox: {flex: 1, justifyContent: 'flex-end', margin: 0},
-        button: {paddingVertical: 10},
-      }),
-      [height, colors.card],
-    );
+const InnerLoader = React.memo<
+  ILoaderProps & Pick<Theme, 'colors' | 'dark'> & ScaledSize
+>(({message, buttons, height, colors, style}) => {
+  const styles = useMemo<StyleDefinition>(
+    () => ({
+      body: {height: height / 4, padding: 0, backgroundColor: colors.card},
+      box: {flex: 2, justifyContent: 'center', alignItems: 'center'},
+      message: {marginTop: 20},
+      buttonsBox: {flex: 1, justifyContent: 'flex-end', margin: 0},
+      button: {paddingVertical: 10},
+    }),
+    [height, colors.card],
+  );
 
-    return (
-      <View style={[...[style], styles.body]}>
-        <View style={styles.box}>
-          <ActivityIndicator animating={true} size={40} color={colors.text} />
-          <Text style={styles.message}>{message}</Text>
-        </View>
-        {buttons && buttons.length > 0 && (
-          <View style={styles.buttonsBox}>
-            {buttons.map(b => (
-              <Button
-                key={b.text}
-                type="clear"
-                title={b.text}
-                onPress={b.onPress}
-                style={styles.button}
-              />
-            ))}
-          </View>
-        )}
+  return (
+    <View style={[...[style], styles.body]}>
+      <View style={styles.box}>
+        <ActivityIndicator animating={true} size={40} color={colors.text} />
+        <Text style={styles.message}>{message}</Text>
       </View>
-    );
-  },
-);
+      {buttons && buttons.length > 0 && (
+        <View style={styles.buttonsBox}>
+          {buttons.map(b => (
+            <Button
+              key={b.text}
+              type="clear"
+              title={b.text}
+              onPress={b.onPress}
+              style={styles.button}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+});

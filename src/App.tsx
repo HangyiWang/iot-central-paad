@@ -2,14 +2,13 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import React, {useState, useEffect, useContext} from 'react';
+import React, {useState, useEffect, useContext, useRef} from 'react';
 import {View, Platform, StyleSheet} from 'react-native';
 import Settings from './Settings';
 import {
   NavigationContainer,
-  DarkTheme,
-  DefaultTheme,
   getFocusedRouteNameFromRoute,
+  useTheme as useNavigationTheme,
 } from '@react-navigation/native';
 import {
   NavigationParams,
@@ -46,6 +45,8 @@ import Chart from 'Chart';
 import Strings from 'strings';
 import {Option} from 'components/options';
 import Options from 'components/options';
+import {TorchCameraHost} from './tools/Torch';
+import {DeviceCredentials} from './connection';
 
 const Stack = createStackNavigator<NavigationPages>();
 
@@ -66,6 +67,7 @@ export default function App() {
                   setInitialized={setInitialized}
                 />
               )}
+              <TorchCameraHost />
             </LogsProvider>
           </StorageProvider>
         </IoTCProvider>
@@ -75,28 +77,34 @@ export default function App() {
 }
 
 const Navigation = React.memo(() => {
-  const {mode, type: themeType, setThemeMode} = useThemeMode();
+  const {type: themeType, setThemeMode} = useThemeMode();
   const {credentials, initialized} = useContext(StorageContext);
   const [deliveryInterval, setDeliveryInterval] = useDeliveryInterval();
-  const [connect, cancel, , {client, loading}] = useConnectIoTCentralClient();
+  const [connect, cancel, , {client, loading, error, stage}] =
+    useConnectIoTCentralClient();
   const [simulated] = useSimulation();
+  const restored = useRef<DeviceCredentials | null>(null);
 
   const {colors} = useTheme();
+  const navigationTheme = useNavigationTheme();
 
   useEffect(() => {
-    if (credentials && initialized && !client) {
+    if (!credentials) {
+      restored.current = null;
+    } else if (initialized && !client && restored.current !== credentials) {
+      restored.current = credentials;
       connect(credentials, {restore: true});
     }
   }, [connect, client, credentials, initialized]);
 
   return (
-    <NavigationContainer theme={mode === 'dark' ? DarkTheme : DefaultTheme}>
+    <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator
         initialRouteName={simulated ? Pages.ROOT : Pages.REGISTRATION}
         screenOptions={({navigation, route}) => {
           const defaultOptions = {
             gestureEnabled: false,
-            headerBackTitleVisible: false,
+            headerBackButtonDisplayMode: 'minimal' as const,
           };
           if (
             route.name === Pages.ROOT ||
@@ -228,7 +236,7 @@ const Navigation = React.memo(() => {
       <Loader
         visible={loading}
         modal={true}
-        message={Strings.Registration.Connection.Loading}
+        message={Strings.Connection.Stages[stage]}
         buttons={[
           {
             text: Strings.Registration.Connection.Cancel,
@@ -236,6 +244,16 @@ const Navigation = React.memo(() => {
           },
         ]}
       />
+      {error && !loading && (
+        <View
+          testID="connection-error"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={styles.connectionError}>
+          <Text>{error.message}</Text>
+          <Text>{error.serviceCode ?? error.code}</Text>
+        </View>
+      )}
     </NavigationContainer>
   );
 });
@@ -277,6 +295,9 @@ export const Profile = React.memo((props: {navigate: any}) => {
 });
 
 export const styles = StyleSheet.create({
+  connectionError: {
+    padding: 16,
+  },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',

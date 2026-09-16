@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-test -s build/ci-artifacts/baseline-ci.apk
-adb install -r build/ci-artifacts/baseline-ci.apk
+test -s build/ci-artifacts/foundation-ci.apk
+adb install -r build/ci-artifacts/foundation-ci.apk
 adb logcat -c
 collect_evidence() {
   result=$?

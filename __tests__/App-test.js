@@ -34,8 +34,12 @@ describe('App startup', () => {
     try {
       await act(async () => {
         app?.unmount();
+      });
+      await act(async () => {
         await jest.runOnlyPendingTimersAsync();
       });
+      // RN queues Animated node detachment after React's unmount commit.
+      jest.runAllTicks();
       expect(jest.getTimerCount()).toBe(0);
       expect(global.fetch).not.toHaveBeenCalled();
       expect(global.XMLHttpRequest).not.toHaveBeenCalled();

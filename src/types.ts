@@ -3,11 +3,6 @@
 
 import {StackNavigationProp} from '@react-navigation/stack';
 import {GestureResponderEvent, TextStyle, ViewStyle} from 'react-native';
-import {
-  LineData,
-  LineValue,
-  LineDatasetConfig,
-} from 'react-native-charts-wrapper';
 import {IconProps} from '@rneui/themed';
 
 export const Screens = {
@@ -94,16 +89,6 @@ export type StyleDefinition = Literal<ViewStyle | TextStyle>;
 /**
  * Chart typings
  */
-
-export type CustomLineDatasetConfig = LineDatasetConfig & {rgbcolor: string};
-export interface ExtendedLineData extends LineData {
-  dataSets: {
-    itemId: string;
-    values?: LineValue[];
-    label?: string;
-    config?: CustomLineDatasetConfig;
-  }[];
-}
 
 export type ItemProps = {
   id: string;

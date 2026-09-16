@@ -93,7 +93,7 @@ describe('PAAD compatibility contracts', () => {
 
   it.each([
     ['ios', {x: 9.81, y: -4.905, z: 0}],
-    ['android', {x: 1, y: -0.5, z: 0}],
+    ['android', {x: 9.81, y: -4.905, z: 0}],
   ])('normalizes %s acceleration to m/s2', (platform, expected) => {
     jest.replaceProperty(Platform, 'OS', platform);
     const sensor = new Accelerometer('accelerometer', 5000);

@@ -29,6 +29,7 @@ import {
 } from '@react-navigation/native';
 import {
   ConnectionOptions,
+  ConnectionResult,
   useConnectIoTCentralClient,
   useScreenDimensions,
   useTheme,
@@ -61,8 +62,6 @@ import {
   ButtonGroup,
   ButtonGroupItem,
 } from 'components';
-import {Buffer} from 'buffer';
-import {computeKey} from 'react-native-azure-iotcentral-client';
 import {IoTCContext, StorageContext} from 'contexts';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
@@ -161,7 +160,7 @@ export const Registration = React.memo<{
         client && client.isConnected() ? screens.MANUAL : screens.EMPTY
       }
       screenOptions={{
-        headerBackTitleVisible: false,
+        headerBackButtonDisplayMode: 'minimal',
         headerBackAccessibilityLabel: Strings.Core.Back,
         headerBackTestID: 'registration-back',
         headerMode: 'float',
@@ -214,7 +213,7 @@ type QRCodeScannerProps = {
   connect: (
     encryptedCredentials: string,
     options?: ConnectionOptions,
-  ) => Promise<void>;
+  ) => Promise<ConnectionResult>;
   scannerRef: React.MutableRefObject<QRCodeScanner | null>;
 };
 
@@ -227,10 +226,13 @@ const QRCodeScreen = React.memo<QRCodeScannerProps>(({connect, scannerRef}) => {
 
   const onRead = useCallback(
     async (e: Event) => {
-      await connect(e.data);
+      const result = await connect(e.data);
+      if (!result.ok) {
+        scannerRef.current?.reactivate();
+      }
       // scannerRef.current?.reactivate(); // reactivate camera in order to make it available for other use (e.g. torch)
     },
-    [connect],
+    [connect, scannerRef],
   );
   return (
     <QRCodeScanner
@@ -294,16 +296,10 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
     const readonly = !registeringNew && !!client && client?.isConnected();
     const connectDevice = useCallback(
       async (values: FormValues) => {
-        if (values.keyType) {
-          if (values.keyType === 'group' && values.deviceId) {
-            // generate deviceKey
-            values.deviceKey = computeKey(values.authKey, values.deviceId);
-          } else {
-            values['deviceKey'] = values.authKey;
-          }
+        const result = await connect(values);
+        if (result.ok) {
+          navigation.navigate(Pages.ROOT);
         }
-        await connect(Buffer.from(JSON.stringify(values)).toString('base64'));
-        navigation.navigate(Pages.ROOT);
       },
       [connect, navigation],
     );
@@ -379,6 +375,7 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
           },
           {
             id: 'authKey',
+            secure: true,
             label: Strings.Registration.Manual.SASKey.Label,
             placeHolder: Strings.Registration.Manual.SASKey.PlaceHolder,
             multiline: true,
@@ -390,6 +387,7 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
         return [
           {
             id: 'connectionString',
+            secure: true,
             label: 'IoT Hub device connection string',
             placeHolder: 'Enter or paste connection string',
             multiline: true,

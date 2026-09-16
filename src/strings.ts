@@ -17,6 +17,16 @@ const Strings = {
       'Could not initialize the app. Your saved data has not been reset. Please retry.',
     ErrorCode: 'Error code: {{0}}',
   },
+  Connection: {
+    Stages: {
+      idle: 'Not connected',
+      validating: 'Checking connection details...',
+      provisioning: 'Requesting a device assignment...',
+      connecting: 'Connecting to the assigned IoT Hub...',
+      connected: 'Connected',
+      error: 'Connection needs attention',
+    },
+  },
   Settings: {
     Title: 'Settings',
     Theme: {
@@ -127,7 +137,8 @@ const Strings = {
     Properties: {
       Send: 'Send',
       Delivery: {
-        Success: 'Property "{{0}}" successfully sent to Azure IoT.',
+        Success:
+          'Property "{{0}}" was submitted to the device transport. Cloud receipt has not been independently checked.',
         Failure: 'Failed to send property "{{0}}" to Azure IoT.',
       },
       Loading: 'Waiting for properties...',
