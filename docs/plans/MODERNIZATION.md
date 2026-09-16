@@ -1,6 +1,6 @@
 # PAAD modernization plan
 
-Status: implementation authorized; repairing the baseline and establishing CI.
+Status: M0 baseline and dual-platform CI complete; M1 Expo foundation pending.
 Date: 2026-09-15. Branch: `modernize/paad-foundation`.
 Base: fork `master` at `2549196`.
 
@@ -26,6 +26,41 @@ commit and toolchain; a written workflow is not evidence of a successful run.
 Reference artwork remains local and untracked. Use `image2.png` for information
 structure and `image1.png` for calm visual tone, with selective accents from the
 other two images. Produce an original design, not copied artwork.
+
+## M0 evidence (2026-09-16)
+
+[Run 35047634369](https://github.com/HangyiWang/iot-central-paad/actions/runs/35047634369)
+completed successfully for commit `6d6186d23d30dfb2b12d5fb947a76750ea31f4c6`.
+This is the repaired **RN 0.75.4 / React 18.3.1 baseline**, not the Expo or
+New Architecture compatibility gate.
+
+| Lane | Environment | Observed result |
+| --- | --- | --- |
+| JavaScript | Ubuntu 24.04, Node 20.19.4 | Lint and all 19 startup/recovery, device-contract and pod-install tests passed. |
+| Android | AOSP API 34, x86_64 emulator, bundled `ci` APK | Launch, manual-form assertions, back navigation and cold restart passed without Metro or cloud credentials. |
+| iOS | macOS 15 ARM64, Xcode 16.4, iPhone 16 / iOS 18.5 Simulator | Real Keychain initialization and the same bundled launch/manual/back/cold-restart flow passed. |
+
+The native artifact identities, JUnit reports and final screenshots were
+inspected, and the downloaded artifact hashes matched their identity records:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `baseline-ci.apk` | `190fb7244a4271bf84632475b7dcab7bd41c21a6c5ee8f431ac945be84838823` |
+| `baseline-simulator.app.zip` | `7133891db252aeffa5e7e69a64a713d7d9c04e55642dbb4f978278976f7b6f57` |
+
+Artifacts expire after three days. The exact source commit and this evidence
+record remain available for reproducing the baseline.
+
+The iOS lane uses Xcode-managed local ad-hoc signing: simulated Keychain
+entitlements are embedded in the executable's `__TEXT,__entitlements` section,
+not the host macOS signature. No Apple account, certificate or provisioning
+profile is used. The form's keyboard-dismiss wrapper no longer groups its
+heading and choices into one inaccessible element on iOS.
+
+No live Hub/DPS/ADR traffic, secure-storage upgrade migration, physical
+sensor/BLE/camera behavior, suspension handling or full HIG acceptance is
+established by this run. Those gates, the modern shell and ADR application
+implementation remain pending.
 
 ## Goal and branch order
 
