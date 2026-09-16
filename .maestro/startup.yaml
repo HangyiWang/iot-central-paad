@@ -18,6 +18,38 @@ name: Credential-free bundled startup and manual-navigation smoke
 - assertVisible: "Registration ID"
 - assertVisible: "ID scope"
 - tapOn:
+    id: connection-registrationId
+- inputText: "ci-input-fixture"
+- pressKey: Enter
+- tapOn:
+    id: connection-scopeId
+- inputText: "0ne00000000"
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: connection-deviceKey
+    direction: DOWN
+- tapOn:
+    id: connection-deviceKey
+- inputText: "synthetic+not/a-device-key="
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: connection-provisioningHost
+    direction: DOWN
+- tapOn:
+    id: connection-provisioningHost
+- eraseText
+- inputText: "global-canary.azure-devices-provisioning.net"
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: connection-submit
+    direction: DOWN
+- assertVisible:
+    id: connection-submit
+# Never submit these deliberately invalid fixtures or send cloud traffic.
+- tapOn:
     id: registration-back
 - assertVisible: ".*Start here.*"
 - assertVisible: "Connect manually"

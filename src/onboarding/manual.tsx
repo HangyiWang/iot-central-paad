@@ -160,6 +160,9 @@ export function CredentialForm({
               autoComplete="off"
               textContentType="none"
               importantForAutofill="no"
+              returnKeyType="done"
+              submitBehavior="blurAndSubmit"
+              onSubmitEditing={Keyboard.dismiss}
               style={[
                 styles.input,
                 {color: colors.text, borderColor: colors.border},

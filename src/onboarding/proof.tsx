@@ -1,5 +1,12 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Platform, Pressable, StyleSheet, TextInput, View} from 'react-native';
+import {
+  Keyboard,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import {DeviceClient} from '../connection';
 import {Text, Name} from '../components/typography';
 import {useTheme} from '../hooks';
@@ -82,6 +89,9 @@ export function ProofActivity({
         autoComplete="off"
         textContentType="none"
         importantForAutofill="no"
+        returnKeyType="done"
+        submitBehavior="blurAndSubmit"
+        onSubmitEditing={Keyboard.dismiss}
         style={[styles.input, {borderColor: colors.border, color: colors.text}]}
         onChangeText={value => {
           setNonce(value);

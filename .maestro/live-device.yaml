@@ -27,7 +27,7 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     id: connection-scopeId
 - eraseText
 - inputText: ${MAESTRO_SCOPE_ID}
-- hideKeyboard
+- pressKey: Enter
 - scrollUntilVisible:
     element:
       id: connection-provisioningHost
@@ -37,7 +37,7 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     id: connection-provisioningHost
 - eraseText
 - inputText: ${MAESTRO_PROVISIONING_HOST}
-- hideKeyboard
+- pressKey: Enter
 - scrollUntilVisible:
     element:
       id: connection-deviceKey
@@ -46,7 +46,7 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
 - tapOn:
     id: connection-deviceKey
 - inputText: ${MAESTRO_DEVICE_KEY}
-- hideKeyboard
+- pressKey: Enter
 - scrollUntilVisible:
     element:
       id: connection-submit
@@ -100,7 +100,7 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     id: proof-nonce
 - eraseText
 - inputText: ${MAESTRO_NONCE}
-- hideKeyboard
+- pressKey: Enter
 - scrollUntilVisible:
     element:
       id: proof-send

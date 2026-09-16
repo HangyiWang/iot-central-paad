@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {Platform, TextInput} from 'react-native';
+import {Keyboard, Platform, TextInput} from 'react-native';
 import {CredentialForm, manualCredentials} from '../src/onboarding/manual';
 import {
   ProofActivity,
@@ -36,9 +36,11 @@ const client = () => ({
 afterEach(() => {
   act(() => view?.unmount());
   view = undefined;
+  jest.restoreAllMocks();
 });
 
 test('individual is the default; controlled fields survive failure and duplicate presses', async () => {
+  const dismiss = jest.spyOn(Keyboard, 'dismiss');
   const pending = deferred();
   const submit = jest.fn(() => pending.promise);
   act(() => {
@@ -66,6 +68,17 @@ test('individual is the default; controlled fields survive failure and duplicate
   expect(input('deviceKey').props.secureTextEntry).toBe(true);
   expect(input('deviceKey').props.autoCorrect).toBe(false);
   expect(input('deviceKey').props.autoComplete).toBe('off');
+  for (const field of [
+    'registrationId',
+    'scopeId',
+    'deviceKey',
+    'provisioningHost',
+  ]) {
+    expect(input(field).props.returnKeyType).toBe('done');
+    expect(input(field).props.submitBehavior).toBe('blurAndSubmit');
+    act(() => input(field).props.onSubmitEditing());
+  }
+  expect(dismiss).toHaveBeenCalledTimes(4);
   act(() => {
     input('registrationId').props.onChangeText('phone');
     input('scopeId').props.onChangeText('0ne123');
@@ -118,6 +131,21 @@ test('explicit legacy and direct mappings use only existing core credential fiel
     connectionString: 'HostName=value',
     modelId: PHONE_MODEL_ID,
   });
+});
+
+test('nonce keyboard submission dismisses without publishing a proof', () => {
+  const dismiss = jest.spyOn(Keyboard, 'dismiss');
+  const device = client();
+  act(() => {
+    view = render(<ProofActivity client={device} connected simulated={false} />);
+  });
+  const input = view.root.findByType(TextInput);
+  expect(input.props.returnKeyType).toBe('done');
+  expect(input.props.submitBehavior).toBe('blurAndSubmit');
+  act(() => input.props.onSubmitEditing());
+  expect(dismiss).toHaveBeenCalledTimes(1);
+  expect(device.sendTelemetry).not.toHaveBeenCalled();
+  expect(device.sendProperty).not.toHaveBeenCalled();
 });
 
 test('proof requires both local submissions and rejects duplicate presses', async () => {

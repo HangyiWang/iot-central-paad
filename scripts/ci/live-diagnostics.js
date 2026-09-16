@@ -7,7 +7,7 @@ const path = require('node:path');
 // cli-2.10.0 TestOutputWriter / TreeNode schema. Never copy source objects.
 const COMMAND_KINDS = Object.freeze([
   'launchAppCommand', 'stopAppCommand', 'tapOnElement',
-  'eraseTextCommand', 'inputTextCommand', 'hideKeyboardCommand',
+  'eraseTextCommand', 'inputTextCommand', 'hideKeyboardCommand', 'pressKeyCommand',
   'scrollUntilVisible', 'assertCommand', 'assertConditionCommand',
   'applyConfigurationCommand', 'defineVariablesCommand',
 ]);

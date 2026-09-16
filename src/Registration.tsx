@@ -230,6 +230,7 @@ export function ManualConnect({onConnected}: {onConnected(): void}) {
       style={styles.flex}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         contentContainerStyle={styles.manual}>
         {!readonly && (
           <Text style={styles.intro}>{Strings.Registration.Manual.Header}</Text>

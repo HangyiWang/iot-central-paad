@@ -138,6 +138,9 @@ export default function ConnectionSummary({
             style={[styles.sheet, {backgroundColor: colors.card}]}>
             <ScrollView
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={
+                Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+              }
               contentContainerStyle={styles.details}>
               <Text accessibilityRole="header">{text.Details}</Text>
               <Pressable
