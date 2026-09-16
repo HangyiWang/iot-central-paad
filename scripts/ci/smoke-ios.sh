@@ -11,7 +11,7 @@ collect_evidence() {
   result=$?
   trap - EXIT
   if ! xcrun simctl spawn "$IOS_SIMULATOR_UDID" log show --style compact \
-    --last 5m --predicate 'process == "IoT_PnP"' \
+    --last 5m --predicate 'process == "IoT_PnP" OR ((process == "SpringBoard" OR process == "runningboardd" OR process == "CoreSimulatorBridge") AND eventMessage CONTAINS "com.microsoft.iotpnp.ci")' \
     > build/ci-artifacts/ios-runtime.log; then
     echo 'Could not capture iOS runtime diagnostics' >&2
     result=1

@@ -16,18 +16,21 @@ xcodebuild -workspace ios/IoT_PnP.xcworkspace -scheme IoT_PnP \
   -configuration Release -sdk iphonesimulator \
   -destination "generic/platform=iOS Simulator" -derivedDataPath build/ios-derived \
   ONLY_ACTIVE_ARCH=YES "ARCHS=$(uname -m)" \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= \
-  CODE_SIGN_ENTITLEMENTS= DEVELOPMENT_TEAM= \
+  CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES CODE_SIGN_IDENTITY=- \
+  CODE_SIGN_STYLE=Automatic AD_HOC_CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM= \
+  PROVISIONING_PROFILE= PROVISIONING_PROFILE_SPECIFIER= \
+  "CODE_SIGN_ENTITLEMENTS=$PWD/ios/IoT_PnP/IoT_PnPCI.entitlements" \
   PRODUCT_BUNDLE_IDENTIFIER=com.microsoft.iotpnp.ci \
   build 2>&1 | tee build/ci-artifacts/ios-build.log
 app=build/ios-derived/Build/Products/Release-iphonesimulator/IoT_PnP.app
 test -s "$app/main.jsbundle"
 test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = com.microsoft.iotpnp.ci
-# Local simulator identity only; never use an Apple Developer signing key.
-codesign --force --sign - --timestamp=none \
-  --entitlements ios/IoT_PnP/IoT_PnPCI.entitlements "$app"
-codesign --verify --strict "$app"
-codesign --display --entitlements - --xml "$app" > build/ci-artifacts/ios-entitlements.plist
+# Simulator entitlements belong in Mach-O, not the host macOS code signature.
+codesign --verify --strict --deep "$app"
+xcrun segedit "$app/IoT_PnP" -extract __TEXT __entitlements \
+  build/ci-artifacts/ios-entitlements.plist
+codesign --display --entitlements - --xml "$app" \
+  > build/ci-artifacts/ios-signature-entitlements.plist
 test "$(/usr/libexec/PlistBuddy -c 'Print application-identifier' build/ci-artifacts/ios-entitlements.plist)" = com.microsoft.iotpnp.ci
 test "$(/usr/libexec/PlistBuddy -c 'Print keychain-access-groups:0' build/ci-artifacts/ios-entitlements.plist)" = com.microsoft.iotpnp.ci
 ditto -c -k --sequesterRsrc --keepParent "$app" build/ci-artifacts/baseline-simulator.app.zip
