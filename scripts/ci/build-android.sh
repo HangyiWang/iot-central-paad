@@ -5,6 +5,8 @@ mkdir -p build/ci-artifacts
 (
   cd android
   ./gradlew :app:assembleCi --no-daemon --console=plain \
+    -Dorg.gradle.internal.http.connectionTimeout=30000 \
+    -Dorg.gradle.internal.http.socketTimeout=30000 \
     -PreactNativeArchitectures=x86_64
 ) 2>&1 | tee build/ci-artifacts/android-build.log
 apk=android/app/build/outputs/apk/ci/app-ci.apk

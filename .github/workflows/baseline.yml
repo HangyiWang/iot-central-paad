@@ -6,6 +6,16 @@ on:
   pull_request:
     branches: [master, modernize/paad-foundation]
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to exercise
+        type: choice
+        options: [all, android, ios]
+        default: all
+      refresh_pod_lock:
+        description: Explicitly regenerate and upload the CocoaPods lock for review
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,6 +55,7 @@ jobs:
 
   android:
     name: Android bundled CI APK and Maestro
+    if: github.event_name != 'workflow_dispatch' || inputs.platform != 'ios'
     needs: javascript
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -97,6 +108,7 @@ jobs:
 
   ios:
     name: iOS bundled unsigned Simulator and Maestro
+    if: github.event_name != 'workflow_dispatch' || inputs.platform != 'android'
     needs: javascript
     runs-on: macos-15
     timeout-minutes: 45
@@ -120,6 +132,11 @@ jobs:
           bundler: "2.5.23"
           bundler-cache: true
       - run: cp Gemfile.lock build/ci-artifacts/Gemfile.lock
+      - name: Explicit CocoaPods lock refresh
+        if: github.event_name == 'workflow_dispatch' && inputs.refresh_pod_lock
+        working-directory: ios
+        run: bundle exec pod install
+      - run: cp ios/Podfile.lock build/ci-artifacts/Podfile.lock
       - name: Install locked CocoaPods dependencies deliberately
         working-directory: ios
         run: bundle exec pod install --deployment
