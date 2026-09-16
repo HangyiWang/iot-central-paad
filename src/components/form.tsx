@@ -83,7 +83,9 @@ const Form = React.memo<FormProps>(
     );
 
     return (
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <TouchableWithoutFeedback
+        accessible={false}
+        onPress={Keyboard.dismiss}>
         <View>
           {title && <Name style={styles.title}>{title}</Name>}
           {items.map((item, index) => {

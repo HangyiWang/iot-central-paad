@@ -2,7 +2,7 @@
  * @format
  */
 
-import {Text} from 'react-native';
+import {Keyboard, Text, TouchableWithoutFeedback} from 'react-native';
 import React from 'react';
 import App from '../src/App';
 import {Welcome} from '../src/Welcome';
@@ -112,6 +112,11 @@ describe('App startup', () => {
       expect(hasText(Strings.Registration.Manual.Body.ConnectionInfo)).toBe(
         true,
       );
+      const dismissWrappers = app.root
+        .findAllByType(TouchableWithoutFeedback)
+        .filter(node => node.props.onPress === Keyboard.dismiss);
+      expect(dismissWrappers).toHaveLength(1);
+      expect(dismissWrappers[0].props.accessible).toBe(false);
       await act(async () => {
         press('registration-back');
         await jest.runOnlyPendingTimersAsync();
