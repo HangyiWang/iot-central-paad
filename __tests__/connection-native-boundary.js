@@ -254,7 +254,7 @@ test('real vendor and bundled Paho cross the canonical native binary boundary', 
       clientId: identity.deviceId,
       userName: `${identity.assignedHub}/${
         identity.deviceId
-      }/?api-version=2021-06-01&model-id=${encodeURIComponent(
+      }/?api-version=2021-04-12&model-id=${encodeURIComponent(
         identity.modelId,
       )}`,
     },
