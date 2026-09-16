@@ -1,0 +1,144 @@
+name: BASELINE - RN 0.75 bundled startup
+
+on:
+  push:
+    branches: [modernize/paad-foundation]
+  pull_request:
+    branches: [master, modernize/paad-foundation]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baseline-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  PAAD_SKIP_POD_INSTALL: "1"
+  MAESTRO_CLI_NO_ANALYTICS: "1"
+  MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true"
+  PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  javascript:
+    name: Linux lint and real startup Jest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.19.4"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: bash scripts/ci/identity.sh
+      - run: npm run lint
+      - run: npm test -- --runInBand
+
+  android:
+    name: Android bundled CI APK and Maestro
+    needs: javascript
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.19.4"
+          cache: npm
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: npm ci --no-audit --no-fund
+      - run: bash scripts/ci/identity.sh
+      - name: Install the baseline Android SDK and NDK
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"
+      - run: bash scripts/ci/build-android.sh
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: bash scripts/ci/install-maestro.sh
+      - name: Enable standard runner KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Credential-free emulator smoke
+        timeout-minutes: 12
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-boot-timeout: 300
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/ci/smoke-android.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: baseline-android-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/ci-artifacts/
+          retention-days: 3
+          if-no-files-found: warn
+
+  ios:
+    name: iOS bundled unsigned Simulator and Maestro
+    needs: javascript
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
+      IOS_SIMULATOR_DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      RCT_NEW_ARCH_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.19.4"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: bash scripts/ci/identity.sh
+      - uses: ruby/setup-ruby@984c0c890880bbf811283d6f09c4607c62d210a4 # v1
+        with:
+          ruby-version: "3.3.8"
+          bundler: "2.5.23"
+          bundler-cache: true
+      - run: cp Gemfile.lock build/ci-artifacts/Gemfile.lock
+      - name: Install locked CocoaPods dependencies deliberately
+        working-directory: ios
+        run: bundle exec pod install --deployment
+      - run: bash scripts/ci/build-ios.sh
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: bash scripts/ci/install-maestro.sh
+      - name: Credential-free simulator smoke
+        timeout-minutes: 12
+        run: bash scripts/ci/smoke-ios.sh
+      - name: Stop CI simulator
+        if: always() && env.IOS_SIMULATOR_UDID != ''
+        run: DEVELOPER_DIR="$IOS_SIMULATOR_DEVELOPER_DIR" xcrun simctl shutdown "$IOS_SIMULATOR_UDID"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: baseline-ios-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/ci-artifacts/
+          retention-days: 3
+          if-no-files-found: warn

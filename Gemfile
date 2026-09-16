@@ -1,8 +1,9 @@
 source 'https://rubygems.org'
  
 # You may use http://rbenv.org/ or https://rvm.io/ to install and use this version
-ruby ">= 2.6.10"
+ruby ">= 3.3.0"
  
-# Exclude problematic versions of cocoapods and activesupport that causes build failures.
-gem 'cocoapods', '>= 1.13', '!= 1.15.0', '!= 1.15.1'
-gem 'activesupport', '>= 6.1.7.5', '!= 7.1.0'
+# Match Podfile.lock and keep RN 0.75's CocoaPods toolchain explicit.
+gem 'cocoapods', '1.16.2'
+gem 'activesupport', '7.1.5.2'
+gem 'xcodeproj', '1.27.0'

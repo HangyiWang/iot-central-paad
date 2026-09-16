@@ -88,6 +88,13 @@ android {
     }
 
     signingConfigs {
+        ci {
+            // Public development key only; never inherit production signing inputs.
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
         debug {
             if (project.hasProperty('PAAD_BETARELEASE_STORE_FILE')) {
                 storeFile file(PAAD_BETARELEASE_STORE_FILE)
@@ -118,6 +125,18 @@ android {
         }
     }
     buildTypes {
+        ci {
+            applicationIdSuffix ".ci"
+            debuggable false
+            signingConfig signingConfigs.ci
+            matchingFallbacks = ['release']
+            minifyEnabled false
+            ndk {
+                abiFilters 'x86_64'
+            }
+            // No Maps credentials: smoke coverage stops before maps or connection.
+            resValue 'string', 'google_maps_api_key', ''
+        }
         debug {
             signingConfig signingConfigs.debug
                 if (project.hasProperty('GOOGLE_MAPS_API_KEY')) {
