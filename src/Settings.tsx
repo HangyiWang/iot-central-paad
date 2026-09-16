@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import {useCallback, useContext, useMemo} from 'react';
+import {useCallback, useContext, useMemo, useState} from 'react';
 import {ThemeContext} from './contexts/theme';
 import React from 'react';
 import {
@@ -15,7 +15,11 @@ import {
 } from 'react-native';
 import {StackActions, useNavigation} from '@react-navigation/native';
 import {Icon, ListItem} from '@rneui/themed';
-import {useDeliveryInterval, useSimulation} from './hooks/iotc';
+import {
+  useConnectIoTCentralClient,
+  useDeliveryInterval,
+  useSimulation,
+} from './hooks/iotc';
 import {defaults} from './contexts/defaults';
 import Strings from 'strings';
 import {camelToName, Text} from 'components/typography';
@@ -23,6 +27,8 @@ import {useBoolean, useTheme} from 'hooks';
 import {Literal, Pages, PagesNavigator, ThemeMode} from 'types';
 import {Loader} from 'components/loader';
 import {StorageContext} from 'contexts/storage';
+import {IoTCContext} from 'contexts/iotc';
+import {reportDiagnostic, safeError} from './connection/errors';
 
 const pkg = require('../package.json');
 
@@ -42,8 +48,10 @@ export default function Settings() {
   const {mode} = useContext(ThemeContext);
   const {colors, dark} = useTheme();
   const [deliveryInterval] = useDeliveryInterval();
+  const [, , disconnect] = useConnectIoTCentralClient();
+  const {setError} = useContext(IoTCContext);
   const {clear} = useContext(StorageContext);
-  const [loading] = useBoolean(false);
+  const [loading, setLoading] = useBoolean(false);
   const styles: Literal<ViewStyle | TextStyle> = {
     container: {flex: 1, marginVertical: 10},
   };
@@ -56,12 +64,19 @@ export default function Settings() {
         {
           text: 'Proceed',
           onPress: async () => {
-            // IMPORTANT!: clear stored credentials before cleaning client, otherwise device will continue to re-connect
-            await clear();
-            Alert.alert(
-              Strings.Settings.Clear.Success.Title,
-              Strings.Settings.Clear.Success.Text,
-            );
+            setLoading.True();
+            try {
+              disconnect();
+              await clear();
+              Alert.alert(
+                Strings.Settings.Clear.Success.Title,
+                Strings.Settings.Clear.Success.Text,
+              );
+            } catch (failure) {
+              setError(safeError(failure, 'STORAGE_FAILED'));
+            } finally {
+              setLoading.False();
+            }
           },
         },
         {
@@ -74,7 +89,7 @@ export default function Settings() {
         cancelable: false,
       },
     );
-  }, [clear]);
+  }, [clear, disconnect, setLoading, setError]);
 
   const items = useMemo<ProfileItem[]>(
     () => [
@@ -187,15 +202,22 @@ const RightElement = React.memo<{
   colors: any;
   dark: boolean;
 }>(({item, colors, dark}) => {
-  const [enabled, setEnabled] = useBoolean(item.value as boolean);
+  const [pending, setPending] = useState(false);
   const nav = useNavigation<PagesNavigator>();
   if (item.action && item.action.type === 'switch') {
     return (
       <Switch
-        value={enabled}
-        onValueChange={val => {
-          item.action?.fn(val, nav);
-          setEnabled.Toggle();
+        value={Boolean(item.value)}
+        disabled={pending}
+        onValueChange={async val => {
+          setPending(true);
+          try {
+            await item.action?.fn(val, nav);
+          } catch (failure) {
+            reportDiagnostic(failure);
+          } finally {
+            setPending(false);
+          }
         }}
         {...(Platform.OS === 'android' && {
           thumbColor: item.value

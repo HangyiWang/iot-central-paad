@@ -11,6 +11,8 @@ const Strings = {
     Loading: 'Loading...',
     DisableSensor: 'Disable sensor',
     EnableSensor: 'Enable sensor',
+    HideCredential: 'Hide credential',
+    ShowCredential: 'Show credential',
   },
   Startup: {
     Failed:
@@ -75,7 +77,7 @@ const Strings = {
       },
       Success: {
         Title: 'Success',
-        Text: 'Successfully wiped data. Please restart the app!',
+        Text: 'Saved credentials and local settings were cleared. Azure devices were not deleted.',
       },
     },
   },

@@ -77,7 +77,7 @@ export const Registration = React.memo<{
   navigation?: PagesNavigator;
 }>(({navigation: parentNavigator, route}) => {
   const {colors} = useTheme();
-  const [connect, cancel, , {client, error, loading}] =
+  const [connect, , , {client, loading}] =
     useConnectIoTCentralClient();
   const {registeringNew, setRegisteringNew} = useContext(IoTCContext);
   const previousLoading = usePrevious(loading);
@@ -124,36 +124,6 @@ export const Registration = React.memo<{
     }
   }, [client, loading, parentNavigator, previousLoading]);
 
-  if (error && loading) {
-    Alert.alert(
-      'Error',
-      'The QR code you have scanned is not an Azure IoT Central Device QR code',
-      [
-        {
-          text: 'Retry',
-          onPress: async () => {
-            await cancel({clear: false});
-            qrcodeRef.current?.reactivate();
-          },
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: async () => {
-            await cancel({clear: false});
-            parentNavigator?.dispatch(
-              CommonActions.navigate({
-                name: screens.EMPTY,
-              }),
-            );
-          },
-        },
-      ],
-      {
-        cancelable: false,
-      },
-    );
-  }
   return (
     <Stack.Navigator
       initialRouteName={

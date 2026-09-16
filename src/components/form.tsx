@@ -14,6 +14,7 @@ import {Input} from '@rneui/themed';
 import ButtonGroup from './buttonGroup';
 import {Text, Name, normalize} from './typography';
 import {StyleDefinition} from 'types';
+import Strings from '../strings';
 
 export type FormItem = {
   id: string;
@@ -60,6 +61,7 @@ const Form = React.memo<FormProps>(
     // fire if initial items change
     React.useEffect(() => {
       setValues(initValues(items));
+      setRevealed({});
     }, [items, setValues]);
 
     React.useEffect(() => {
@@ -88,10 +90,10 @@ const Form = React.memo<FormProps>(
       <TouchableWithoutFeedback accessible={false} onPress={Keyboard.dismiss}>
         <View>
           {title && <Name style={styles.title}>{title}</Name>}
-          {items.map((item, index) => {
+          {items.map(item => {
             if (item.choices && item.choices.length > 0) {
               return (
-                <View key={`formitem-${index}`}>
+                <View key={item.id}>
                   <Text style={styles.item}>{item.label}</Text>
                   <ButtonGroup
                     readonly={item.readonly}
@@ -110,7 +112,7 @@ const Form = React.memo<FormProps>(
             return (
               <Input
                 shake={() => null}
-                key={`formitem-${index}`}
+                key={item.id}
                 testID={`connection-${item.id}`}
                 multiline={item.multiline && !item.secure}
                 secureTextEntry={item.secure && !revealed[item.id]}
@@ -118,7 +120,7 @@ const Form = React.memo<FormProps>(
                 autoCorrect={false}
                 autoComplete="off"
                 textContentType="none"
-                value={values[item.id]}
+                value={values[item.id] ?? ''}
                 label={item.label}
                 labelStyle={styles.label}
                 disabled={item.readonly}
@@ -147,8 +149,8 @@ const Form = React.memo<FormProps>(
                           : 'eye-outline',
                         type: 'ionicon',
                         accessibilityLabel: revealed[item.id]
-                          ? 'Hide credential'
-                          : 'Show credential',
+                          ? Strings.Core.HideCredential
+                          : Strings.Core.ShowCredential,
                         containerStyle: {
                           minWidth: 44,
                           minHeight: 44,
