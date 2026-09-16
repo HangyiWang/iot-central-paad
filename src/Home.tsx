@@ -5,7 +5,8 @@
 import {RouteProp} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import CardView from 'CardView';
-import {Loader, Name, Detail} from 'components';
+import {Loader} from 'components';
+import ConnectionSummary from './components/connectionSummary';
 import FileUpload from 'FileUpload';
 import {
   useLogger,
@@ -13,7 +14,6 @@ import {
   useProperties,
   IIcon,
   useDeliveryInterval,
-  useSimulation,
   useIoTCentralClient,
 } from 'hooks';
 import Logs from 'Logs';
@@ -42,13 +42,101 @@ import {
   DATA_AVAILABLE_EVENT,
   NavigationScreens,
   ItemProps,
+  Pages,
+  ChartType,
 } from 'types';
-import {DEFAULT_DELIVERY_INTERVAL} from './sensors';
+import {AVAILABLE_SENSORS} from './sensors';
 import {Icon} from '@rneui/themed';
 import {playTorch} from 'tools/Torch';
 import {BluetoothPage} from 'bluetooth/Bluetooth';
 
 const Tab = createBottomTabNavigator<NavigationScreens>();
+
+export async function executeCommand(
+  command: IIoTCCommand,
+  sensors: ItemProps[],
+  append: (item: {eventName: string; eventData: string}) => void,
+) {
+  let status = IIoTCCommandResponse.ERROR;
+  let response: Record<string, unknown> = {
+    error: 'Invalid or unavailable command',
+  };
+  try {
+    if (
+      typeof command.requestPayload !== 'string' ||
+      command.requestPayload.length > 4096
+    ) {
+      throw new Error('Invalid command');
+    }
+    const data: unknown = JSON.parse(command.requestPayload);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error('Invalid command');
+    }
+    const input = data as Record<string, unknown>;
+    if (command.name === LIGHT_TOGGLE_COMMAND) {
+      const {pulses, duration, delay = 1} = input;
+      if (
+        typeof pulses !== 'number' ||
+        !Number.isInteger(pulses) ||
+        pulses < 1 ||
+        pulses > 100 ||
+        typeof duration !== 'number' ||
+        !Number.isFinite(duration) ||
+        duration <= 0 ||
+        duration > 60 ||
+        typeof delay !== 'number' ||
+        !Number.isFinite(delay) ||
+        delay < 0 ||
+        delay > 60
+      ) {
+        throw new Error('Invalid command');
+      }
+      await playTorch(pulses, duration, delay);
+      response = {execution: 'completed'};
+    } else {
+      const sensor = sensors.find(item => item.id === input.sensor);
+      if (!sensor) {
+        throw new Error('Invalid command');
+      }
+      if (
+        command.name === ENABLE_DISABLE_COMMAND &&
+        typeof input.enable === 'boolean'
+      ) {
+        if (input.enable && sensor.availability === 'unavailable') {
+          throw new Error('Unavailable sensor');
+        }
+        await sensor.enable(input.enable);
+        response = {enabled: input.enable, execution: 'requested'};
+      } else if (
+        command.name === SET_FREQUENCY_COMMAND &&
+        typeof input.interval === 'number' &&
+        Number.isFinite(input.interval) &&
+        input.interval >= 1 &&
+        input.interval <= 3600 &&
+        sensor.availability !== 'unavailable'
+      ) {
+        sensor.sendInterval(input.interval * 1000);
+        response = {interval: input.interval};
+      } else {
+        throw new Error('Invalid command');
+      }
+    }
+    status = IIoTCCommandResponse.SUCCESS;
+  } catch {
+    append({
+      eventName: 'ERROR',
+      eventData: 'Command rejected or execution failed.',
+    });
+  }
+  try {
+    await command.reply(status, JSON.stringify(response));
+  } catch {
+    append({
+      eventName: 'ERROR',
+      eventData: 'Command response could not be submitted.',
+    });
+  }
+}
 
 const icons: {
   [x in ScreenNames]: (props: {
@@ -171,103 +259,63 @@ const Root = React.memo<{
     properties,
     updateProperty,
   } = useProperties();
-  const [simulated] = useSimulation();
+  const propertyRef = useRef(properties);
+  propertyRef.current = properties;
 
-  const onConnectionRefresh = useCallback(
-    async (client: IIoTCClient) => {
-      await client.fetchTwin();
-      await client.sendProperty({
-        [PROPERTY]: {
-          __t: 'c',
-          ...properties.reduce((obj, p) => ({...obj, [p.id]: p.value}), {}),
-        },
-      });
-    },
-    [properties],
-  );
+  const onConnectionRefresh = useCallback(async (client: IIoTCClient) => {
+    await client.fetchTwin();
+    await client.sendProperty({
+      [PROPERTY]: {
+        __t: 'c',
+        ...propertyRef.current
+          .filter(property => property.value !== undefined)
+          .reduce((obj, p) => ({...obj, [p.id]: p.value}), {}),
+      },
+    });
+  }, []);
   const [iotcentralClient] = useIoTCentralClient(onConnectionRefresh);
 
   const sensorRef = useRef(sensors);
+  sensorRef.current = sensors;
   // const healthRef = useRef(healths);
 
   const sendToCentralHandler = useCallback(
     async (componentName: string, id: string, value: any) => {
       if (iotcentralClient && iotcentralClient.isConnected()) {
-        await iotcentralClient.sendTelemetry(
-          {[id]: value},
-          {'$.sub': componentName},
-        );
-      }
-    },
-    [iotcentralClient],
-  );
-
-  const onCommandUpdate = useCallback(
-    async (command: IIoTCCommand) => {
-      let data: any;
-      data = JSON.parse(command.requestPayload);
-      Alert.alert(
-        Strings.Client.Commands.Alert.Title,
-        resolveString(Strings.Client.Commands.Alert.Message, command.name),
-      );
-
-      if (command.name === LIGHT_TOGGLE_COMMAND) {
-        await command.reply(
-          IIoTCCommandResponse.SUCCESS,
-          '{"execution":"started"}',
-        );
-        const torchParams = data as {
-          pulses: number;
-          duration: number;
-          delay?: number;
-        };
-        append({
-          eventName: 'INFO',
-          eventData: `Received Light Toggle Command. Light will be turned on for ${
-            torchParams.duration
-          } seconds ${torchParams.pulses} times with ${
-            torchParams.delay ?? 1
-          } seconds between each power.`,
-        });
-        await playTorch(
-          torchParams.pulses,
-          torchParams.duration,
-          torchParams.delay || 1,
-        );
-        append({
-          eventName: 'INFO',
-          eventData: 'End turning on/off light.',
-        });
-        return;
-      }
-      if (data.sensor) {
-        const sensor = sensorRef.current.find(s => s.id === data.sensor);
-        if (sensor) {
-          switch (command.name) {
-            case ENABLE_DISABLE_COMMAND:
-              sensor.enable(data.enable ? data.enable : false);
-              await command.reply(
-                IIoTCCommandResponse.SUCCESS,
-                `{"enabled":${data.enable}}`,
-              );
-              break;
-            case SET_FREQUENCY_COMMAND:
-              sensor.sendInterval(data.interval ? data.interval * 1000 : 5000);
-              await command.reply(
-                IIoTCCommandResponse.SUCCESS,
-                `{"interval":${data.interval}}`,
-              );
-              break;
-          }
+        try {
+          await iotcentralClient.sendTelemetry(
+            {[id]: value},
+            {'$.sub': componentName},
+          );
+        } catch {
+          append({
+            eventName: 'ERROR',
+            eventData: 'Telemetry could not be submitted.',
+          });
         }
       }
     },
+    [iotcentralClient, append],
+  );
+
+  const onCommandUpdate = useCallback(
+    (command: IIoTCCommand) =>
+      executeCommand(command, sensorRef.current, append),
     [append],
   );
 
   const onPropUpdate = useCallback(
     async (prop: IIoTCProperty) => {
       const {name, value} = prop;
+      if (
+        name !== PROPERTY &&
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        value.__t === 'c'
+      ) {
+        return;
+      }
       if (
         value &&
         typeof value === 'object' &&
@@ -282,9 +330,16 @@ const Root = React.memo<{
       } else {
         updateProperty(name, value);
       }
-      await prop.ack();
+      try {
+        await prop.ack();
+      } catch {
+        append({
+          eventName: 'ERROR',
+          eventData: 'Property response could not be submitted.',
+        });
+      }
     },
-    [updateProperty],
+    [updateProperty, append],
   );
 
   const sendTelemetryHandler = useCallback(
@@ -298,6 +353,8 @@ const Root = React.memo<{
 
   useEffect(() => {
     const currentSensorRef = sensorRef.current;
+    let unsubscribeCommands: (() => void) | undefined;
+    let unsubscribeProperties: (() => void) | undefined;
     // const currentHealthRef = healthRef.current;
     if (iotcentralClient) {
       currentSensorRef.forEach(s =>
@@ -321,12 +378,25 @@ const Root = React.memo<{
         eventData: 'Properties initialized.',
       });
 
-      iotcentralClient.on(IOTC_EVENTS.Commands, onCommandUpdate);
-      iotcentralClient.on(IOTC_EVENTS.Properties, onPropUpdate);
-      iotcentralClient.fetchTwin();
+      unsubscribeCommands = iotcentralClient.on(
+        IOTC_EVENTS.Commands,
+        onCommandUpdate,
+      );
+      unsubscribeProperties = iotcentralClient.on(
+        IOTC_EVENTS.Properties,
+        onPropUpdate,
+      );
+      iotcentralClient.fetchTwin().catch(() => {
+        append({
+          eventName: 'ERROR',
+          eventData: 'Device twin could not be requested.',
+        });
+      });
     }
 
     return () => {
+      unsubscribeCommands?.();
+      unsubscribeProperties?.();
       currentSensorRef.forEach(s =>
         removeSensorListener(s.id, DATA_AVAILABLE_EVENT, sendTelemetryHandler),
       );
@@ -350,7 +420,11 @@ const Root = React.memo<{
 
   // react to sendinterval change
   useEffect(() => {
-    if (deliveryInterval !== DEFAULT_DELIVERY_INTERVAL) {
+    if (
+      Number.isFinite(deliveryInterval) &&
+      deliveryInterval >= 1 &&
+      deliveryInterval <= 3600
+    ) {
       sensorRef.current.forEach(sensor =>
         sensor.sendInterval(deliveryInterval * 1000),
       );
@@ -359,11 +433,11 @@ const Root = React.memo<{
 
   return (
     <>
-      {simulated && (
-        <Name style={{textAlign: 'center', marginTop: 5}}>
-          Device: <Detail>{iotcentralClient?.id}</Detail>
-        </Name>
-      )}
+      <ConnectionSummary
+        onManualConnection={() =>
+          navigation.navigate(Pages.REGISTRATION, {screen: 'MANUAL'})
+        }
+      />
       <Tab.Navigator
         key="tab"
         screenOptions={{
@@ -374,7 +448,7 @@ const Root = React.memo<{
           options={{
             tabBarIcon: icons.Telemetry,
           }}>
-          {getCardView(sensors, 'Telemetry')}
+          {getCardView(sensors, 'Telemetry', navigation)}
         </Tab.Screen>
         {/* <Tab.Screen
           name={Screens.HEALTH_SCREEN}
@@ -407,13 +481,15 @@ const Root = React.memo<{
                       if (!iotcentralClient?.isConnected()) {
                         throw new ConnectionError('NOT_CONNECTED');
                       }
-                      await iotcentralClient.sendProperty({
+                      const submission = await iotcentralClient.sendProperty({
                         [PROPERTY]: {__t: 'c', [item.id]: value},
                       });
                       Alert.alert(
                         'Property',
                         resolveString(
-                          Strings.Client.Properties.Delivery.Success,
+                          submission.delivery === 'simulated'
+                            ? Strings.Client.Properties.Delivery.Simulated
+                            : Strings.Client.Properties.Delivery.Success,
                           item.name,
                         ),
                         [{text: 'OK'}],
@@ -460,33 +536,31 @@ const Root = React.memo<{
   );
 });
 
-const getCardView = (items: ItemProps[], name: string) => () =>
-  (
-    <CardView
-      items={items}
-      componentName={name}
-      onItemLongPress={item => {
-        item.enable(!item.enabled);
-      }}
-      // TEMP: temporary disabled charts
-      // onItemPress={
-      //   detail
-      //     ? item => {
-      //         navigation.navigate('Insight', {
-      //           chartType:
-      //             item.id === AVAILABLE_SENSORS.GEOLOCATION
-      //               ? ChartType.MAP
-      //               : ChartType.DEFAULT,
-      //           currentValue: item.value,
-      //           telemetryId: item.id,
-      //           title: camelToName(item.id),
-      //           backTitle: 'Telemetry',
-      //         });
-      //       }
-      //     : undefined
-      // }
-    />
-  );
+const getCardView =
+  (items: ItemProps[], name: string, navigation: PagesNavigator) => () =>
+    (
+      <CardView
+        items={items}
+        componentName={name}
+        onItemLongPress={item => {
+          item.enable(!item.enabled);
+        }}
+        onItemPress={item =>
+          navigation.navigate(Pages.INSIGHT, {
+            chartType:
+              item.id === AVAILABLE_SENSORS.GEOLOCATION
+                ? ChartType.MAP
+                : ChartType.DEFAULT,
+            currentValue: item.value,
+            telemetryId: item.id,
+            title: item.name,
+            backTitle: 'Telemetry',
+            unit: item.unit,
+            simulated: item.simulated,
+          })
+        }
+      />
+    );
 
 const TabBarIcon = React.memo<{icon: IIcon; color: string; size: number}>(
   ({icon, color, size}) => {

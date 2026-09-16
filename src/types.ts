@@ -42,6 +42,12 @@ export type NavigationParams = {
     type: string;
   };
   previousScreen?: string;
+  screen?: string;
+  telemetryId?: string;
+  currentValue?: any;
+  chartType?: ChartType;
+  unit?: string;
+  simulated?: boolean;
 };
 
 // Type for getting the values of an object (lookup)
@@ -98,6 +104,8 @@ export type ItemProps = {
   icon?: IconProps;
   enabled: boolean;
   simulated: boolean;
+  availability?: 'checking' | 'available' | 'unavailable';
+  retry?(): void;
   enable(value?: boolean): void;
   sendInterval(value: number): void;
   unit?: string;

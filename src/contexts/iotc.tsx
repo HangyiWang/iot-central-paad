@@ -49,8 +49,8 @@ const IoTCProvider: React.FC<{children: React.ReactNode}> = ({children}) => {
       switch (action.type) {
         case 'UPDATE_CLIENT':
           return {
+            ...centralState,
             client: action.value,
-            connecting: false,
             registeringNew: false,
           };
         case 'SET_CONNECTING':
@@ -74,7 +74,13 @@ const IoTCProvider: React.FC<{children: React.ReactNode}> = ({children}) => {
     dispatch({type: 'SET_REGISTERING', value});
   }, []);
 
-  useEffect(() => () => request.current?.controller.abort(), []);
+  useEffect(
+    () => () => {
+      request.current?.controller.abort();
+      request.current?.client?.cancel();
+    },
+    [],
+  );
   useEffect(() => () => state.client?.cancel(), [state.client]);
 
   const value = {

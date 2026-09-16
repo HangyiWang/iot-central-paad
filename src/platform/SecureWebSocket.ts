@@ -23,7 +23,7 @@ const instancePrefix = `${Date.now().toString(36)}-${Math.random()
   .toString(36)
   .slice(2)}`;
 const endpoint =
-  /^wss:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.(?:device\.)?azure-devices\.(?:net|cn|us)(?:\/[^#\s\\]*)?$/i;
+  /^wss:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.(?:device\.)?azure-devices\.(?:net|cn|us)(?::443)?(?:\/[^#\s\\]*)?$/i;
 
 /** MQTT-only binary socket. Never replaces the global/dev-server WebSocket. */
 export class SecureWebSocket {
@@ -69,7 +69,8 @@ export class SecureWebSocket {
     ) {
       throw new SyntaxError('An MQTT subprotocol is required');
     }
-    this.url = url;
+    // Paho supplies :443; the native boundary receives a canonical TLS URL.
+    this.url = url.replace(/^(wss:\/\/[^/:]+):443(?=\/|$)/, '$1');
     this.protocols = [...requested];
     // A constructor must return before open/error callbacks can be delivered.
     Promise.resolve().then(() => this.connect());

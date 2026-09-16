@@ -2,7 +2,8 @@
 // Licensed under the MIT License.
 
 import React, {useState} from 'react';
-import {StyleProp, ViewStyle} from 'react-native';
+import {Platform, StyleProp, View, ViewStyle} from 'react-native';
+import Constants from 'expo-constants';
 import {
   Marker,
   default as MapView,
@@ -10,6 +11,8 @@ import {
   Region,
 } from 'react-native-maps';
 import {GeoCoordinates} from '../types';
+import {Text} from './typography';
+import Strings from '../strings';
 
 const Map = React.memo<{
   location: GeoCoordinates;
@@ -21,6 +24,19 @@ const Map = React.memo<{
     latitudeDelta: location.latD ? location.latD : 0.0922,
     longitudeDelta: location.lonD ? location.lonD : 0.0421,
   });
+  if (
+    Platform.OS === 'android' &&
+    Constants.expoConfig?.extra?.androidMapsConfigured !== true
+  ) {
+    return (
+      <View style={style} testID="map-not-configured">
+        <Text>{Strings.Map.NotConfigured}</Text>
+        <Text selectable>
+          {location.lat.toFixed(5)}, {location.lon.toFixed(5)}
+        </Text>
+      </View>
+    );
+  }
   return (
     <MapView
       provider={PROVIDER_DEFAULT}
@@ -33,7 +49,7 @@ const Map = React.memo<{
       onRegionChangeComplete={setRegion}>
       <Marker
         coordinate={{latitude: location.lat, longitude: location.lon}}
-        title="Current location"
+        title={Strings.Map.CurrentLocation}
         description={`${location.lat
           .toString()
           .substring(0, 6)}... - ${location.lon.toString().substring(0, 6)}...`}

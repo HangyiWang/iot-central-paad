@@ -170,6 +170,7 @@ test('properties preserve false/zero and command replies truthfully mean submitt
     destinationName: '$iothub/twin/PATCH/properties/desired/?$version=3',
     payloadString: JSON.stringify({$version: 3, setting: {value: false}}),
   });
+
   expect(properties.mock.calls[0][0].value).toBe(false);
   expect(await properties.mock.calls[0][0].ack()).toEqual({
     delivery: 'submitted',
@@ -192,4 +193,38 @@ test('properties preserve false/zero and command replies truthfully mean submitt
     0,
     false,
   );
+});
+
+test.each([
+  ['$iothub/twin/PATCH/properties/desired/?$version=3', false],
+  ['$iothub/twin/res/200/?$rid=1', true],
+])('acknowledges writable PnP component properties from %s', async (topic, twin) => {
+  const client = createDeviceClient(credentials, {secureWebSocket});
+  const properties = jest.fn();
+  client.on(IOTC_EVENTS.Properties, properties);
+  await client.connect();
+  const desired = {
+    $version: 3,
+    sensors: {__t: 'c', telemetryInterval: 10, enabled: false, value: 0},
+  };
+  instances[0].listeners.messageReceived[0]({
+    destinationName: topic,
+    payloadString: JSON.stringify(twin ? {desired} : desired),
+  });
+  const update = properties.mock.calls[0][0];
+  expect(update.value).toEqual(desired.sensors);
+  await update.ack();
+  const [destination, payload] = instances[0].send.mock.calls.at(-1);
+  expect(destination).toMatch(/^\$iothub\/twin\/PATCH\/properties\/reported\//);
+  const ack = value => ({value, ac: 200, av: 3, ad: 'Property applied'});
+  expect(JSON.parse(payload)).toEqual({
+    sensors: {
+      __t: 'c',
+      telemetryInterval: ack(10),
+      enabled: ack(false),
+      value: ack(0),
+    },
+  });
+  await client.disconnect();
+  expect(jest.getTimerCount()).toBe(0);
 });

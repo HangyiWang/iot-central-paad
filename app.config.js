@@ -6,10 +6,15 @@ const locationPermission =
   'Your location will be sent to your Azure IoT application, to be shown on a map. Microsoft does not collect or have access to your location.';
 const cameraPermission =
   '"IoT Plug and Play" needs access to your camera for scanning QR codes and connecting devices.';
+const androidMapsKey = process.env.PAAD_ANDROID_MAPS_API_KEY;
 
 module.exports = ({config}) => ({
   ...config,
   scheme: isCI ? 'iot-pnp-ci' : 'iot-pnp',
+  extra: {
+    ...config.extra,
+    androidMapsConfigured: Boolean(androidMapsKey),
+  },
   ios: {
     ...config.ios,
     bundleIdentifier: isCI ? 'com.microsoft.iotpnp.ci' : 'com.microsoft.iotpnp',
@@ -23,11 +28,19 @@ module.exports = ({config}) => ({
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSLocationWhenInUseUsageDescription: locationPermission,
+      // RNVectorIcons' CocoaPod copies these; register them without copying twice.
+      UIAppFonts: [
+        'FontAwesome.ttf',
+        'Ionicons.ttf',
+        'MaterialIcons.ttf',
+        'MaterialCommunityIcons.ttf',
+      ],
     },
   },
   android: {
     ...config.android,
     package: isCI ? 'com.iot_pnp.ci' : 'com.iot_pnp',
+    config: androidMapsKey ? {googleMaps: {apiKey: androidMapsKey}} : undefined,
     blockedPermissions: [
       'android.permission.RECORD_AUDIO',
       'android.permission.READ_MEDIA_AUDIO',
@@ -108,12 +121,14 @@ module.exports = ({config}) => ({
     [
       'expo-font',
       {
-        fonts: [
-          './node_modules/react-native-vector-icons/Fonts/FontAwesome.ttf',
-          './node_modules/react-native-vector-icons/Fonts/Ionicons.ttf',
-          './node_modules/react-native-vector-icons/Fonts/MaterialIcons.ttf',
-          './node_modules/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf',
-        ],
+        android: {
+          fonts: [
+            './node_modules/react-native-vector-icons/Fonts/FontAwesome.ttf',
+            './node_modules/react-native-vector-icons/Fonts/Ionicons.ttf',
+            './node_modules/react-native-vector-icons/Fonts/MaterialIcons.ttf',
+            './node_modules/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf',
+          ],
+        },
       },
     ],
     ['./app.plugin.js', {isCI}],

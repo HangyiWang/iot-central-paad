@@ -16,7 +16,7 @@ import {
   useCallback,
   useMemo,
 } from 'react';
-import {Platform} from 'react-native';
+import {AppState, Platform} from 'react-native';
 import {AVAILABLE_SENSORS, SensorMap} from 'sensors';
 import {
   DATA_AVAILABLE_EVENT,
@@ -113,7 +113,8 @@ export function useSensors(): [
   EventManagementFN,
 ] {
   const {simulated} = useContext(StorageContext);
-  const [sensors, setSensors] = useState<ItemProps[]>(
+  const intent = useRef<Record<string, boolean>>({});
+  const [sensors, setSensors] = useState<ItemProps[]>(() =>
     (
       [
         {
@@ -198,20 +199,45 @@ export function useSensors(): [
       ] as ItemProps[]
     ).map<ItemProps>(s => ({
       ...s,
+      availability: 'checking',
+      unit: {
+        accelerometer: 'm/s²',
+        gyroscope: 'rad/s',
+        magnetometer: 'µT',
+        barometer: 'hPa',
+        battery: '%',
+        geolocation: '° (lat/lon), m (alt)',
+      }[s.id],
+      retry: () => {
+        if (intent.current[s.id] !== false) {
+          setSensors(current =>
+            current.map(sensor =>
+              sensor.id === s.id
+                ? {...sensor, availability: 'checking', value: undefined}
+                : sensor,
+            ),
+          );
+          SensorMap[s.id].enable(false);
+          SensorMap[s.id].enable(true);
+        }
+      },
       enable: (val?: boolean) => {
         const enabled = val !== undefined ? val : true;
-        SensorMap[s.id].enable(enabled);
+        intent.current[s.id] = enabled;
         setSensors(currentSensors => {
           return currentSensors.map(sensor => {
             if (sensor.id === s.id) {
               return {
                 ...sensor,
                 enabled,
+                value: undefined,
+                availability: enabled ? 'checking' : sensor.availability,
               };
             }
             return sensor;
           });
         });
+        SensorMap[s.id].enable(enabled);
       },
       sendInterval: (value: number) => {
         SensorMap[s.id].sendInterval(value);
@@ -226,6 +252,7 @@ export function useSensors(): [
           return {
             ...sensor,
             value,
+            availability: 'available',
           };
         }
         return sensor;
@@ -234,11 +261,11 @@ export function useSensors(): [
   };
   const availableHandler = (id: string) => {
     setSensors(currentSensors => {
-      const currentIndex = currentSensors.findIndex(s => s.id === id);
-      if (currentIndex > -1) {
-        currentSensors.splice(currentIndex, 1);
-      }
-      return currentSensors;
+      return currentSensors.map(sensor =>
+        sensor.id === id
+          ? {...sensor, value: undefined, availability: 'unavailable'}
+          : sensor,
+      );
     });
   };
 
@@ -260,8 +287,6 @@ export function useSensors(): [
     sensors.forEach(s => {
       addListener(s.id, DATA_AVAILABLE_EVENT, dataHandler);
       addListener(s.id, SENSOR_UNAVAILABLE_EVENT, availableHandler);
-      SensorMap[s.id].simulate(s.simulated);
-      SensorMap[s.id].enable(true);
     });
     return () => {
       sensors.forEach(s => {
@@ -271,6 +296,39 @@ export function useSensors(): [
       });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const currentSensors = useRef(sensors);
+  currentSensors.current = sensors;
+  useEffect(() => {
+    setSensors(current =>
+      current.map(sensor => ({
+        ...sensor,
+        simulated,
+        value: undefined,
+        availability: 'checking',
+      })),
+    );
+    Object.entries(SensorMap).forEach(([id, adapter]) => {
+      const metadata = currentSensors.current.find(sensor => sensor.id === id);
+      Object.assign(adapter, {unit: metadata?.unit, name: metadata?.name});
+      adapter.enable(false);
+      adapter.simulate(simulated);
+      adapter.enable(intent.current[id] !== false);
+    });
+  }, [simulated]);
+
+  useEffect(() => {
+    const listener = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        currentSensors.current.forEach(sensor => {
+          if (sensor.enabled && sensor.availability === 'unavailable') {
+            sensor.retry?.();
+          }
+        });
+      }
+    });
+    return () => listener.remove();
   }, []);
 
   return [sensors, addListener, removeListener];
@@ -422,8 +480,11 @@ export function useProperties() {
   );
 
   useEffect(() => {
-    loadDeviceInfo();
-  }, [loadDeviceInfo]);
+    loadDeviceInfo().catch(() => {
+      setLoading.False();
+      append({eventName: 'ERROR', eventData: 'Device properties unavailable.'});
+    });
+  }, [loadDeviceInfo, setLoading, append]);
 
   return {loading, properties, updateProperty};
 }

@@ -11,6 +11,7 @@ export type ConnectionErrorCode =
   | 'SECURE_TRANSPORT_REQUIRED'
   | 'NOT_CONNECTED'
   | 'OPERATION_FAILED'
+  | 'STORAGE_FAILED'
   | 'BUSY';
 
 const messages: Record<ConnectionErrorCode, string> = {
@@ -27,6 +28,7 @@ const messages: Record<ConnectionErrorCode, string> = {
     'A WebSocket implementation that rejects redirects is required.',
   NOT_CONNECTED: 'The device is not connected.',
   OPERATION_FAILED: 'The device operation failed.',
+  STORAGE_FAILED: 'Device settings could not be saved securely.',
   BUSY: 'A connection attempt is already in progress.',
 };
 

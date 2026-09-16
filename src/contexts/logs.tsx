@@ -3,6 +3,9 @@
 
 import React, {useCallback, useState} from 'react';
 import {LogItem, TimedLog} from '../types';
+import {redactLog} from '../tools/CustomLogger';
+
+export const MAX_LOG_ENTRIES = 500;
 
 interface ILogsContext {
   logs: TimedLog;
@@ -19,8 +22,14 @@ const LogsProvider: React.FC<{children: React.ReactNode}> = ({children}) => {
   const append = useCallback(
     (logItem: LogItem) => {
       setLogs(current => [
-        ...current,
-        {logItem, timestamp: new Date(Date.now()).toLocaleString()},
+        ...current.slice(-(MAX_LOG_ENTRIES - 1)),
+        {
+          logItem: {
+            eventName: redactLog(logItem.eventName),
+            eventData: redactLog(logItem.eventData),
+          },
+          timestamp: new Date(Date.now()).toLocaleString(),
+        },
       ]);
     },
     [setLogs],

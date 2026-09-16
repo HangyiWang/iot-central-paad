@@ -1,7 +1,7 @@
 # PAAD modernization plan
 
-Status: M0 complete; M1 modern app integrated, awaiting modern native CI.
-Date: 2026-09-15. Branch: `modernize/paad-foundation`.
+Status: M0 complete; modern Android startup passed; iOS font fix awaiting rerun.
+Date: 2026-09-16. Branch: `modernize/paad-foundation`.
 Base: fork `master` at `2549196`.
 
 ## Current decisions (supersede the original local-first plan)
@@ -16,6 +16,13 @@ The owner approved Expo SDK 57 development builds, minimum iOS 16.4 and Android
 runs. Each job is bounded to 45 minutes and nonsecret build/log/screenshot
 artifacts to three days. No larger runners, Azure access, production signing,
 automatic merges, or billable-resource/role changes are included.
+
+Subsequent authorization permits local foundation-to-ADR merges and pushes of
+both topic branches, plus scoped reuse of the retained proof lab for individual
+test enrollments and device traffic. Dedicated temporary device-input Actions
+secrets are permitted only in manually dispatched trusted-code live jobs and
+must be removed afterward. No administrator credentials enter the app or CI.
+No `master` merge, new billable resources, IAM changes or cloud cleanup is authorized.
 
 The baseline lane is `.github/workflows/baseline.yml`: lint and genuine app-startup
 Jest coverage, followed by independent bundled Android/iOS builds and Maestro
@@ -61,6 +68,35 @@ No live Hub/DPS/ADR traffic, secure-storage upgrade migration, physical
 sensor/BLE/camera behavior, suspension handling or full HIG acceptance is
 established by this run. Those gates, the modern shell and ADR application
 implementation remain pending.
+
+## Modern foundation progress (2026-09-16)
+
+[Run 35052582168](https://github.com/HangyiWang/iot-central-paad/actions/runs/35052582168)
+built `f02ed75b061f675b5a3312a67c940de4b2a37cbc` using Expo 57.0.23,
+React Native 0.86.3 and React 19.2.3. Its JavaScript gate and real Android
+API 36 bundled launch/manual/back/cold-restart flow passed. iOS resolved its
+new CocoaPods lock on Xcode 26.6, then rejected duplicate icon-font copies.
+The fix leaves CocoaPods as the sole iOS font-copy owner; Expo embeds Android
+fonts, and both platforms register the required font families.
+
+The initially resolved lock had SHA-256
+`ff546c745d21063bbb8f83507a086d1edabe48b867d94bad8d6d2c5f9bdc1f78`.
+The follow-up promotes Expo Constants 57.0.18 to a direct dependency, updating
+only its two external-source paths in that lock; versions/checksums are retained.
+Subsequent installs use deployment mode, not implicit resolution updates.
+
+Follow-up coverage exercises the real vendor/Paho/owned-WebSocket boundary
+against an in-memory broker, secure-storage serialization, shared connection
+ownership, cancellation, explicit disconnect, one-shot restoration, commands,
+PnP component acknowledgements, sensor availability and bounded/redacted logs.
+It does not replace actual mobile-to-cloud acceptance.
+
+Android map previews require an operator-supplied, application-restricted
+`PAAD_ANDROID_MAPS_API_KEY` at native build time. Without one, the location
+view displays coordinates and an explicit configuration notice instead of
+creating a native map that would fail. No Maps service or key is created by CI.
+Hardware parity, production distribution and secure-storage upgrade acceptance
+remain separate from the simulator prototype.
 
 ## Goal and branch order
 

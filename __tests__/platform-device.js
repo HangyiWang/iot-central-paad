@@ -56,7 +56,8 @@ test.each([
   'ws://synthetic.azure-devices.net/',
   'wss://example.org/',
   'wss://synthetic.azure-devices.net.evil.org/',
-  'wss://synthetic.azure-devices.net:443/',
+  'wss://synthetic.azure-devices.net:444/',
+  'wss://synthetic.azure-devices.net:0443/',
   'wss://user:password@synthetic.azure-devices.net/',
   'wss://synthetic.azure-devices.net/#fragment',
   'wss://synthetic.azure-devices.net./',
@@ -68,6 +69,24 @@ test.each([
 ])('rejects unsafe endpoint %s before native access', value => {
   expect(() => new SecureWebSocket(value, ['mqtt'])).toThrow('Unsafe MQTT');
   expect(native.connect).not.toHaveBeenCalled();
+});
+
+test('canonicalizes the vendor default TLS port before the native boundary', async () => {
+  const socket = new SecureWebSocket(
+    'wss://synthetic.device.azure-devices.net:443/$iothub/websocket',
+    'mqtt',
+  );
+  await tick();
+  expect(socket.url).toBe(
+    'wss://synthetic.device.azure-devices.net/$iothub/websocket',
+  );
+  expect(native.connect).toHaveBeenCalledWith(
+    expect.any(String),
+    socket.url,
+    ['mqtt'],
+  );
+  emit(native.connect.mock.calls[0][0], 'close');
+  expect(subscribers.size).toBe(0);
 });
 
 test.each(['net', 'cn', 'us'])(

@@ -19,7 +19,7 @@ import {
   bytesToSize,
   normalize,
 } from './typography';
-import {DataType, StyleDefinition} from 'types';
+import {DataType, ItemProps, StyleDefinition} from 'types';
 import {useTheme} from 'hooks';
 import Strings from 'strings';
 
@@ -37,6 +37,8 @@ export function Card(
       icon?: IconProps;
       editable?: boolean;
       onEdit?: EditCallback;
+      availability?: ItemProps['availability'];
+      simulated?: boolean;
     },
 ) {
   const {
@@ -50,6 +52,8 @@ export function Card(
     onPress,
     onLongPress,
     dataType,
+    availability,
+    simulated,
     ...otherProps
   } = props;
   const {dark, colors} = useTheme();
@@ -120,7 +124,14 @@ export function Card(
 
         <View style={styles.cardBody}>
           <Name style={{color: textColor}}>{otherProps.title}</Name>
-          {typeof value === 'function' ? (
+          {simulated && <Text>{Strings.Sensors.Simulated}</Text>}
+          {!enabled ? (
+            <Text>{Strings.Sensors.Disabled}</Text>
+          ) : availability === 'unavailable' ? (
+            <Text>{Strings.Sensors.Unavailable}</Text>
+          ) : availability === 'checking' ? (
+            <Text>{Strings.Sensors.Checking}</Text>
+          ) : typeof value === 'function' ? (
             value()
           ) : (
             <View style={styles.cardValues}>
@@ -173,7 +184,12 @@ const Value = React.memo<{
   if (!enabled) {
     return null;
   }
-  if (value === undefined || edited === null || edited === undefined) {
+  if (
+    value === null ||
+    value === undefined ||
+    edited === null ||
+    edited === undefined
+  ) {
     return <Text>N/A</Text>;
   }
 
@@ -181,7 +197,7 @@ const Value = React.memo<{
     return (
       <View>
         {Object.keys(value).map((v, i) => {
-          let strVal: string = value[v].toString();
+          let strVal: string = value[v] == null ? 'N/A' : String(value[v]);
           if (typeof value[v] === 'number') {
             strVal = (value[v] as number).toLocaleString(undefined, {
               maximumFractionDigits: 3,

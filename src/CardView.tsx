@@ -57,6 +57,7 @@ const CardView = React.memo<{
         key={`flatlist-${componentName}-${items.length}`}
         numColumns={items.length > 4 ? 2 : 1}
         data={items}
+        keyExtractor={item => item.id}
         renderItem={getCard(
           componentName,
           onItemPress,
@@ -74,6 +75,20 @@ const CardView = React.memo<{
             </ListItem.Title>
           </ListItem.Content>
         </ListItem>
+        {bottomItem?.availability === 'unavailable' && bottomItem.enabled && (
+          <ListItem
+            onPress={() => {
+              bottomItem.retry?.();
+              setBottomItem(undefined);
+            }}
+            containerStyle={styles.listItem}>
+            <ListItem.Content>
+              <ListItem.Title style={styles.detailItemText}>
+                {Strings.Sensors.Retry}
+              </ListItem.Title>
+            </ListItem.Content>
+          </ListItem>
+        )}
         <ListItem
           onPress={async () => {
             await onItemLongPress?.(bottomItem!);
@@ -110,6 +125,8 @@ const getCard =
         unit={item.unit}
         dataType={item.dataType}
         enabled={item.enabled}
+        availability={item.availability}
+        simulated={item.simulated}
         editable={(item as any).editable}
         icon={item.icon}
         // onToggle={() => item.enable(!item.enabled)}

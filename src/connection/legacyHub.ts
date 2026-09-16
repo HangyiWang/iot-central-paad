@@ -198,6 +198,7 @@ export function createLegacyHub(
         raw &&
         typeof raw === 'object' &&
         !Array.isArray(raw) &&
+        !('__t' in raw && raw.__t === 'c') &&
         Object.prototype.hasOwnProperty.call(raw, 'value')
       ) {
         propertyValue = (raw as JsonObject).value;
@@ -207,10 +208,29 @@ export function createLegacyHub(
           name,
           value: propertyValue,
           version,
-          ack: async (message = 'Property applied') =>
-            sendProperty({
-              [name]: {value: propertyValue, ac: 200, av: version, ad: message},
-            }),
+          ack: async (message = 'Property applied') => {
+            const acknowledgement = (item: JsonValue): JsonObject => ({
+              value: item,
+              ac: 200,
+              av: version,
+              ad: message,
+            });
+            if (
+              propertyValue &&
+              typeof propertyValue === 'object' &&
+              !Array.isArray(propertyValue) &&
+              propertyValue.__t === 'c'
+            ) {
+              const component: JsonObject = {__t: 'c'};
+              for (const [property, item] of Object.entries(propertyValue)) {
+                if (property !== '__t' && !property.startsWith('$')) {
+                  component[property] = acknowledgement(item);
+                }
+              }
+              return sendProperty({[name]: component});
+            }
+            return sendProperty({[name]: acknowledgement(propertyValue)});
+          },
         }),
       ).catch(reportDiagnostic);
     }

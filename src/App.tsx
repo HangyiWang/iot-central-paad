@@ -46,7 +46,6 @@ import Strings from 'strings';
 import {Option} from 'components/options';
 import Options from 'components/options';
 import {TorchCameraHost} from './tools/Torch';
-import {DeviceCredentials} from './connection';
 
 const Stack = createStackNavigator<NavigationPages>();
 
@@ -83,19 +82,21 @@ const Navigation = React.memo(() => {
   const [connect, cancel, , {client, loading, error, stage}] =
     useConnectIoTCentralClient();
   const [simulated] = useSimulation();
-  const restored = useRef<DeviceCredentials | null>(null);
+  const restored = useRef(false);
 
   const {colors} = useTheme();
   const navigationTheme = useNavigationTheme();
 
   useEffect(() => {
-    if (!credentials) {
-      restored.current = null;
-    } else if (initialized && !client && restored.current !== credentials) {
-      restored.current = credentials;
+    if (!initialized || loading || restored.current) {
+      return;
+    }
+    // Restore once per launch, never after an explicit disconnect or failed save.
+    restored.current = true;
+    if (credentials && !client) {
       connect(credentials, {restore: true});
     }
-  }, [connect, client, credentials, initialized]);
+  }, [connect, client, credentials, initialized, loading]);
 
   return (
     <NavigationContainer theme={navigationTheme}>

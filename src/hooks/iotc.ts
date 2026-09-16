@@ -74,10 +74,14 @@ export function useConnectIoTCentralClient() {
   } = useContext(IoTCContext);
   const {save, simulated} = useContext(StorageContext);
   const clear = useCallback(() => {
+    request.current?.controller.abort();
+    request.current?.client?.cancel();
     client?.cancel();
     setClient(null);
+    setConnecting(false);
     setStage('idle');
-  }, [client, setClient, setStage]);
+    setError(null);
+  }, [request, client, setClient, setConnecting, setStage, setError]);
 
   const connect = useCallback(
     async (
@@ -107,9 +111,11 @@ export function useConnectIoTCentralClient() {
           : createDeviceClient(credentials, {
               secureWebSocket,
               onStage(next, failure) {
-                setStage(next);
-                if (failure) {
-                  setError(failure);
+                if (!attempt.controller.signal.aborted) {
+                  setStage(next);
+                  if (failure) {
+                    setError(failure);
+                  }
                 }
               },
             });
@@ -122,26 +128,35 @@ export function useConnectIoTCentralClient() {
         if (attempt.controller.signal.aborted) {
           throw new ConnectionError('CANCELLED');
         }
-        await save({credentials});
+        try {
+          await save({credentials});
+        } catch {
+          throw new ConnectionError('STORAGE_FAILED');
+        }
         if (attempt.controller.signal.aborted) {
           throw new ConnectionError('CANCELLED');
         }
         setClient(candidate);
+        setError(null);
         setStage('connected');
         await options?.onSuccess?.();
         return {ok: true};
       } catch (failure) {
         attempt.client?.cancel();
-        const safe = safeError(failure, 'CONNECT_FAILED');
-        setError(safe);
-        setStage('error');
-        await options?.onFailure?.(safe);
+        const safe = attempt.controller.signal.aborted
+          ? new ConnectionError('CANCELLED')
+          : safeError(failure, 'CONNECT_FAILED');
+        setError(safe.code === 'CANCELLED' ? null : safe);
+        setStage(safe.code === 'CANCELLED' ? 'idle' : 'error');
+        if (safe.code !== 'CANCELLED') {
+          await options?.onFailure?.(safe);
+        }
         return {ok: false, error: safe};
       } finally {
         if (request.current === attempt) {
           request.current = null;
+          setConnecting(false);
         }
-        setConnecting(false);
       }
     },
     [
@@ -164,8 +179,15 @@ export function useConnectIoTCentralClient() {
       setStage('idle');
       setError(null);
       if (options?.clear) {
-        await save({credentials: null});
-        clear();
+        try {
+          await save({credentials: null});
+          clear();
+        } catch {
+          const failure = new ConnectionError('STORAGE_FAILED');
+          setError(failure);
+          setStage('error');
+          throw failure;
+        }
       }
     },
     [request, setConnecting, setStage, setError, save, clear],
@@ -181,20 +203,26 @@ export function useConnectIoTCentralClient() {
 
 export function useSimulation(): [boolean, (val: boolean) => Promise<void>] {
   const {save, simulated} = useContext(StorageContext);
-  const {client, setClient, setError, setStage} = useContext(IoTCContext);
+  const {client, setClient, setError, setStage, setConnecting, request} =
+    useContext(IoTCContext);
   const setSimulated = useCallback(
     async (value: boolean) => {
       try {
+        request.current?.controller.abort();
+        request.current?.client?.cancel();
         client?.cancel();
         setClient(null);
+        setConnecting(false);
         setStage('idle');
+        setError(null);
         await save({simulated: value});
       } catch (failure) {
-        setError(safeError(failure));
-        throw failure;
+        const safe = safeError(failure, 'STORAGE_FAILED');
+        setError(safe);
+        throw safe;
       }
     },
-    [client, setClient, setStage, save, setError],
+    [client, request, setClient, setStage, setConnecting, save, setError],
   );
   return [simulated, setSimulated];
 }

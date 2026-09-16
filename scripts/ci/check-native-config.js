@@ -11,6 +11,13 @@ assert.deepEqual(ci.ios.entitlements['keychain-access-groups'], [
   'com.microsoft.iotpnp.ci',
 ]);
 assert.equal(ci.ios.appleTeamId, undefined);
+const fonts = ci.plugins.find(plugin => plugin[0] === 'expo-font')[1];
+assert.equal(fonts.fonts, undefined);
+assert.equal(fonts.ios, undefined);
+assert.deepEqual(
+  fonts.android.fonts.map(font => font.split('/').pop()),
+  ci.ios.infoPlist.UIAppFonts,
+);
 
 delete process.env.CI;
 delete process.env.PAAD_VARIANT;

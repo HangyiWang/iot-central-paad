@@ -17,7 +17,22 @@ const Strings = {
       'Could not initialize the app. Your saved data has not been reset. Please retry.',
     ErrorCode: 'Error code: {{0}}',
   },
+  Map: {
+    CurrentLocation: 'Current location',
+    NotConfigured:
+      'Map preview is not configured in this Android build. Location coordinates remain available.',
+  },
   Connection: {
+    Summary: {
+      Connected: 'Connected',
+      Disconnected: 'Disconnected',
+      Simulated: 'Offline simulation — no cloud connection',
+      Device: 'Assigned device',
+      Hub: 'Assigned Hub',
+      Disconnect: 'Disconnect',
+      Reconnect: 'Reconnect',
+      Manual: 'Connect manually',
+    },
     Stages: {
       idle: 'Not connected',
       validating: 'Checking connection details...',
@@ -137,6 +152,8 @@ const Strings = {
     Properties: {
       Send: 'Send',
       Delivery: {
+        Simulated:
+          'Property "{{0}}" was simulated locally. Nothing was sent to the cloud.',
         Success:
           'Property "{{0}}" was submitted to the device transport. Cloud receipt has not been independently checked.',
         Failure: 'Failed to send property "{{0}}" to Azure IoT.',
@@ -173,6 +190,13 @@ const Strings = {
     Enabled: 'Simulation mode is enabled.',
     Disable:
       'Disable simulation mode and connect to Azure IoT to work with file uploads.',
+  },
+  Sensors: {
+    Unavailable: 'Unavailable — check hardware and permissions',
+    Checking: 'Waiting for sensor',
+    Simulated: 'Simulated data',
+    Disabled: 'Disabled',
+    Retry: 'Retry sensor',
   },
   Update: {
     Mandatory: {
