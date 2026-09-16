@@ -216,7 +216,10 @@ test('CLI report serializes only whitelisted configuration after an explicit res
     env: {...mockEnvironment, PAAD_LIVE_CONFIG: JSON.stringify(fixture()), GITHUB_SHA: sourceSha, MAESTRO_DEVICE_KEY: 'KEY_CANARY'},
   });
   expect(result.status).toBe(0);
-  expect(JSON.parse(result.stdout)).toEqual(createLiveReport(fixture(), 'ios', {sourceSha, uiResult: 'passed'}));
+  expect(JSON.parse(result.stdout)).toEqual(createLiveReport(fixture(), 'ios', {
+    sourceSha, uiResult: 'passed',
+    diagnostics: {availability: 'unavailable', reason: 'read-failed'},
+  }));
   expect(result.stdout).not.toContain('KEY_CANARY');
 });
 

@@ -37,12 +37,26 @@ const LIMITS = Object.freeze({
   entries: 256, files: 32, fileBytes: 1024 * 1024, totalBytes: 4 * 1024 * 1024,
   directoryDepth: 6, nodes: 4096, hierarchyDepth: 64, commands: 512,
 });
-const unavailable = () => ({availability: 'unavailable'});
+const UNAVAILABLE_REASONS = Object.freeze([
+  'no-supported-data', 'invalid-metadata', 'entry-limit', 'depth-limit',
+  'file-limit', 'byte-limit', 'command-limit', 'hierarchy-limit', 'unsafe-path', 'read-failed',
+]);
+const unavailable = reason => ({
+  availability: 'unavailable',
+  ...(UNAVAILABLE_REASONS.includes(reason) ? {reason} : {}),
+});
+class DiagnosticUnavailable extends Error {
+  constructor(reason) {
+    super('Unavailable');
+    this.reason = reason;
+  }
+}
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 const object = value => value && typeof value === 'object' && !Array.isArray(value);
 
 function parseCommands(value) {
-  if (!Array.isArray(value) || value.length > LIMITS.commands) throw new Error('Unavailable');
+  if (!Array.isArray(value)) throw new DiagnosticUnavailable('invalid-metadata');
+  if (value.length > LIMITS.commands) throw new DiagnosticUnavailable('command-limit');
   const failedCommands = [];
   for (const entry of value) {
     if (!object(entry) || !object(entry.metadata) || entry.metadata.status !== 'FAILED') continue;
@@ -66,11 +80,13 @@ function parseCommands(value) {
 }
 
 function parseHierarchy(value) {
-  if (!object(value)) throw new Error('Unavailable');
+  if (!object(value)) throw new DiagnosticUnavailable('invalid-metadata');
   const ui = {};
   let count = 0;
   function visit(node, depth) {
-    if (++count > LIMITS.nodes || depth > LIMITS.hierarchyDepth) throw new Error('Unavailable');
+    if (++count > LIMITS.nodes || depth > LIMITS.hierarchyDepth) {
+      throw new DiagnosticUnavailable('hierarchy-limit');
+    }
     if (!object(node)) return;
     const attributes = node.attributes;
     if (object(attributes)) {
@@ -102,7 +118,10 @@ function parseHierarchy(value) {
 
 function sanitizeDiagnostics(value) {
   try {
-    if (!object(value) || value.availability !== 'available') return unavailable();
+    if (!object(value)) return unavailable();
+    if (value.availability !== 'available') {
+      return unavailable(value.availability === 'unavailable' ? value.reason : undefined);
+    }
     const failedCommands = [];
     if (Array.isArray(value.failedCommands) && value.failedCommands.length <= LIMITS.commands) {
       for (const entry of value.failedCommands) {
@@ -133,7 +152,7 @@ function collectLiveDiagnostics() {
     const root = path.resolve('build/live-device-private');
     const requireDirectory = directory => {
       const stat = fs.lstatSync(directory);
-      if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('Unavailable');
+      if (!stat.isDirectory() || stat.isSymbolicLink()) throw new DiagnosticUnavailable('unsafe-path');
     };
     requireDirectory(path.resolve('build'));
     requireDirectory(root);
@@ -144,12 +163,12 @@ function collectLiveDiagnostics() {
     const ui = {};
     function walk(directory, depth) {
       requireDirectory(directory);
-      if (depth > LIMITS.directoryDepth) throw new Error('Unavailable');
+      if (depth > LIMITS.directoryDepth) throw new DiagnosticUnavailable('depth-limit');
       const dir = fs.opendirSync(directory);
       try {
         let entry;
         while ((entry = dir.readSync())) {
-          if (++entries > LIMITS.entries) throw new Error('Unavailable');
+          if (++entries > LIMITS.entries) throw new DiagnosticUnavailable('entry-limit');
           const filename = path.join(directory, entry.name);
           const stat = fs.lstatSync(filename);
           if (stat.isSymbolicLink()) continue;
@@ -163,17 +182,19 @@ function collectLiveDiagnostics() {
           const commands = entry.name === 'commands.json';
           const hierarchy = path.basename(directory) === 'screen-hierarchy' && entry.name.endsWith('.json');
           if (!stat.isFile() || (!commands && !hierarchy)) continue;
-          if (++files > LIMITS.files || stat.size > LIMITS.fileBytes ||
-              (bytes += stat.size) > LIMITS.totalBytes) throw new Error('Unavailable');
+          if (++files > LIMITS.files) throw new DiagnosticUnavailable('file-limit');
+          if (stat.size > LIMITS.fileBytes || (bytes += stat.size) > LIMITS.totalBytes) {
+            throw new DiagnosticUnavailable('byte-limit');
+          }
           const fd = fs.openSync(filename, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
           let value;
           try {
             const current = fs.fstatSync(fd);
             if (!current.isFile() || current.size !== stat.size || current.ino !== stat.ino ||
-                current.dev !== stat.dev) throw new Error('Unavailable');
+                current.dev !== stat.dev) throw new DiagnosticUnavailable('unsafe-path');
             const buffer = Buffer.alloc(stat.size + 1);
             const size = fs.readSync(fd, buffer, 0, buffer.length, 0);
-            if (size !== stat.size) throw new Error('Unavailable');
+            if (size !== stat.size) throw new DiagnosticUnavailable('read-failed');
             value = JSON.parse(buffer.subarray(0, size).toString('utf8'));
           } finally {
             fs.closeSync(fd);
@@ -195,14 +216,16 @@ function collectLiveDiagnostics() {
       }
       walk(directory, 0);
     }
-    return sanitizeDiagnostics({availability: 'available', failedCommands, ui});
-  } catch {
-    return unavailable();
+    const result = sanitizeDiagnostics({availability: 'available', failedCommands, ui});
+    return result.availability === 'available' ? result : unavailable('no-supported-data');
+  } catch (error) {
+    return unavailable(error instanceof DiagnosticUnavailable ? error.reason
+      : error instanceof SyntaxError ? 'invalid-metadata' : 'read-failed');
   }
 }
 
 module.exports = {
   collectLiveDiagnostics, sanitizeDiagnostics, parseCommands, parseHierarchy,
-  COMMAND_KINDS, TARGET_IDS, ERROR_CODES, LIMITS,
+  COMMAND_KINDS, TARGET_IDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS,
 };
 if (require.main === module) process.stdout.write(`${JSON.stringify(collectLiveDiagnostics())}\n`);

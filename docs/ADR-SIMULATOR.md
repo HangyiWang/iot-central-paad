@@ -186,6 +186,9 @@ safe failure codes are uploaded, never raw Maestro logs, hierarchies or images.
 Maestro 2.10.0 creates private failure artifacts and has no supported automatic
 failure-image opt-out; inputs remain masked, and those artifacts are deleted
 without publication. Do not enable reveal or recording in live automation.
+Unavailable diagnostics include only a fixed reason category, such as missing
+supported metadata, a size/count limit, or a read failure. They never include
+raw errors or paths, and unavailability alone does not establish a UI timeout.
 
 A UI success report still says independent Azure verification is pending.
 Pair it with the operator verifier's result. Downstream telemetry consumption,

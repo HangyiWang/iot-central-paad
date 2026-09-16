@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   collectLiveDiagnostics, sanitizeDiagnostics, parseCommands, parseHierarchy,
-  COMMAND_KINDS, ERROR_CODES, LIMITS,
+  COMMAND_KINDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS,
 } = require('../scripts/ci/live-diagnostics');
 
 const CANARY = 'SECRET_CANARY';
@@ -226,26 +226,33 @@ test('traverses only fixed private results/debug and never follows links or open
   expect(JSON.stringify(result)).not.toContain(CANARY);
 });
 
-test.each(['{SECRET_CANARY', '{}', '[]'])('malformed or missing useful commands return unavailable (%#)', raw => {
+test.each([
+  ['{SECRET_CANARY', 'invalid-metadata'],
+  ['{}', 'invalid-metadata'],
+  ['[]', 'no-supported-data'],
+])('malformed or missing useful commands return unavailable (%#)', (raw, reason) => {
   mockArtifacts({'results/commands.json': raw});
-  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable'});
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason});
 });
 
 test('missing diagnostics and symlinked scan roots are unavailable', () => {
+  mockArtifacts();
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'no-supported-data'});
+  jest.restoreAllMocks();
   mockArtifacts({}, ['results']);
-  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable'});
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'unsafe-path'});
 });
 
 test('never follows a replaced private root or build parent', () => {
   mockArtifacts({'results/commands.json': [command()]});
   fs.lstatSync.mockReturnValue({isDirectory: () => true, isSymbolicLink: () => true});
-  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable'});
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'unsafe-path'});
   expect(fs.opendirSync).not.toHaveBeenCalled();
 });
 
 test('caps bytes before reading oversized files', () => {
   const {opened} = mockArtifacts({'results/commands.json': CANARY.repeat(LIMITS.fileBytes)});
-  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable'});
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'byte-limit'});
   expect(opened).not.toHaveBeenCalled();
 });
 
@@ -253,24 +260,24 @@ test('caps directory entries and depth without exposing paths', () => {
   const contents = {};
   for (let i = 0; i <= LIMITS.entries; i++) contents[`results/${i}.log`] = CANARY;
   mockArtifacts(contents);
-  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable'});
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'entry-limit'});
   jest.restoreAllMocks();
   mockArtifacts({[`results/${'nested/'.repeat(LIMITS.directoryDepth + 1)}commands.json`]: [command()]});
-  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable'});
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'depth-limit'});
 });
 
 test('caps JSON file count and cumulative bytes', () => {
   const contents = {};
   for (let i = 0; i <= LIMITS.files; i++) contents[`results/screen-hierarchy/${i}.json`] = {};
   mockArtifacts(contents);
-  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable'});
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'file-limit'});
   expect(fs.openSync).toHaveBeenCalledTimes(LIMITS.files);
   jest.restoreAllMocks();
   const large = JSON.stringify({ignored: CANARY.repeat(90000)});
   mockArtifacts(Object.fromEntries(Array.from({length: 6}, (_, i) => [
     `debug/screen-hierarchy/${i}.json`, large,
   ])));
-  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable'});
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'byte-limit'});
   expect(fs.openSync.mock.calls.length).toBeLessThan(6);
 });
 
@@ -279,7 +286,7 @@ test('rejects a file replaced after lstat', () => {
   fs.fstatSync.mockReturnValue({
     isFile: () => true, size: 1, dev: 4, ino: 9,
   });
-  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable'});
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'unsafe-path'});
   expect(fs.readSync).not.toHaveBeenCalled();
   expect(fs.closeSync).toHaveBeenCalled();
 });
@@ -288,7 +295,22 @@ test('fails closed on read races and parser errors without printing raw errors',
   mockArtifacts({'results/commands.json': [command()]});
   fs.readSync.mockImplementation(() => { throw new Error(CANARY); });
   const log = jest.spyOn(console, 'error').mockImplementation(() => {});
-  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable'});
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'read-failed'});
   expect(log).not.toHaveBeenCalled();
   expect(fs.closeSync).toHaveBeenCalled();
+});
+
+test.each(UNAVAILABLE_REASONS)('retains only a fixed unavailable reason (%s)', reason => {
+  expect(sanitizeDiagnostics({availability: 'unavailable', reason, error: CANARY}))
+    .toEqual({availability: 'unavailable', reason});
+});
+
+test('rejects unknown diagnostic reasons and never exports raw errors', () => {
+  expect(sanitizeDiagnostics({availability: 'unavailable', reason: CANARY, error: CANARY}))
+    .toEqual({availability: 'unavailable'});
+});
+
+test('reports the command limit without inspecting or exposing extra commands', () => {
+  mockArtifacts({'results/commands.json': Array(LIMITS.commands + 1).fill(CANARY)});
+  expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'command-limit'});
 });
