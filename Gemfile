@@ -7,3 +7,5 @@ ruby ">= 3.3.0"
 gem 'cocoapods', '1.16.2'
 gem 'activesupport', '7.1.5.2'
 gem 'xcodeproj', '1.27.0'
+# RN 0.75 codegen still passes quirks_mode, which JSON 3 removed.
+gem 'json', '2.10.2'
