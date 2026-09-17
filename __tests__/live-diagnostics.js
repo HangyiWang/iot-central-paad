@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   collectLiveDiagnostics, sanitizeDiagnostics, parseCommands, parseHierarchy,
-  COMMAND_KINDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS,
+  COMMAND_KINDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS, UI_PRESENCE_IDS,
 } = require('../scripts/ci/live-diagnostics');
 
 const CANARY = 'SECRET_CANARY';
@@ -82,6 +82,25 @@ test('reads only safe status IDs and literals from private hierarchy', () => {
     proofStatus: 'Submitted locally',
   });
   expect(JSON.stringify(parseHierarchy(hierarchy()))).not.toContain(CANARY);
+});
+
+test.each(UI_PRESENCE_IDS)('records only fixed target presence, never the value of %s', id => {
+  const ui = parseHierarchy(node(id, CANARY));
+  expect(ui).toEqual({observedTargets: [id]});
+  expect(sanitizeDiagnostics({availability: 'available', ui}).ui).toEqual(ui);
+  expect(JSON.stringify(ui)).not.toContain(CANARY);
+});
+
+test('presence metadata rejects arbitrary values, duplicates and excessive collections', () => {
+  expect(sanitizeDiagnostics({availability: 'available', ui: {
+    observedTargets: ['model-id', CANARY, 'model-id'],
+  }}).ui).toEqual({observedTargets: ['model-id']});
+  for (const targets of [CANARY, [CANARY], [true], [{id: 'model-id'}],
+    Array(UI_PRESENCE_IDS.length + 1).fill('model-id')]) {
+    expect(sanitizeDiagnostics({availability: 'available', ui: {observedTargets: targets}}))
+      .toEqual({availability: 'unavailable'});
+  }
+  expect(parseHierarchy(node(CANARY, 'model-id'))).toEqual({});
 });
 
 test.each(ERROR_CODES)('accepts exact connection enum %s on iOS accessibility text', code => {
@@ -204,6 +223,19 @@ function mockArtifacts(contents = {}, links = []) {
   jest.spyOn(fs, 'closeSync').mockImplementation(() => {});
   return {root, opened};
 }
+
+test('unions fixed target presence across failure captures without claiming visibility', () => {
+  mockArtifacts({
+    'results/session/flow/screen-hierarchy/step-041.json': node('connection-details', CANARY),
+    'results/session/flow/screen-hierarchy/step-042.json': node('connection-details-close', CANARY, [
+      node('model-id', CANARY),
+    ]),
+  });
+  expect(collectLiveDiagnostics()).toEqual({
+    availability: 'available', failedCommands: [],
+    ui: {observedTargets: ['connection-details', 'connection-details-close', 'model-id']},
+  });
+});
 
 test('traverses only fixed private results/debug and never follows links or opens raw output', () => {
   const {root, opened} = mockArtifacts({

@@ -103,6 +103,12 @@ nonce and connected cold-restoration evidence; XCTest screenshot and simulator
 startup reliability remain under investigation. None of this establishes physical-device parity or downstream
 telemetry receipt.
 
+The follow-up iOS run `35185542106` on source
+`64ea3610ee6dc578021412bddb051e4195943c4f` again reached independently matching
+DPS assignment, Hub model and one automatic ADR record. Its details-screen
+model-field assertion failed before nonce submission; connected cold restoration
+was not reached. The owned temporary device input was removed afterward.
+
 ## What the experiment proved, and what it did not
 
 The 2026-09-13 isolated cloud experiment used `azure-iot-device` Python SDK

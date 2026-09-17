@@ -16,6 +16,7 @@ const TARGET_IDS = Object.freeze([
   'registration-manual', 'registration-back', 'connection-registrationId', 'connection-scopeId',
   'connection-provisioningHost', 'connection-deviceKey', 'connection-submit',
   'connection-status', 'assigned-device-id', 'assigned-hub', 'connection-details',
+  'connection-details-sheet', 'connection-details-close',
   'model-id', 'registration-id', 'registry-status', 'proof-nonce', 'proof-send',
   'proof-status', 'connection-error-code', 'connection-service-code', 'connection-http-status',
 ]);
@@ -26,6 +27,10 @@ const ERROR_CODES = Object.freeze([
   'NOT_CONNECTED', 'OPERATION_FAILED', 'STORAGE_FAILED', 'BUSY',
 ]);
 const PROOF_STATUSES = Object.freeze(['Submitted locally']);
+const UI_PRESENCE_IDS = Object.freeze([
+  'connection-status', 'assigned-device-id', 'assigned-hub', 'connection-details',
+  'connection-details-sheet', 'connection-details-close', 'model-id',
+]);
 const SYSTEM_DIALOGS = new Map([
   ["Quickstep isn't responding", 'quickstep-anr'],
   ["System UI isn't responding", 'system-ui-anr'],
@@ -82,6 +87,7 @@ function parseCommands(value) {
 function parseHierarchy(value) {
   if (!object(value)) throw new DiagnosticUnavailable('invalid-metadata');
   const ui = {};
+  const observedTargets = new Set();
   let count = 0;
   function visit(node, depth) {
     if (++count > LIMITS.nodes || depth > LIMITS.hierarchyDepth) {
@@ -92,6 +98,7 @@ function parseHierarchy(value) {
     if (object(attributes)) {
       // Android resource-id and iOS accessibility identifier share this attribute.
       const id = attributes['resource-id'];
+      if (UI_PRESENCE_IDS.includes(id)) observedTargets.add(id);
       for (const text of [attributes.text, attributes.accessibilityText]) {
         if (id === 'connection-error-code' && ERROR_CODES.includes(text)) ui.connectionErrorCode = text;
         if (id === 'connection-http-status' && typeof text === 'string' &&
@@ -113,6 +120,7 @@ function parseHierarchy(value) {
     }
   }
   visit(value, 0);
+  if (observedTargets.size) ui.observedTargets = [...observedTargets].sort();
   return ui;
 }
 
@@ -133,6 +141,11 @@ function sanitizeDiagnostics(value) {
     }
     const ui = {};
     if (object(value.ui)) {
+      if (Array.isArray(value.ui.observedTargets) &&
+          value.ui.observedTargets.length <= UI_PRESENCE_IDS.length) {
+        const targets = [...new Set(value.ui.observedTargets.filter(id => UI_PRESENCE_IDS.includes(id)))].sort();
+        if (targets.length) ui.observedTargets = targets;
+      }
       if (ERROR_CODES.includes(value.ui.connectionErrorCode)) ui.connectionErrorCode = value.ui.connectionErrorCode;
       if (integer(value.ui.connectionHttpStatus) && value.ui.connectionHttpStatus >= 100 &&
           value.ui.connectionHttpStatus <= 599) ui.connectionHttpStatus = value.ui.connectionHttpStatus;
@@ -161,6 +174,7 @@ function collectLiveDiagnostics() {
     let bytes = 0;
     const failedCommands = [];
     const ui = {};
+    const observedTargets = new Set();
     function walk(directory, depth) {
       requireDirectory(directory);
       if (depth > LIMITS.directoryDepth) throw new DiagnosticUnavailable('depth-limit');
@@ -200,7 +214,11 @@ function collectLiveDiagnostics() {
             fs.closeSync(fd);
           }
           if (commands) failedCommands.push(...parseCommands(value));
-          else Object.assign(ui, parseHierarchy(value));
+          else {
+            const hierarchy = parseHierarchy(value);
+            for (const target of hierarchy.observedTargets ?? []) observedTargets.add(target);
+            Object.assign(ui, hierarchy);
+          }
         }
       } finally {
         dir.closeSync();
@@ -216,6 +234,8 @@ function collectLiveDiagnostics() {
       }
       walk(directory, 0);
     }
+    // Presence across captured failure hierarchies is not current visibility.
+    if (observedTargets.size) ui.observedTargets = [...observedTargets].sort();
     const result = sanitizeDiagnostics({availability: 'available', failedCommands, ui});
     return result.availability === 'available' ? result : unavailable('no-supported-data');
   } catch (error) {
@@ -226,6 +246,6 @@ function collectLiveDiagnostics() {
 
 module.exports = {
   collectLiveDiagnostics, sanitizeDiagnostics, parseCommands, parseHierarchy,
-  COMMAND_KINDS, TARGET_IDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS,
+  COMMAND_KINDS, TARGET_IDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS, UI_PRESENCE_IDS,
 };
 if (require.main === module) process.stdout.write(`${JSON.stringify(collectLiveDiagnostics())}\n`);

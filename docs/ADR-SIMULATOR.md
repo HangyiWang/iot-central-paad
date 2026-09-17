@@ -194,6 +194,9 @@ without publication. Do not enable reveal or recording in live automation.
 Unavailable diagnostics include only a fixed reason category, such as missing
 supported metadata, a size/count limit, or a read failure. They never include
 raw errors or paths, and unavailability alone does not establish a UI timeout.
+Diagnostics may also list a small fixed set of UI target names observed in
+captured failure hierarchies, without their values. This is accumulated target
+presence, not a claim of current visibility, a successful tap, or cloud proof.
 
 A UI success report still says independent Azure verification is pending.
 Pair it with the operator verifier's result. Downstream telemetry consumption,
