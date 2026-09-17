@@ -9,6 +9,48 @@ independent operator report before treating a mobile-to-cloud case as proven.
 The foundation's credential-free native gate is recorded in
 [MODERNIZATION.md](plans/MODERNIZATION.md).
 
+## Prepare Azure once, then enroll each phone
+
+The namespace-based flow requires an operator-managed ADR namespace, DPS and
+IoT Hub, their managed-identity configuration, and resource-scoped permissions.
+Link DPS first and then Hub to the namespace; this flow does not use classic
+DPS linked-Hub configuration. The tested preview configuration and role matrix
+are in the [cloud preparation plan](plans/ADR-NAMESPACE-INTEGRATION.md#cloud-preparation-operator-or-setup-automation-never-the-phone).
+Confirm preview access, supported endpoints and cost before creating a new stack.
+An existing correctly configured stack can serve multiple individual enrollments.
+
+For each phone, create an enabled individual symmetric-key DPS enrollment and
+securely supply its bootstrap values below. Do not manually create an ADR registry
+device for an automatic-onboarding proof. DPS provisions the assigned Hub device
+identity, and the operator checks the resulting automatic ADR record separately.
+The phone itself creates no Azure infrastructure and receives no operator login.
+ADR is inventory, not a telemetry store or dashboard.
+
+In Azure Portal, find the resource group, inspect the DPS enrollment and assigned
+registration, and find the assigned device under the Hub's Devices page. Its
+device twin exposes the model and reported properties. Preview portal support
+may be incomplete; the existing authorized Azure CLI setup can inspect the
+namespace links and registry without requesting keys:
+
+```bash
+az iot adr ns link dps list --namespace <namespace> --resource-group <rg> \
+  --subscription <subscription-id>
+az iot adr ns link hub list --namespace <namespace> --resource-group <rg> \
+  --subscription <subscription-id>
+az iot adr ns registry-device list --namespace <namespace> --resource-group <rg> \
+  --subscription <subscription-id> \
+  --query "[?properties.externalDeviceId=='<assigned-device-id>'].{name:name,id:id,externalDeviceId:properties.externalDeviceId}"
+az iot hub device-twin show --hub-name <configured-Hub-service-host> \
+  --device-id <assigned-device-id> --auth-type login \
+  --subscription <subscription-id> \
+  --query '{deviceId:deviceId,modelId:modelId,proof:properties.reported.paadProof}'
+```
+
+Use the assigned device ID, not an assumed copy of the enrollment registration
+ID. Service hostnames can differ from the device-facing addresses shown by the
+app. A stored proof marker establishes a past submission; it does not by itself
+establish that the device is still online.
+
 ## Windows emulator with a WSL checkout
 
 Keep source and development tools in WSL. Run Android Studio on Windows and

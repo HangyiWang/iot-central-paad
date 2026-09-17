@@ -188,6 +188,19 @@ APK SHA256:
 This is retained-identity upgrade/restoration evidence, not a new registry
 creation case or a separate process-force-stop assertion for this binary.
 
+The quieter header and 48 dp editable input candidate
+`aed9186c8c327442b27dc5c475c5335d809fa103` passed JavaScript and both native
+lanes in run `35257757198`. Its Android APK was installed in place, preserving
+the saved device identity and restoring Connected. The native helper observed
+the new header, no redundant visible connection caption, a 48 dp Settings
+target, the empty property input and its actual focus/48 dp height, disabled
+unchanged submission, cloud empty state, and working Details/log/utility controls.
+It left the app on Telemetry. This update did not submit a new proof nonce.
+APK SHA256:
+`ca7e57b47ec3dc2143d063a87e3f4420ddadf934a868ad96efd84548dab3163b`.
+The completed foundation ancestry was merged in `6d613a6` without changing the
+ADR feature tree; `master` remains untouched.
+
 ## What the experiment proved, and what it did not
 
 The 2026-09-13 isolated cloud experiment used `azure-iot-device` Python SDK
