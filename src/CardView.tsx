@@ -142,6 +142,7 @@ const getCard =
         availability={item.availability}
         simulated={item.simulated}
         editable={item.editable}
+        presentation={item.presentation}
         icon={item.icon}
         // onToggle={() => item.enable(!item.enabled)}
         onLongPress={onItemLongPress && onItemLongPress.bind(null, item)} // edit card

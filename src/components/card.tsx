@@ -10,7 +10,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import {Button} from 'components';
-import {Text, Name, Headline, bytesToSize} from './typography';
+import {Text, Headline, bytesToSize} from './typography';
 import {DataType, ItemProps, StyleDefinition} from 'types';
 import {useTheme} from 'hooks';
 import Strings from 'strings';
@@ -33,6 +33,7 @@ export function Card(
       availability?: ItemProps['availability'];
       simulated?: boolean;
       accentKey?: string;
+      presentation?: ItemProps['presentation'];
     },
 ) {
   const {
@@ -49,6 +50,7 @@ export function Card(
     availability,
     simulated,
     accentKey,
+    presentation,
     ...otherProps
   } = props;
   const {dark} = useTheme();
@@ -87,6 +89,8 @@ export function Card(
       },
       unit: {color: colors.muted, fontSize: 13, fontWeight: '400'},
       status: {fontSize: 13, color: colors.muted},
+      label: {fontSize: 14, fontWeight: '600', color: colors.muted},
+      description: {fontSize: 13, lineHeight: 19, color: colors.muted},
       simulated: {fontSize: 12, fontWeight: '600', color: colors.primary},
     }),
     [colors, enabled, tint],
@@ -115,7 +119,12 @@ export function Card(
           </View>
         )}
         <View style={styles.cardBody}>
-          <Name style={{color: textColor}}>{otherProps.title}</Name>
+          <Text
+            testID="card-label"
+            accessibilityRole="header"
+            style={styles.label}>
+            {otherProps.title}
+          </Text>
           {simulated && (
             <Text style={styles.simulated}>{Strings.Sensors.Simulated}</Text>
           )}
@@ -136,9 +145,15 @@ export function Card(
                 editable={editable}
                 onEdit={onEdit}
                 textColor={textColor}
+                presentation={presentation}
+                label={otherProps.title}
+                id={accentKey}
               />
               {unit && enabled && <Text style={styles.unit}>{unit}</Text>}
             </View>
+          )}
+          {presentation?.description && (
+            <Text style={styles.description}>{presentation.description}</Text>
           )}
         </View>
         {onPress && (
@@ -162,94 +177,137 @@ const Value = React.memo<{
   onEdit: EditCallback | undefined;
   textColor: string;
   type?: DataType;
-}>(({value, enabled, editable, onEdit, textColor, type}) => {
-  const [edited, setEdited] = useState(value);
-  const styles: StyleDefinition = {
-    container: {flex: 1, minWidth: 0},
-    editInput: {paddingHorizontal: 0, marginBottom: 4},
-    stringVal: {
-      fontSize: 23,
-      fontWeight: '600',
-      color: textColor,
-      fontVariant: ['tabular-nums'],
-    },
-  };
+  presentation?: ItemProps['presentation'];
+  label?: string;
+  id?: string;
+}>(
+  ({
+    value,
+    enabled,
+    editable,
+    onEdit,
+    textColor,
+    type,
+    presentation,
+    label,
+    id,
+  }) => {
+    const [edited, setEdited] = useState(value);
+    const {dark} = useTheme();
+    const colors = palette(dark);
+    const styles: StyleDefinition = {
+      container: {flex: 1, minWidth: 0},
+      editInput: {paddingHorizontal: 0, marginBottom: 4},
+      inputFrame: {
+        backgroundColor: colors.surface,
+        borderColor: colors.controlBorder,
+        borderWidth: 1,
+        borderRadius: 12,
+        minHeight: 52,
+        paddingHorizontal: 12,
+      },
+      stringVal: {
+        fontSize: 23,
+        fontWeight: '600',
+        color: textColor,
+        fontVariant: ['tabular-nums'],
+      },
+    };
 
-  useEffect(() => {
-    setEdited(value);
-  }, [value]);
+    useEffect(() => {
+      setEdited(value);
+    }, [value]);
 
-  if (!enabled) {
-    return null;
-  }
-  if (
-    value === null ||
-    value === undefined ||
-    edited === null ||
-    edited === undefined
-  ) {
-    return <Text>N/A</Text>;
-  }
-
-  if (type === 'object') {
-    return (
-      <View style={valueStyles.measurements}>
-        {Object.keys(value).map(v => {
-          let strVal: string = value[v] == null ? 'N/A' : String(value[v]);
-          if (typeof value[v] === 'number') {
-            strVal = (value[v] as number).toLocaleString(undefined, {
-              maximumFractionDigits: 3,
-            });
-          }
-          return (
-            <View key={v} style={valueStyles.measurement}>
-              <Text style={[valueStyles.measurementLabel, {color: textColor}]}>
-                {v}
-              </Text>
-              <Text style={[valueStyles.measurementValue, {color: textColor}]}>
-                {strVal}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-    );
-  } else {
-    let strVal = value.toString();
-    switch (type) {
-      case 'bytes':
-        strVal = bytesToSize(value as number);
-        break;
-      case 'number':
-        strVal = (value as number).toLocaleString(undefined, {
-          maximumFractionDigits: 3,
-        });
-        break;
+    if (!enabled) {
+      return null;
     }
-
     if (editable && onEdit) {
+      const draft = edited == null ? '' : String(edited);
       return (
         <View style={styles.container}>
           <Input
+            testID={id ? `property-input-${id}` : undefined}
+            accessibilityLabel={label}
+            placeholder={presentation?.placeholder}
+            placeholderTextColor={colors.muted}
             shake={() => null}
-            value={edited.toString()}
+            value={draft}
             onChangeText={setEdited}
-            inputStyle={{color: textColor}}
+            inputStyle={{color: textColor, fontSize: 17}}
+            inputContainerStyle={styles.inputFrame}
             containerStyle={styles.editInput}
-            keyboardType={typeof value === 'number' ? 'numeric' : 'default'}
+            renderErrorMessage={false}
+            keyboardType={
+              type === 'number' || typeof value === 'number'
+                ? 'numeric'
+                : 'default'
+            }
           />
           <Button
-            title={Strings.Client.Properties.Send}
+            testID={id ? `property-submit-${id}` : undefined}
+            title={presentation?.actionLabel ?? Strings.Client.Properties.Send}
+            disabled={draft === String(value ?? '')}
             onPress={() => onEdit(edited)}
+            buttonStyle={{minHeight: 48, borderRadius: 12}}
             type="clear"
           />
         </View>
       );
-    } else {
-      return <Headline style={styles.stringVal}>{strVal}</Headline>;
     }
-  }
-});
+    if (value === null || value === undefined || value === '') {
+      return (
+        <Text testID="card-empty" style={{fontSize: 16, color: colors.muted}}>
+          {presentation?.emptyLabel ?? Strings.Sensors.Unavailable}
+        </Text>
+      );
+    }
+
+    if (type === 'object') {
+      return (
+        <View style={valueStyles.measurements}>
+          {Object.keys(value).map(v => {
+            let strVal: string = value[v] == null ? 'N/A' : String(value[v]);
+            if (typeof value[v] === 'number') {
+              strVal = (value[v] as number).toLocaleString(undefined, {
+                maximumFractionDigits: 3,
+              });
+            }
+            return (
+              <View key={v} style={valueStyles.measurement}>
+                <Text
+                  style={[valueStyles.measurementLabel, {color: textColor}]}>
+                  {v}
+                </Text>
+                <Text
+                  style={[valueStyles.measurementValue, {color: textColor}]}>
+                  {strVal}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      );
+    } else {
+      let strVal = value.toString();
+      switch (type) {
+        case 'bytes':
+          strVal = bytesToSize(value as number);
+          break;
+        case 'number':
+          strVal = (value as number).toLocaleString(undefined, {
+            maximumFractionDigits: 3,
+          });
+          break;
+      }
+
+      return (
+        <Headline testID="card-value" style={styles.stringVal}>
+          {strVal}
+        </Headline>
+      );
+    }
+  },
+);
 
 const valueStyles = StyleSheet.create({
   measurements: {flexDirection: 'row', flexWrap: 'wrap', gap: 14},

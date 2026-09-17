@@ -12,12 +12,22 @@ export const Properties: PropertyProps[] = [
     id: AVAILABLE_PROPERTIES.WRITEABLE_PROP,
     name: 'Cloud property',
     editable: false,
+    icon: {name: 'cloud-outline', type: 'material-community'},
+    presentation: {
+      emptyLabel: 'Waiting for a cloud update',
+      description: 'Values set in your IoT application appear here.',
+    },
   },
   {
     id: AVAILABLE_PROPERTIES.READONLY_PROP,
-    name: 'Editable property',
-    value: 'editable',
+    name: 'Device property',
     editable: true,
+    icon: {name: 'pencil-outline', type: 'material-community'},
+    presentation: {
+      placeholder: 'Enter a value to share',
+      actionLabel: 'Submit value',
+      description: 'Edit on this device and submit to the cloud.',
+    },
   },
   {
     id: AVAILABLE_PROPERTIES.MANUFACTURER,
@@ -26,7 +36,7 @@ export const Properties: PropertyProps[] = [
   },
   {
     id: AVAILABLE_PROPERTIES.MODEL,
-    name: 'Device Model',
+    name: 'Device model',
     editable: false,
   },
   {
@@ -41,12 +51,12 @@ export const Properties: PropertyProps[] = [
   },
   {
     id: AVAILABLE_PROPERTIES.PROCESSOR_ARCHITECTURE,
-    name: 'Processor Architecture',
+    name: 'Processor architecture',
     editable: false,
   },
   {
     id: AVAILABLE_PROPERTIES.PROCESSOR_MANUFACTURER,
-    name: 'Processor Manufacturer',
+    name: 'Processor manufacturer',
     editable: false,
   },
   {
@@ -61,6 +71,10 @@ export const Properties: PropertyProps[] = [
   },
 ].map(p => ({
   ...p,
+  presentation: {
+    emptyLabel: 'Not reported by this device',
+    ...p.presentation,
+  },
   enable: () => {},
   sendInterval: () => {},
   enabled: true,
