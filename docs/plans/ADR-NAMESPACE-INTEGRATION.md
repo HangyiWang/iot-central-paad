@@ -2,7 +2,7 @@
 
 Status: SAS-first application integrated; Android end-to-end and cold restore confirmed;
 iOS nonce/cold-restore acceptance remains pending.
-Date: 2026-09-16. Branch: `feature/adr-onboarding`.
+Date: 2026-09-17. Branch: `feature/adr-onboarding`.
 Parent: `modernize/paad-foundation`.
 
 ## CI-first update (2026-09-16)
@@ -90,6 +90,41 @@ The preceding replay isolated an input mismatch before Return. Individual public
 XCTest key actions passed where burst typing did not; the app's input behavior and
 strict assertions were not changed. Live iOS nonce/connected restoration still
 requires a fresh individual enrollment and independent operator confirmation.
+
+The later native live run `35277305904`, source
+`0d206068bcb1069ed5b60cf617cdcc16e95c0a47`, passed synthetic preflight and reached
+Connected, but Details was not hittable. Independent reads matched assignment,
+model and one automatic ADR record; the nonce and connected cold restoration
+were not established. The owned temporary device input was removed.
+
+The native runner now waits boundedly for the fixed Details control and handles
+only the existing allowlisted permission-denial actions. It does not substitute
+coordinates or swipe that fixed header. Credential-free replay `35283136275`
+passed exact input, masking and cold-start assertions and deleted its owned
+simulator. This replay used harness
+`9007ba1d6d036a86101075f00a899810be37c119` and the pre-secret `0d20606` app from
+`35277305904`. The smoke boot allowance is five minutes following an observed
+three-minute fresh-simulator data-migration timeout. Synthetic smoke never
+connects, so this result does not prove the connected Details readiness fix or
+the pending live nonce/cold-restoration gate.
+
+### Connection capsule delivery (2026-09-17)
+
+The accepted capsule keeps status, a ringed cloud icon and a separated Details
+action together, with a stacked large-text layout. Feature source
+`2ed3d5a5f93ef3d05ebf7646036d7295fa89fbaf` passed JavaScript and both native lanes
+in `35280082698`. Foundation adaptation
+`15cdffb1331eceb449ee40fa3a7cb7ab079dd962` passed all three in `35280821601`;
+it retains the legacy connection flow and local disclosure rather than adding
+the feature's ADR sheet.
+
+The feature APK was installed in place on the retained Windows Android emulator.
+Connected identity, saved Azure context/activity, Details and utility/log actions
+remained available. A fresh app-submitted nonce independently matched the exact
+DPS identity, phone model and existing automatic ADR record. This is a new traffic
+proof for the retained device, not a new automatic registry-creation case.
+APK SHA256:
+`6192bd6e0a9181c29b888cb267c3641362e983a7694c942f09b37721561a7584`.
 
 ### Recorded mobile evidence (2026-09-16)
 
