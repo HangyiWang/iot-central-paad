@@ -30,7 +30,7 @@ import {
   ScrollView,
 } from 'react-native';
 import {LogsContext} from './contexts/logs';
-import Strings from 'strings';
+import Strings, {resolveString} from 'strings';
 import BottomPopup from 'components/bottomPopup';
 import {CircleSnail} from 'react-native-progress';
 import {Literal, StyleDefinition} from 'types';
@@ -74,10 +74,17 @@ export default function FileUpload() {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        marginHorizontal: 30,
+        gap: 12,
       },
       centerText: {
         textAlign: 'center',
+      },
+      footer: {fontSize: 13, lineHeight: 20, color: appearance.muted},
+      footerLink: {fontSize: 13, lineHeight: 20},
+      iconWrapper: {
+        padding: 18,
+        borderRadius: 24,
+        backgroundColor: appearance.surface,
       },
       listItem: {
         backgroundColor: colors.card,
@@ -197,14 +204,27 @@ export default function FileUpload() {
 
   if (simulated) {
     return (
-      <View style={styles.simulatedContainer}>
-        <Headline style={styles.centerText}>
-          {Strings.Simulation.Enabled}
-        </Headline>
-        <Text style={styles.centerText}>
-          {' '}
-          {Strings.FileUpload.NotAvailable} {Strings.Simulation.Disable}
-        </Text>
+      <View style={styles.flex1}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.card}>
+            <View style={styles.simulatedContainer}>
+              <View accessible={false} style={styles.iconWrapper}>
+                <Icon
+                  size={40}
+                  name="cloud-off-outline"
+                  type="material-community"
+                  color={appearance.muted}
+                />
+              </View>
+              <Headline accessibilityRole="header" style={styles.centerText}>
+                {Strings.Simulation.Enabled}
+              </Headline>
+              <Text style={[styles.centerText, styles.footer]}>
+                {Strings.FileUpload.NotAvailable} {Strings.Simulation.Disable}
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -233,9 +253,10 @@ export default function FileUpload() {
         </Pressable>
 
         <View style={styles.container}>
-          <Text>
+          <Text style={styles.footer}>
             {Strings.FileUpload.Footer}
             <Link
+              style={styles.footerLink}
               onPress={() => Linking.openURL(Strings.FileUpload.LearnMore.Url)}>
               {Strings.FileUpload.LearnMore.Title}
             </Link>
@@ -341,6 +362,7 @@ function UploadProgress(props: {
       cancel: {
         color: 'red',
       },
+      resultText: {textAlign: 'center'},
       spinnerContainer: {
         flex: 1,
         justifyContent: 'center',
@@ -389,10 +411,13 @@ function UploadProgress(props: {
             android: 'material-community',
           })}
         />
-        <Text>
-          {uploadStatus
-            ? `Successfully uploaded ${filename}`
-            : `Failed to upload ${filename}`}
+        <Text style={style.resultText}>
+          {resolveString(
+            uploadStatus
+              ? Strings.FileUpload.Uploaded
+              : Strings.FileUpload.UploadFailed,
+            filename,
+          )}
         </Text>
       </View>
     );
@@ -411,7 +436,7 @@ function UploadProgress(props: {
         />
       </View>
       <View style={style.details}>
-        <Text selectable style={{textAlign: 'center'}}>
+        <Text selectable style={style.resultText}>
           {filename}
         </Text>
         <Text style={{color: appearance.muted}}>{fileSize}</Text>

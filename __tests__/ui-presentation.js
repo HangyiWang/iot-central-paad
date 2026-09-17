@@ -4,11 +4,15 @@ import * as Native from 'react-native';
 import CardView from '../src/CardView';
 import {Headline, Detail, Name, Text} from '../src/components/typography';
 import {cardTint, palette} from '../src/theme/palette';
+import {Loader} from '../src/components/loader';
 
 jest.mock('../src/hooks', () => ({
   useTheme: () => ({
     dark: false,
     colors: {text: '#17252A', card: '#FFFFFF', background: '#F5F4F0'},
+  }),
+  useScreenDimensions: () => ({
+    screen: {width: 390, height: 844, scale: 2, fontScale: 1},
   }),
 }));
 jest.mock('../src/components/card', () => ({Card: 'Card'}));
@@ -19,7 +23,7 @@ jest.mock('@rneui/themed', () => {
     React.createElement('ListItem', props, props.children);
   ListItem.Content = 'ListItemContent';
   ListItem.Title = 'ListItemTitle';
-  return {Text: 'NativeText', ListItem};
+  return {Text: 'NativeText', ListItem, Button: 'Button', Overlay: 'Overlay'};
 });
 
 let view;
@@ -153,3 +157,66 @@ test.each([false, true])(
     expect(colors.tints).toContain(cardTint('accelerometer', dark));
   },
 );
+
+test('the blocking busy state stays in-tree so it cannot compete with a native sheet presentation', () => {
+  const cancel = jest.fn();
+  act(() => {
+    view = renderer.create(
+      <Loader
+        visible
+        modal
+        nativeModal={false}
+        message="Connecting to the assigned IoT Hub..."
+        buttons={[{text: 'Cancel', onPress: cancel}]}
+      />,
+    );
+  });
+  // A native busy modal could compete with Details during iOS dismissal.
+  expect(view.root.findAllByType(Native.Modal)).toHaveLength(0);
+  const overlay = view.root.findAllByProps({testID: 'app-busy-overlay'})[0];
+  expect(overlay.props.accessibilityViewIsModal).toBe(true);
+  expect(overlay.props.accessibilityLiveRegion).toBe('polite');
+  expect(Native.StyleSheet.flatten(overlay.props.style)).toMatchObject({
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  });
+  expect(JSON.stringify(view.toJSON())).toContain(
+    'Connecting to the assigned IoT Hub...',
+  );
+  view.root.findByType('Button').props.onPress();
+  expect(cancel).toHaveBeenCalledTimes(1);
+});
+
+test('screen-local modal loaders retain native blocking, including the navigation header', () => {
+  act(() => {
+    view = renderer.create(<Loader visible modal message="Loading..." />);
+  });
+  expect(view.root.findByType('Overlay').props.isVisible).toBe(true);
+  expect(view.root.findAllByProps({testID: 'app-busy-overlay'})).toHaveLength(
+    0,
+  );
+});
+
+test('in-tree Android busy overlays swallow back only while visible and release the listener', () => {
+  jest.replaceProperty(Native.Platform, 'OS', 'android');
+  const remove = jest.fn();
+  const listen = jest
+    .spyOn(Native.BackHandler, 'addEventListener')
+    .mockReturnValue({remove});
+  act(() => {
+    view = renderer.create(
+      <Loader visible modal nativeModal={false} message="Loading..." />,
+    );
+  });
+  expect(listen.mock.calls[0][0]).toBe('hardwareBackPress');
+  expect(listen.mock.calls[0][1]()).toBe(true);
+  act(() => {
+    view.update(
+      <Loader visible={false} modal nativeModal={false} message="Loading..." />,
+    );
+  });
+  expect(remove).toHaveBeenCalledTimes(1);
+});

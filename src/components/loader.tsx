@@ -1,8 +1,17 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import React, {useMemo} from 'react';
-import {View, ActivityIndicator, ViewStyle, ScaledSize} from 'react-native';
+import React, {useEffect, useMemo} from 'react';
+import {
+  View,
+  ActivityIndicator,
+  ViewStyle,
+  ScaledSize,
+  StyleSheet,
+  BackHandler,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import {Text} from './typography';
 import {Theme} from '@react-navigation/native';
 import {Button, Overlay} from '@rneui/themed';
@@ -19,53 +28,125 @@ interface ILoaderProps {
   buttons?: ILoaderButton[];
   visible: boolean;
   modal?: boolean;
+  nativeModal?: boolean;
   style?: ViewStyle;
 }
 export function Loader(props: ILoaderProps) {
   const {colors, dark} = useTheme();
   const {screen} = useScreenDimensions();
 
-  const {visible, modal, style} = props;
-  const overlayStyle = [
-    ...[style],
-    {
-      padding: 0,
-      borderRadius: 20,
-      backgroundColor: colors.card,
-      width: screen.width / 1.5,
-    },
-  ];
+  const {visible, modal, style, nativeModal = true} = props;
+  const blocking = visible && !!modal && !nativeModal;
 
-  const backdropStyle = {backgroundColor: colors.background};
+  // The previous native modal swallowed the Android back press. Keep that
+  // while the busy state is shown, since cancelling has a dedicated button.
+  useEffect(() => {
+    if (!blocking || Platform.OS !== 'android') {
+      return;
+    }
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => true,
+    );
+    return () => subscription.remove();
+  }, [blocking]);
 
   if (!visible) {
     return null;
   }
   if (modal) {
+    if (nativeModal) {
+      return (
+        <Overlay
+          isVisible
+          overlayStyle={[
+            style,
+            {
+              padding: 0,
+              borderRadius: 20,
+              backgroundColor: colors.card,
+              width: screen.width / 1.5,
+            },
+          ]}
+          backdropStyle={{backgroundColor: colors.background}}>
+          <InnerLoader colors={colors} dark={dark} {...props} {...screen} />
+        </Overlay>
+      );
+    }
+    // The global connection overlay must not compete with the Details sheet
+    // while an iOS native-modal dismissal is still in progress.
     return (
-      <Overlay
-        isVisible={visible}
-        overlayStyle={overlayStyle}
-        backdropStyle={backdropStyle}>
-        <InnerLoader colors={colors} dark={dark} {...props} {...screen} />
-      </Overlay>
+      <View
+        testID="app-busy-overlay"
+        accessibilityViewIsModal
+        accessibilityLiveRegion="polite"
+        style={[
+          StyleSheet.absoluteFill,
+          overlay.backdrop,
+          {backgroundColor: colors.background},
+        ]}>
+        <ScrollView
+          style={overlay.scroll}
+          contentContainerStyle={overlay.content}>
+          <View style={[overlay.card, {backgroundColor: colors.card}]}>
+            <InnerLoader
+              colors={colors}
+              dark={dark}
+              {...props}
+              {...screen}
+              fluid
+              style={style}
+            />
+          </View>
+        </ScrollView>
+      </View>
     );
   }
   return <InnerLoader colors={colors} dark={dark} {...props} {...screen} />;
 }
 
+const overlay = StyleSheet.create({
+  backdrop: {
+    zIndex: 10,
+    elevation: 10,
+  },
+  scroll: {flex: 1},
+  content: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  card: {width: '100%', maxWidth: 420, borderRadius: 20, overflow: 'hidden'},
+});
+
 const InnerLoader = React.memo<
-  ILoaderProps & Pick<Theme, 'colors' | 'dark'> & ScaledSize
->(({message, buttons, height, colors, style}) => {
+  ILoaderProps & Pick<Theme, 'colors' | 'dark'> & ScaledSize & {fluid?: boolean}
+>(({message, buttons, height, colors, style, fluid}) => {
   const styles = useMemo<StyleDefinition>(
     () => ({
-      body: {height: height / 4, padding: 0, backgroundColor: colors.card},
-      box: {flex: 2, justifyContent: 'center', alignItems: 'center'},
-      message: {marginTop: 20},
-      buttonsBox: {flex: 1, justifyContent: 'flex-end', margin: 0},
+      body: {
+        ...(fluid ? {padding: 20, gap: 20} : {height: height / 4, padding: 0}),
+        backgroundColor: colors.card,
+      },
+      box: {
+        flex: fluid ? undefined : 2,
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: fluid ? 12 : undefined,
+      },
+      message: {
+        marginTop: fluid ? 0 : 20,
+        textAlign: fluid ? 'center' : undefined,
+      },
+      buttonsBox: {
+        flex: fluid ? undefined : 1,
+        justifyContent: 'flex-end',
+        margin: 0,
+      },
       button: {paddingVertical: 10},
     }),
-    [height, colors.card],
+    [height, colors.card, fluid],
   );
 
   return (
