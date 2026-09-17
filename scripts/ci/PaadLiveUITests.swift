@@ -589,6 +589,16 @@ final class PaadLiveUITests: XCTestCase {
     pendingCategory = nil
   }
 
+  private func typeCharacters(_ text: String, into field: XCUIElement) {
+    // Each public XCTest typing action waits for UI idleness. Avoid one burst
+    // racing the controlled input's native/JavaScript updates.
+    pendingCategory = .notHittable
+    for character in text {
+      field.typeText(String(character))
+    }
+    pendingCategory = nil
+  }
+
   @discardableResult
   private func enterExactText(_ target: Target, text: String) throws -> XCUIElement {
     inputDiagnostics = []
@@ -596,9 +606,7 @@ final class PaadLiveUITests: XCTestCase {
     diagnoseInput(field, target: target, phase: .focused, expected: text)
     clearField(field)
     diagnoseInput(field, target: target, phase: .cleared, expected: text)
-    pendingCategory = .notHittable
-    field.typeText(text)
-    pendingCategory = nil
+    typeCharacters(text, into: field)
     diagnoseInput(field, target: target, phase: .typed, expected: text)
     commitField(field)
     diagnoseInput(field, target: target, phase: .committed, expected: text)
@@ -616,9 +624,7 @@ final class PaadLiveUITests: XCTestCase {
     inputDiagnostics = []
     let field = try focusField(target)
     clearField(field)
-    pendingCategory = .notHittable
-    field.typeText(secret)
-    pendingCategory = nil
+    typeCharacters(secret, into: field)
     commitField(field)
     try requireMaskedEntry(field, expectedLength: secret.count)
   }

@@ -589,7 +589,7 @@ test('input diagnosis brackets real keystrokes, leaves exact proof strict, and e
   const entry = swift.split('private func enterExactText(')[1].split('private func enterSecret(')[0];
   const events = [
     'inputDiagnostics = []', 'focusField(target)', 'phase: .focused',
-    'clearField(field)', 'phase: .cleared', 'field.typeText(text)', 'phase: .typed',
+    'clearField(field)', 'phase: .cleared', 'typeCharacters(text, into: field)', 'phase: .typed',
     'commitField(field)', 'phase: .committed', 'requireExactValue(on: field',
     'phase: .settled', 'throw failure',
   ].map(text => entry.indexOf(text));
@@ -613,7 +613,12 @@ test('input diagnosis brackets real keystrokes, leaves exact proof strict, and e
   const secret = swift.split('private func enterSecret(')[1].split('private func requireMaskedEntry(')[0];
   expect(secret).toContain('inputDiagnostics = []');
   expect(secret).not.toContain('diagnoseInput(');
+  expect(secret).toContain('typeCharacters(secret, into: field)');
   expect(secret).toContain('requireMaskedEntry(field, expectedLength: secret.count)');
+  const typing = swift.split('private func typeCharacters(')[1].split('@discardableResult')[0];
+  expect(typing).toContain('for character in text');
+  expect(typing).toContain('field.typeText(String(character))');
+  expect(typing).not.toMatch(/setValue|paste|UIPasteboard|sleep|usleep/);
 });
 
 test('native smoke never submits credentials and live cold restoration uses an actual process stop', () => {
