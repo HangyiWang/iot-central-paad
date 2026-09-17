@@ -116,6 +116,33 @@ test.each(UI_PRESENCE_IDS)('records only fixed target presence, never the value 
   expect(JSON.stringify(ui)).not.toContain(CANARY);
 });
 
+test('classifies only fixed untagged UI labels and exact connection-state values', () => {
+  const input = node(undefined, 'IoT PnP', [
+    node(undefined, 'Connecting to the assigned IoT Hub...'),
+    node('connection-deviceKey', 'Cancel'),
+    node('connection-status', 'Connected'),
+    node(undefined, CANARY),
+  ]);
+  const ui = parseHierarchy(input);
+  expect(ui).toEqual({
+    observedTargets: ['connection-status'],
+    observedLabels: ['app-root', 'connecting'],
+    connectionState: 'Connected',
+  });
+  expect(sanitizeDiagnostics({availability: 'available', ui}).ui).toEqual(ui);
+  expect(JSON.stringify(ui)).not.toContain(CANARY);
+});
+
+test('rejects arbitrary labels and connection-state data at the report boundary', () => {
+  const ui = sanitizeDiagnostics({
+    availability: 'available',
+    failedCommands: [{sequenceNumber: 1, commandKind: 'assertCommand'}],
+    ui: {observedLabels: ['app-root', CANARY], connectionState: CANARY, text: CANARY},
+  }).ui;
+  expect(ui).toEqual({observedLabels: ['app-root']});
+  expect(JSON.stringify(ui)).not.toContain(CANARY);
+});
+
 test('presence metadata rejects arbitrary values, duplicates and excessive collections', () => {
   expect(sanitizeDiagnostics({availability: 'available', ui: {
     observedTargets: ['model-id', CANARY, 'model-id'],

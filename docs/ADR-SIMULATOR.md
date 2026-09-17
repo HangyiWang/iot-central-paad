@@ -212,6 +212,10 @@ may obtain a new snapshot on that same owned simulator. This shares the original
 15-minute Maestro deadline, does not retry the flow, and writes only allowlisted
 fields after parsing in memory. Such presence is post-failure diagnostic context,
 not a reconstruction of the failure instant or a successful UI assertion.
+Reports may also classify a fixed set of public labels (app/manual/loading
+headings and generic dialog actions), without copying their source text or
+credential-field values. A generic Allow/Cancel label alone does not establish
+which dialog was shown. All file, byte, command and node limits remain unchanged.
 All iOS lanes allow four minutes for cold XCTest startup within their existing
 overall command and job deadlines.
 

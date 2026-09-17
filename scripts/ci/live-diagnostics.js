@@ -31,7 +31,20 @@ const UI_PRESENCE_IDS = Object.freeze([
   'connection-status', 'assigned-device-id', 'assigned-hub', 'connection-details',
   'connection-details-sheet', 'connection-details-close', 'model-id',
   'app-busy-overlay', 'navigation-content', 'registration-manual',
+  'registration-close', 'connection-registrationId', 'connection-scopeId',
+  'connection-provisioningHost', 'connection-submit', 'connection-error',
 ]);
+const UI_LABELS = new Map([
+  ['IoT PnP', 'app-root'], ['IoT Plug and Play', 'app-heading'],
+  ['Home Screen', 'launcher'], ['SpringBoard', 'launcher'],
+  ['Manually connect', 'manual-heading'], ['Connect manually', 'manual-entry'],
+  ['Checking connection details...', 'validating'],
+  ['Requesting a device assignment...', 'provisioning'],
+  ['Connecting to the assigned IoT Hub...', 'connecting'],
+  ['Connected', 'connected'], ['Disconnected', 'disconnected'],
+  ['Cancel', 'cancel'], ['Allow', 'allow'], ["Don't Allow", 'deny'], ['OK', 'ok'],
+]);
+const UI_LABEL_CODES = [...UI_LABELS.values()];
 const FAILURE_PREFIXES = Object.freeze([
   ['Assertion is false: ', 'assertion-failed'],
   ['Device became unreachable during ', 'device-unreachable'],
@@ -101,6 +114,7 @@ function parseHierarchy(value) {
   if (!object(value)) throw new DiagnosticUnavailable('invalid-metadata');
   const ui = {};
   const observedTargets = new Set();
+  const observedLabels = new Set();
   let count = 0;
   function visit(node, depth) {
     if (++count > LIMITS.nodes || depth > LIMITS.hierarchyDepth) {
@@ -113,6 +127,10 @@ function parseHierarchy(value) {
       const id = attributes['resource-id'];
       if (UI_PRESENCE_IDS.includes(id)) observedTargets.add(id);
       for (const text of [attributes.text, attributes.accessibilityText]) {
+        if (!id && UI_LABELS.has(text)) observedLabels.add(UI_LABELS.get(text));
+        if (id === 'connection-status' && ['Connected', 'Disconnected'].includes(text)) {
+          ui.connectionState = text;
+        }
         if (id === 'connection-error-code' && ERROR_CODES.includes(text)) ui.connectionErrorCode = text;
         if (id === 'connection-http-status' && typeof text === 'string' &&
             text.length === 8 && /^HTTP [1-5][0-9]{2}$/.test(text)) {
@@ -134,6 +152,7 @@ function parseHierarchy(value) {
   }
   visit(value, 0);
   if (observedTargets.size) ui.observedTargets = [...observedTargets].sort();
+  if (observedLabels.size) ui.observedLabels = [...observedLabels].sort();
   return ui;
 }
 
@@ -155,6 +174,14 @@ function sanitizeDiagnostics(value) {
     }
     const ui = {};
     if (object(value.ui)) {
+      if (Array.isArray(value.ui.observedLabels) &&
+          value.ui.observedLabels.length <= UI_LABEL_CODES.length) {
+        const labels = [...new Set(value.ui.observedLabels.filter(label => UI_LABEL_CODES.includes(label)))].sort();
+        if (labels.length) ui.observedLabels = labels;
+      }
+      if (['Connected', 'Disconnected'].includes(value.ui.connectionState)) {
+        ui.connectionState = value.ui.connectionState;
+      }
       if (Array.isArray(value.ui.observedTargets) &&
           value.ui.observedTargets.length <= UI_PRESENCE_IDS.length) {
         const targets = [...new Set(value.ui.observedTargets.filter(id => UI_PRESENCE_IDS.includes(id)))].sort();
@@ -192,6 +219,7 @@ function collectLiveDiagnostics() {
     const failedCommands = [];
     const ui = {};
     const observedTargets = new Set();
+    const observedLabels = new Set();
     let hierarchyCaptured = false;
     function walk(directory, depth) {
       requireDirectory(directory);
@@ -240,12 +268,14 @@ function collectLiveDiagnostics() {
             const safe = sanitizeDiagnostics({availability: 'available', ui: value.ui});
             hierarchyCaptured = true;
             for (const target of safe.ui?.observedTargets ?? []) observedTargets.add(target);
+            for (const label of safe.ui?.observedLabels ?? []) observedLabels.add(label);
             Object.assign(ui, safe.ui);
           }
           else {
             const hierarchy = parseHierarchy(value);
             hierarchyCaptured = true;
             for (const target of hierarchy.observedTargets ?? []) observedTargets.add(target);
+            for (const label of hierarchy.observedLabels ?? []) observedLabels.add(label);
             Object.assign(ui, hierarchy);
           }
         }
@@ -265,6 +295,7 @@ function collectLiveDiagnostics() {
     }
     // Presence across captured failure hierarchies is not current visibility.
     if (observedTargets.size) ui.observedTargets = [...observedTargets].sort();
+    if (observedLabels.size) ui.observedLabels = [...observedLabels].sort();
     const result = sanitizeDiagnostics({availability: 'available', failedCommands, ui, hierarchyCaptured});
     return result.availability === 'available' ? result : unavailable('no-supported-data');
   } catch (error) {

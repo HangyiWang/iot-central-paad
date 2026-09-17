@@ -139,6 +139,12 @@ hierarchy contained none of the fixed target names. That does not identify the
 cause or establish a driver disconnect. Temporary inputs were removed, and the
 iOS nonce/cold-restoration gate remains open.
 
+An isolated Foundation API probe (`35240491338`) compared 15-second and
+180-second request timeouts on iOS Simulator with 30 seconds of loopback
+WebSocket silence. Both received the subsequent frame. This did not reproduce
+the proposed 15-second idle-disconnect explanation, so the production transport
+was not changed on that hypothesis. The probe is not PAAD/TLS/Azure acceptance.
+
 ## What the experiment proved, and what it did not
 
 The 2026-09-13 isolated cloud experiment used `azure-iot-device` Python SDK
