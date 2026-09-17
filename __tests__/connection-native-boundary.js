@@ -391,12 +391,29 @@ test('native transport error after connection is terminal and redacted', async (
   await flush();
   expect(client.isConnected()).toBe(false);
   expect(stages.mock.calls.at(-1)[0]).toBe('error');
-  expect(stages.mock.calls.at(-1)[1]).toMatchObject({code: 'CONNECT_FAILED'});
+  expect(stages.mock.calls.at(-1)[1]).toMatchObject({code: 'CONNECTION_LOST'});
+  expect(stages.mock.calls.at(-1)[1].message).toBe(
+    'The cloud connection was interrupted.',
+  );
   expect(String(stages.mock.calls.at(-1)[1])).not.toContain('private token');
   await expect(client.sendTelemetry({x: 1})).rejects.toMatchObject({
     code: 'NOT_CONNECTED',
   });
   await jest.advanceTimersByTimeAsync(120000);
   expect(broker.connections).toHaveLength(1);
+  expectTerminal();
+});
+
+test('native transport failure before CONNACK is not mislabelled as a lost established session', async () => {
+  broker.acknowledge = false;
+  const pending = client.connect().catch(error => error);
+  await flush();
+  broker.emit(broker.connections[0].id, 'error', {
+    message: 'synthetic private token',
+  });
+  await flush();
+  expect(await pending).toMatchObject({code: 'CONNECT_FAILED'});
+  expect(stages.mock.calls.some(([, error]) => error?.code === 'CONNECTION_LOST')).toBe(false);
+  expect(client.isConnected()).toBe(false);
   expectTerminal();
 });
