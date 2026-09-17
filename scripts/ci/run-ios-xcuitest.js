@@ -102,7 +102,12 @@ function executeNative(mode, env = process.env) {
       env: cleanEnv, timeout, killSignal: 'SIGKILL', input,
       stdio: [input === undefined ? 'ignore' : 'pipe', descriptor, descriptor],
     });
-    if (result.error || result.signal || result.status !== 0) throw new Error('Native UI subprocess failed');
+    if (result.error || result.signal || result.status !== 0) {
+      const reason = result.error?.code === 'ETIMEDOUT' ? 'deadline-exceeded'
+        : result.error ? 'spawn-failed' : result.signal ? 'signal' : 'nonzero-exit';
+      fs.writeSync(descriptor, `Native bootstrap failure: ${reason}\n`);
+      throw new Error('Native UI subprocess failed');
+    }
   };
   try {
     descriptor = fs.openSync(log, 'wx', 0o600);
@@ -127,12 +132,16 @@ function executeNative(mode, env = process.env) {
     command('plutil', ['-convert', 'binary1', '-o', privateManifest, '-'], 10000, JSON.stringify(configured));
     if (mode === 'smoke') {
       // This simulator was created by build-ios.sh, not discovered from other running devices.
+      fs.writeSync(descriptor, 'Native bootstrap: simulator boot\n');
       command('xcrun', ['simctl', 'boot', env.IOS_SIMULATOR_UDID], 15000);
       smokeBooted = true;
       command('xcrun', ['simctl', 'bootstatus', env.IOS_SIMULATOR_UDID, '-b'], 180000);
+      fs.writeSync(descriptor, 'Native bootstrap: app install\n');
       command('xcrun', ['simctl', 'install', env.IOS_SIMULATOR_UDID, path.resolve(APP)], 60000);
+      fs.writeSync(descriptor, 'Native bootstrap: simulator presentation\n');
       command('bash', ['scripts/ci/show-ios-simulator.sh', env.IOS_SIMULATOR_UDID], 65000);
     }
+    fs.writeSync(descriptor, 'Native bootstrap: XCTest execution\n');
     const result = spawnSync('xcodebuild', [
       'test-without-building', '-xctestrun', privateManifest,
       '-destination', `platform=iOS Simulator,id=${env.IOS_SIMULATOR_UDID}`,
