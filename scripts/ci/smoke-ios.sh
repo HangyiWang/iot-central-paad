@@ -25,6 +25,8 @@ collect_evidence() {
 }
 trap collect_evidence EXIT
 bash scripts/ci/show-ios-simulator.sh "$IOS_SIMULATOR_UDID"
+# The cold hosted XCTest runner can take more than the default two minutes.
+export MAESTRO_DRIVER_STARTUP_TIMEOUT=240000
 maestro --version
 maestro --device "$IOS_SIMULATOR_UDID" test --no-ansi --format junit \
   --output build/ci-artifacts/maestro-ios.xml \
