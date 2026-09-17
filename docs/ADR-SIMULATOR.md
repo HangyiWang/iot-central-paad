@@ -84,6 +84,13 @@ Credentials is a separate confirmed action and does not delete an Azure device.
 Ordinary cold restart restores the saved connection once; failures offer an
 explicit retry rather than an infinite reconnect loop.
 
+An established session that drops is labelled **Connection interrupted**
+(`CONNECTION_LOST`), separately from an initial `CONNECT_FAILED`. Neither code
+alone establishes invalid credentials or identifies the underlying network
+failure. Device SAS tokens currently last one hour; **Reconnect** generates
+fresh authorization from the saved device key. This prototype does not silently
+renew or indefinitely reconnect a dropped session.
+
 ## Versioned QR input
 
 New QR payloads use a strict envelope. The scanner accepts JSON, base64 JSON and
@@ -123,6 +130,11 @@ hardening, not independent evidence of a successful cloud connection.
 The full-screen Android details sheet applies system safe-area insets so its
 Close button and content remain outside system bars; iOS keeps its native
 page-sheet inset behavior.
+
+Connection errors belong to the connection summary or the active onboarding
+screen, not below the bottom navigation tabs. The compact notice offers recovery;
+technical error/status codes remain available in Details rather than being
+repeated across the screen.
 
 Open connection details and submit a unique proof nonce. The app sends telemetry
 and a reported property:

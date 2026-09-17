@@ -81,7 +81,7 @@ const Navigation = React.memo(() => {
   const {credentials, initialized} = useContext(StorageContext);
   const {registeringNew} = useContext(IoTCContext);
   const [deliveryInterval, setDeliveryInterval] = useDeliveryInterval();
-  const [connect, cancel, , {client, loading, error, stage}] =
+  const [connect, cancel, , {client, loading, stage}] =
     useConnectIoTCentralClient();
   const [simulated] = useSimulation();
   const restored = useRef(false);
@@ -261,24 +261,6 @@ const Navigation = React.memo(() => {
           },
         ]}
       />
-      {error && !loading && (
-        <View
-          testID="connection-error"
-          accessibilityRole="alert"
-          accessibilityLiveRegion="polite"
-          style={styles.connectionError}>
-          <Text>{error.message}</Text>
-          <Text testID="connection-error-code">{error.code}</Text>
-          {error.status !== undefined &&
-            error.status >= 100 &&
-            error.status <= 599 && (
-              <Text testID="connection-http-status">{`HTTP ${error.status}`}</Text>
-            )}
-          {error.serviceCode !== undefined && (
-            <Text testID="connection-service-code">{error.serviceCode}</Text>
-          )}
-        </View>
-      )}
     </NavigationContainer>
   );
 });
@@ -323,9 +305,6 @@ export const Profile = React.memo((props: {navigate: any}) => {
 });
 
 export const styles = StyleSheet.create({
-  connectionError: {
-    padding: 16,
-  },
   logoContainer: {
     width: 30,
     height: 30,

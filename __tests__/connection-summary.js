@@ -4,6 +4,8 @@ import ConnectionSummary from '../src/components/connectionSummary';
 import * as hooks from '../src/hooks';
 import {Alert, Share, Modal, Platform, StyleSheet} from 'react-native';
 import {PHONE_MODEL_ID} from '../src/connection/types';
+import {ConnectionError} from '../src/connection/errors';
+import {palette} from '../src/theme/palette';
 jest.mock('@rneui/themed', () => ({Icon: 'Icon'}));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({top: 60, bottom: 24, left: 14, right: 8}),
@@ -195,4 +197,86 @@ it('labels simulation as offline and exposes cancellation for the shared active 
   });
   expect(cancel).toHaveBeenCalledTimes(1);
   expect(connect).not.toHaveBeenCalled();
+});
+
+it('replaces the plain error line with one actionable notice and keeps codes in details', async () => {
+  connected = false;
+  state = {
+    ...state,
+    error: new ConnectionError('CONNECT_FAILED', {
+      status: 503,
+      serviceCode: 404001,
+      operationId: 'operation-9',
+    }),
+    stage: 'idle',
+  };
+  act(() => {
+    view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+  });
+  const notices = view.root
+    .findAllByProps({testID: 'connection-error'})
+    .filter(node => typeof node.type === 'string');
+  expect(notices).toHaveLength(1);
+  expect(StyleSheet.flatten(notices[0].props.style).backgroundColor).toBe(
+    palette(false).dangerSurface,
+  );
+  expect(text()).toContain('Could not connect');
+  expect(text()).toContain('The device transport could not connect.');
+  // Raw diagnostics stay in the details sheet, not in the compact row.
+  expect(text()).not.toContain('CONNECT_FAILED');
+  expect(text()).not.toContain('HTTP 503');
+  expect(text()).not.toContain('404001');
+
+  act(() => press('Connection details'));
+  const value = id =>
+    view.root.findAllByType('Text').filter(node => node.props.testID === id);
+  expect(value('connection-error-code').map(n => n.props.children)).toEqual([
+    'CONNECT_FAILED',
+  ]);
+  expect(value('connection-http-status').map(n => n.props.children)).toEqual([
+    'HTTP 503',
+  ]);
+  expect(value('connection-service-code').map(n => n.props.children)).toEqual([
+    '404001',
+  ]);
+  act(() => press('Close'));
+
+  await act(async () => {
+    await press('Reconnect');
+  });
+  expect(connect).toHaveBeenCalledWith({deviceId: 'registration-id'});
+});
+
+it('falls back to reviewing details when there is nothing saved to reconnect with', () => {
+  connected = false;
+  hooks.useIoTCentralClient.mockReturnValue([null, null]);
+  state = {...state, error: new ConnectionError('CONNECTION_LOST')};
+  act(() => {
+    view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+  });
+  expect(text()).toContain('Connection interrupted');
+  expect(
+    view.root.findAllByProps({testID: 'connection-error-reconnect'}),
+  ).toHaveLength(0);
+  act(() => press('Review details'));
+  expect(
+    view.root.findAllByProps({testID: 'connection-details-sheet'}).length,
+  ).toBeGreaterThan(0);
+  expect(connect).not.toHaveBeenCalled();
+});
+
+it('hides the notice while a connection attempt is in flight', () => {
+  state = {
+    ...state,
+    loading: true,
+    stage: 'connecting',
+    error: new ConnectionError('CONNECT_FAILED'),
+  };
+  act(() => {
+    view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+  });
+  expect(view.root.findAllByProps({testID: 'connection-error'})).toHaveLength(
+    0,
+  );
+  expect(text()).toContain('Connecting to the assigned IoT Hub');
 });

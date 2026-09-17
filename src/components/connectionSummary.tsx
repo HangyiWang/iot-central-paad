@@ -24,6 +24,7 @@ import Strings from 'strings';
 import {connectionDiagnostics} from '../onboarding/diagnostics';
 import {ProofActivity} from '../onboarding/proof';
 import {palette} from '../theme/palette';
+import ConnectionNotice from './connectionNotice';
 import {Icon} from '@rneui/themed';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
@@ -92,9 +93,50 @@ export default function ConnectionSummary({
     ...(operationId ? [{label: text.Operation, value: operationId}] : []),
     {label: text.Stage, value: Strings.Connection.Stages[stage]},
     ...(error
-      ? [{label: text.ErrorCode, value: error.code, tone: appearance.danger}]
+      ? [
+          {
+            label: text.ErrorCode,
+            value: error.code,
+            valueTestID: 'connection-error-code',
+            tone: appearance.danger,
+          },
+          ...(error.status !== undefined &&
+          error.status >= 100 &&
+          error.status <= 599
+            ? [
+                {
+                  label: text.HttpStatus,
+                  value: `HTTP ${error.status}`,
+                  valueTestID: 'connection-http-status',
+                  tone: appearance.danger,
+                },
+              ]
+            : []),
+          ...(error.serviceCode !== undefined
+            ? [
+                {
+                  label: text.ServiceCode,
+                  value: `${error.serviceCode}`,
+                  valueTestID: 'connection-service-code',
+                  tone: appearance.danger,
+                },
+              ]
+            : []),
+        ]
       : []),
   ];
+  const noticeAction =
+    credentials && !connected && !simulated
+      ? {
+          label: text.Reconnect,
+          onPress: () => void connect(credentials),
+          testID: 'connection-error-reconnect',
+        }
+      : {
+          label: Strings.Connection.Notice.Review,
+          onPress: () => setDetails(true),
+          testID: 'connection-error-details',
+        };
   return (
     <View
       testID="connection-summary"
@@ -210,12 +252,10 @@ export default function ConnectionSummary({
           {Strings.Connection.Stages[stage]}
         </Text>
       )}
-      {error && (
-        <Text
-          style={[styles.supporting, {color: appearance.danger}]}
-          accessibilityLiveRegion="polite">
-          {error.message}
-        </Text>
+      {error && !loading && (
+        <View style={styles.notice}>
+          <ConnectionNotice error={error} action={noticeAction} />
+        </View>
       )}
       {details && (
         <Modal
@@ -535,6 +575,7 @@ const styles = StyleSheet.create({
   },
   label: {fontSize: 12, lineHeight: 18, fontWeight: '500'},
   supporting: {fontSize: 13, lineHeight: 20},
+  notice: {paddingTop: 4},
   action: {minHeight: 52, justifyContent: 'center'},
   divided: {borderTopWidth: StyleSheet.hairlineWidth},
   actionText: {fontSize: 15, fontWeight: '600'},

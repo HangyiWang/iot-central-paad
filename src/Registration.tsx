@@ -13,6 +13,7 @@ import {
 import {
   CommonActions,
   RouteProp,
+  useIsFocused,
   useNavigation,
 } from '@react-navigation/native';
 import {
@@ -27,7 +28,15 @@ import {
   RegistrationScreens,
 } from './types';
 import Strings from 'strings';
-import {QRCodeScanner, Event, Button, Link, Name, Text} from 'components';
+import {
+  QRCodeScanner,
+  Event,
+  Button,
+  Link,
+  Name,
+  Text,
+  ConnectionNotice,
+} from 'components';
 import {IoTCContext, StorageContext} from 'contexts';
 import {CredentialForm} from './onboarding/manual';
 import {DeviceCredentials} from './connection';
@@ -163,14 +172,20 @@ function QRCodeScreen({onConnected}: {onConnected(): void}) {
         (orientation === 'portrait' ? screen.width : screen.height) / 1.5,
       )}
       bottomContent={
-        <View>
+        <View style={styles.scannerFooter}>
           {error && (
-            <Text accessibilityLiveRegion="polite">{error.message}</Text>
-          )}
-          {error && !loading && (
-            <Button
-              title={Strings.Core.Retry}
-              onPress={() => scanner.current?.reactivate()}
+            <ConnectionNotice
+              error={error}
+              diagnostics
+              action={
+                loading
+                  ? undefined
+                  : {
+                      label: Strings.Core.Retry,
+                      onPress: () => scanner.current?.reactivate(),
+                      testID: 'connection-error-retry',
+                    }
+              }
             />
           )}
           <Button
@@ -249,11 +264,7 @@ export function ManualConnect({onConnected}: {onConnected(): void}) {
             <Button title={Strings.Core.Cancel} onPress={() => cancel()} />
           </>
         )}
-        {error && (
-          <Text accessibilityRole="alert" accessibilityLiveRegion="polite">
-            {error.message}
-          </Text>
-        )}
+        {error && <ConnectionNotice error={error} diagnostics />}
         {readonly && (
           <Button
             testID="registration-close"
@@ -277,12 +288,30 @@ export function ManualConnect({onConnected}: {onConnected(): void}) {
 
 function EmptyClient() {
   const navigation = useNavigation<StackNavigationProp<RegistrationRoutes>>();
+  const focused = useIsFocused();
+  const {credentials} = useContext(StorageContext);
+  const [connect, , , {error, loading}] = useConnectIoTCentralClient();
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text>
         <Name>{Strings.Registration.Header.Welcome}</Name>
         {Strings.Registration.Header.Text}
       </Text>
+      {focused && error && !loading && (
+        <ConnectionNotice
+          error={error}
+          diagnostics
+          action={
+            credentials
+              ? {
+                  label: Strings.Connection.Summary.Reconnect,
+                  onPress: () => void connect(credentials),
+                  testID: 'connection-error-reconnect',
+                }
+              : undefined
+          }
+        />
+      )}
       <Button
         testID="registration-scan"
         title={Strings.Registration.QRCode.Scan}
@@ -308,5 +337,6 @@ const styles = StyleSheet.create({
   flex: {flex: 1},
   container: {flexGrow: 1, justifyContent: 'space-around', padding: 20},
   manual: {padding: 20, paddingBottom: 40},
+  scannerFooter: {padding: 16, gap: 12, alignSelf: 'stretch'},
   intro: {marginBottom: 20},
 });

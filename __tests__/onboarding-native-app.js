@@ -193,6 +193,20 @@ test('manual individual DPS connects to returned identity and submits genuine co
   expect(value('connection-error-code')).toBe('PROVISIONING_FAILED');
   expect(value('connection-http-status')).toBe('HTTP 400');
   expect(value('connection-service-code')).toBe(400123);
+  // Exactly one notice, next to the form that can recover — never a second
+  // copy stranded under the navigator and tab bar.
+  const hosts = id =>
+    app.root
+      .findAllByProps({testID: id})
+      .filter(node => typeof node.type === 'string');
+  expect(hosts('connection-error')).toHaveLength(1);
+  expect(hosts('connection-error-code')).toHaveLength(1);
+  expect(hosts('connection-http-status')).toHaveLength(1);
+  expect(hosts('connection-service-code')).toHaveLength(1);
+  expect(hosts('connection-error')[0].props.accessibilityRole).toBe('alert');
+  expect(JSON.stringify(app.toJSON())).toContain(
+    'Provisioning did not complete',
+  );
   expect(JSON.stringify(app.toJSON())).not.toContain(
     'synthetic-service-secret',
   );
@@ -278,6 +292,39 @@ test('manual individual DPS connects to returned identity and submits genuine co
   expect(
     JSON.parse(Keychain.setGenericPassword.mock.calls.at(-1)[1]).credentials,
   ).toBeNull();
+});
+
+test('failed restore stays visible on welcome and retries saved credentials without a bottom duplicate', async () => {
+  Keychain.getGenericPassword.mockResolvedValue({
+    username: 'IOTC_PAD_CLIENT',
+    password: JSON.stringify({
+      credentials: {
+        registrationId: 'saved-phone',
+        scopeId: '0ne123456',
+        deviceKey: key,
+      },
+    }),
+  });
+  httpFetch.mockRejectedValueOnce(new Error('private-network-fixture'));
+  await boot();
+  expect(value('connection-error-code')).toBe('NETWORK_ERROR');
+  expect(
+    app.root.findAllByProps({testID: 'registration-manual'}).length,
+  ).toBeGreaterThan(0);
+  expect(
+    app.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        node.props.testID === 'connection-error',
+    ),
+  ).toHaveLength(1);
+  expect(JSON.stringify(app.toJSON())).not.toContain('private-network-fixture');
+  await act(async () => {
+    press('connection-error-reconnect');
+    await jest.advanceTimersByTimeAsync(1000);
+  });
+  expect(value('connection-status')).toBe('Connected');
+  expect(value('connection-error-code')).toBeUndefined();
 });
 
 test('one-shot restored real client lands Home even with batched connection updates', async () => {

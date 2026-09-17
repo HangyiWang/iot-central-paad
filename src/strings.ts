@@ -46,6 +46,8 @@ const Strings = {
       Operation: 'Operation ID',
       Stage: 'Connection stage',
       ErrorCode: 'Error code',
+      HttpStatus: 'HTTP status',
+      ServiceCode: 'Service code',
       Registry: 'Registry status',
       NotChecked: 'Not checked',
       RegistryExplanation:
@@ -65,6 +67,38 @@ const Strings = {
         'Proof was not fully submitted. Retry with a new nonce if needed.',
       ProofExplanation:
         'Sends telemetry and a reported property through the connected client. Local submission is not a broker acknowledgement, downstream receipt or registry confirmation.',
+    },
+    Notice: {
+      Titles: {
+        Default: 'Connection needs attention',
+        CONNECTION_LOST: 'Connection interrupted',
+        CONNECT_FAILED: 'Could not connect',
+        INVALID_CREDENTIALS: 'Check connection details',
+        UNSAFE_ENDPOINT: 'Endpoint not approved',
+        AUTHENTICATION_FAILED: 'Authentication rejected',
+        PROVISIONING_FAILED: 'Provisioning did not complete',
+        INVALID_RESPONSE: 'Unexpected response',
+        NETWORK_ERROR: 'Network request failed',
+        SECURE_TRANSPORT_REQUIRED: 'Secure transport required',
+        TIMEOUT: 'Timed out',
+        CANCELLED: 'Connection cancelled',
+        NOT_CONNECTED: 'Not connected',
+        OPERATION_FAILED: 'Operation failed',
+        STORAGE_FAILED: 'Settings were not saved',
+        BUSY: 'Already connecting',
+      },
+      Guidance: {
+        CONNECTION_LOST: 'Reconnect to resume sending data.',
+        CONNECT_FAILED:
+          'Try connecting again. Check the connection details if it keeps failing.',
+        NETWORK_ERROR: 'Check your network, then try again.',
+        TIMEOUT:
+          'Try again. Review the connection details if it keeps timing out.',
+        INVALID_CREDENTIALS: 'Review the connection details and try again.',
+        AUTHENTICATION_FAILED:
+          'Confirm the enrollment is enabled for this device.',
+      },
+      Review: 'Review details',
     },
     Stages: {
       idle: 'Not connected',
@@ -198,6 +232,16 @@ const Strings = {
         Failure: 'Failed to send property "{{0}}" to Azure IoT.',
       },
       Loading: 'Waiting for properties...',
+      Presentation: {
+        CloudName: 'Cloud property',
+        DeviceName: 'Device property',
+        CloudEmpty: 'Waiting for a cloud update',
+        CloudDescription: 'Values set in your IoT application appear here.',
+        Placeholder: 'Enter a value to share',
+        Submit: 'Submit value',
+        DeviceDescription: 'Edit on this device and submit to the cloud.',
+        NotReported: 'Not reported by this device',
+      },
     },
     Commands: {
       Alert: {
