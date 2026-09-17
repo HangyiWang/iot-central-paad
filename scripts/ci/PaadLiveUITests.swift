@@ -54,6 +54,7 @@ private enum Failure: String, Error {
   case configuration
   case launchFailed = "launch-failed"
   case missingElement = "missing-element"
+  case ambiguousElement = "ambiguous-element"
   case notHittable = "not-hittable"
   case valueMismatch = "value-mismatch"
   case secretNotMasked = "secret-not-masked"
@@ -78,6 +79,7 @@ private enum Target: String, CaseIterable {
   case connectionStatus = "connection-status"
   case connectionDetails = "connection-details"
   case connectionDetailsSheet = "connection-details-sheet"
+  case connectionStatusCapsule = "connection-status-capsule"
   case appBusyOverlay = "app-busy-overlay"
   case assignedDeviceId = "assigned-device-id"
   case assignedHub = "assigned-hub"
@@ -147,6 +149,31 @@ private enum PermissionAlert: String {
   case denialHittable = "denial-hittable"
 }
 
+private enum MatchCount: String {
+  case unavailable
+  case zero
+  case one
+  case two
+  case three
+  case moreThanThree = "more-than-three"
+}
+
+private enum NativeElementType: String {
+  case missing
+  case button
+  case staticText = "static-text"
+  case other
+}
+
+private enum FrameVisibility: String {
+  case unavailable
+  case invalid
+  case empty
+  case outsideApp = "outside-app"
+  case partlyInsideApp = "partly-inside-app"
+  case insideApp = "inside-app"
+}
+
 // MARK: - Test case configuration
 
 private struct CaseConfig {
@@ -191,6 +218,10 @@ final class PaadLiveUITests: XCTestCase {
 
   private enum Permission {
     static let maximumAttempts = 4
+  }
+
+  private enum Diagnostic {
+    static let maximumCandidates = 3
   }
 
   private var app: XCUIApplication!
@@ -457,13 +488,19 @@ final class PaadLiveUITests: XCTestCase {
   ) throws -> XCUIElement {
     // Details is a fixed header, not scroll content. Give navigation, the busy
     // overlay and asynchronous sensor permission dialogs time to settle.
-    let field = element(target)
+    // SummaryAction declares an accessible button. A type-erased first match
+    // could instead resolve a wrapper or conceal duplicate navigation elements.
+    let query = target == .connectionDetails
+      ? app.buttons.matching(identifier: target.rawValue)
+      : app.descendants(matching: .any).matching(identifier: target.rawValue)
+    let field = query.firstMatch
     let deadline = ProcessInfo.processInfo.systemUptime + Timeout.standard
     pendingCategory = failure
     updateInteraction(target, field: field, phase: phase)
     emit(outcome: .inProgress)
     let predicate = NSPredicate { [self] _, _ in
-      return updateInteraction(target, field: field, phase: phase)
+      let unique = query.count == 1
+      return updateInteraction(target, field: field, phase: phase) && unique
     }
     while ProcessInfo.processInfo.systemUptime < deadline {
       // Public attribute reads do not trigger interruption monitors. Explicitly
@@ -471,16 +508,23 @@ final class PaadLiveUITests: XCTestCase {
       dismissKnownPermissionAlert()
       let remaining = deadline - ProcessInfo.processInfo.systemUptime
       guard remaining > 0 else {
-        throw failure
+        break
       }
       let expectation = XCTNSPredicateExpectation(predicate: predicate, object: NSNull())
       if XCTWaiter().wait(
         for: [expectation], timeout: min(Timeout.interactionPoll, remaining)
       ) == .completed {
+        diagnoseResolution(target, field: field, query: query)
         pendingCategory = nil
         observe(target)
-        return field
+        // Unlike firstMatch, element also fails if ambiguity appears at tap time.
+        return query.element
       }
+    }
+    let ambiguous = query.count > 1
+    diagnoseResolution(target, field: field, query: query)
+    if ambiguous {
+      throw Failure.ambiguousElement
     }
     throw failure
   }
@@ -799,6 +843,90 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   // MARK: Diagnostics
+
+  private func matchCount(_ count: Int) -> MatchCount {
+    switch count {
+    case 0: return .zero
+    case 1: return .one
+    case 2: return .two
+    case 3: return .three
+    default: return .moreThanThree
+    }
+  }
+
+  private func frameVisibility(_ frame: CGRect, in viewport: CGRect) -> FrameVisibility {
+    guard frame.origin.x.isFinite, frame.origin.y.isFinite,
+      frame.width.isFinite, frame.height.isFinite,
+      viewport.origin.x.isFinite, viewport.origin.y.isFinite,
+      viewport.width.isFinite, viewport.height.isFinite, !viewport.isEmpty
+    else {
+      return .invalid
+    }
+    if frame.isEmpty {
+      return .empty
+    }
+    if !viewport.intersects(frame) {
+      return .outsideApp
+    }
+    return viewport.contains(frame) ? .insideApp : .partlyInsideApp
+  }
+
+  private func elementGeometry(_ field: XCUIElement, viewport: CGRect) -> [String: String] {
+    guard field.exists else {
+      return [
+        "type": NativeElementType.missing.rawValue,
+        "state": InteractionElement.missing.rawValue,
+        "frame": FrameVisibility.unavailable.rawValue,
+      ]
+    }
+    let type: NativeElementType
+    switch field.elementType {
+    case .button: type = .button
+    case .staticText: type = .staticText
+    default: type = .other
+    }
+    let state: InteractionElement = !field.isEnabled
+      ? .disabled : field.isHittable ? .hittable : .notHittable
+    return [
+      "type": type.rawValue,
+      "state": state.rawValue,
+      "frame": frameVisibility(field.frame, in: viewport).rawValue,
+    ]
+  }
+
+  private func diagnoseResolution(
+    _ target: Target, field: XCUIElement, query: XCUIElementQuery
+  ) {
+    // Terminal readiness evidence only, not an accessibility-tree dump. Frames
+    // are reduced to categories and are never used to synthesize a tap.
+    let viewport = app.frame
+    let matches = app.descendants(matching: .any).matching(identifier: target.rawValue)
+    let count = matches.count
+    let capsuleQuery = app.descendants(matching: .any)
+      .matching(identifier: Target.connectionStatusCapsule.rawValue)
+    let capsuleCount = capsuleQuery.count
+    let capsule = capsuleQuery.firstMatch
+    var candidates: [[String: String]] = []
+    for index in 0..<min(count, Diagnostic.maximumCandidates) {
+      candidates.append(elementGeometry(matches.element(boundBy: index), viewport: viewport))
+    }
+    let scopedButtons: MatchCount = capsuleCount == 1
+      ? matchCount(capsule.buttons.matching(identifier: target.rawValue).count) : .unavailable
+    interactionDiagnostics?["resolution"] = [
+      "queryType": target == .connectionDetails ? "button" : "any",
+      "queryMatches": matchCount(query.count).rawValue,
+      "identifierMatches": matchCount(count).rawValue,
+      "buttonMatches": matchCount(app.buttons.matching(identifier: target.rawValue).count).rawValue,
+      "capsuleMatches": matchCount(capsuleCount).rawValue,
+      "capsuleButtonMatches": scopedButtons.rawValue,
+      "selected": elementGeometry(field, viewport: viewport),
+      "untypedFirst": elementGeometry(matches.firstMatch, viewport: viewport),
+      "candidates": candidates,
+      "capsule": elementGeometry(capsule, viewport: viewport),
+      "status": elementGeometry(element(.connectionStatus), viewport: viewport),
+    ]
+    emit(outcome: .inProgress)
+  }
 
   private func permissionAlertState(_ alert: XCUIElement) -> PermissionAlert {
     guard alert.exists else {

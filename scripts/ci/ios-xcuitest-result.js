@@ -11,7 +11,7 @@ const APPLICATION_STATES = Object.freeze([
   'unknown', 'not-running', 'running-background-suspended', 'running-background', 'running-foreground',
 ]);
 const FAILURE_CATEGORIES = Object.freeze([
-  'configuration', 'missing-element', 'not-hittable', 'value-mismatch',
+  'configuration', 'missing-element', 'ambiguous-element', 'not-hittable', 'value-mismatch',
   'keyboard-unavailable', 'connection-timeout', 'submission-timeout',
   'termination-failed', 'restore-timeout', 'unexpected-issue', 'deadline-exceeded',
   'launch-failed', 'secret-not-masked', 'registry-changed',
@@ -25,7 +25,7 @@ const TARGETS = Object.freeze([
   'connection-submit', 'connection-status', 'connection-details', 'connection-details-sheet',
   'connection-details-close', 'assigned-device-id', 'assigned-hub', 'model-id',
   'registration-id', 'registry-status', 'proof-nonce', 'proof-send', 'proof-status',
-  'app-busy-overlay', 'navigation-content', 'connection-error',
+  'app-busy-overlay', 'navigation-content', 'connection-error', 'connection-status-capsule',
 ]);
 const INPUT_TARGETS = Object.freeze([
   'connection-registrationId', 'connection-scopeId', 'connection-provisioningHost',
@@ -46,6 +46,15 @@ const PERMISSION_ALERTS = Object.freeze(['none', 'other', 'denial-present', 'den
 const INTERACTION_FLAGS = Object.freeze([
   'busyOverlay', 'keyboardVisible', 'permissionDismissed', 'permissionLimitReached',
 ]);
+const MATCH_COUNTS = Object.freeze(['unavailable', 'zero', 'one', 'two', 'three', 'more-than-three']);
+const NATIVE_ELEMENT_TYPES = Object.freeze(['missing', 'button', 'static-text', 'other']);
+const FRAME_VISIBILITIES = Object.freeze([
+  'unavailable', 'invalid', 'empty', 'outside-app', 'partly-inside-app', 'inside-app',
+]);
+const RESOLUTION_COUNTS = Object.freeze([
+  'queryMatches', 'identifierMatches', 'buttonMatches', 'capsuleMatches', 'capsuleButtonMatches',
+]);
+const MAX_RESOLUTION_CANDIDATES = 3;
 
 function sanitizeInputDiagnostics(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > INPUT_PHASES.length ||
@@ -66,10 +75,39 @@ function sanitizeInteractionDiagnostics(value) {
       !INTERACTION_ELEMENTS.includes(value.element) || !PERMISSION_ALERTS.includes(value.systemAlert) ||
       !PERMISSION_ALERTS.includes(value.applicationAlert) ||
       INTERACTION_FLAGS.some(flag => typeof value[flag] !== 'boolean')) return undefined;
+  const resolution = value.resolution === undefined ? undefined : sanitizeResolution(value.resolution);
+  if (value.resolution !== undefined && !resolution) return undefined;
   return {
     target: value.target, phase: value.phase, element: value.element,
     systemAlert: value.systemAlert, applicationAlert: value.applicationAlert,
     ...Object.fromEntries(INTERACTION_FLAGS.map(flag => [flag, value[flag]])),
+    ...(resolution ? {resolution} : {}),
+  };
+}
+
+function sanitizeGeometry(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      !NATIVE_ELEMENT_TYPES.includes(value.type) || !INTERACTION_ELEMENTS.includes(value.state) ||
+      !FRAME_VISIBILITIES.includes(value.frame)) return undefined;
+  return {type: value.type, state: value.state, frame: value.frame};
+}
+
+function sanitizeResolution(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      !['button', 'any'].includes(value.queryType) ||
+      RESOLUTION_COUNTS.some(key => !MATCH_COUNTS.includes(value[key])) ||
+      !Array.isArray(value.candidates) || value.candidates.length > MAX_RESOLUTION_CANDIDATES) return undefined;
+  const selected = sanitizeGeometry(value.selected);
+  const untypedFirst = sanitizeGeometry(value.untypedFirst);
+  const capsule = sanitizeGeometry(value.capsule);
+  const status = sanitizeGeometry(value.status);
+  const candidates = value.candidates.map(sanitizeGeometry);
+  if (!selected || !untypedFirst || !capsule || !status ||
+      candidates.some(candidate => !candidate)) return undefined;
+  return {
+    queryType: value.queryType,
+    ...Object.fromEntries(RESOLUTION_COUNTS.map(key => [key, value[key]])),
+    selected, untypedFirst, candidates, capsule, status,
   };
 }
 
@@ -131,5 +169,6 @@ module.exports = {
   PREFIX, MAX_LOG_BYTES, STAGES, APPLICATION_STATES, FAILURE_CATEGORIES, EXECUTIONS, TARGETS,
   INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
   INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
+  MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };

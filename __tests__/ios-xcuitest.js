@@ -14,6 +14,7 @@ const {
   STAGES, APPLICATION_STATES, FAILURE_CATEGORIES, TARGETS,
   INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
   INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
+  MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
 } = require('../scripts/ci/ios-xcuitest-result');
 const {sanitizeDiagnostics} = require('../scripts/ci/live-diagnostics');
 const {validateEnvironment} = require('../scripts/ci/run-ios-xcuitest');
@@ -79,6 +80,25 @@ const interactionDiagnostic = () => ({
   keyboardVisible: false,
   permissionDismissed: false,
   permissionLimitReached: false,
+});
+const geometryDiagnostic = () => ({
+  type: 'button', state: 'not-hittable', frame: 'inside-app',
+});
+const resolutionDiagnostic = () => ({
+  queryType: 'button',
+  queryMatches: 'one',
+  identifierMatches: 'two',
+  buttonMatches: 'one',
+  capsuleMatches: 'one',
+  capsuleButtonMatches: 'one',
+  selected: geometryDiagnostic(),
+  untypedFirst: {...geometryDiagnostic(), type: 'other'},
+  candidates: [
+    {...geometryDiagnostic(), type: 'other'},
+    geometryDiagnostic(),
+  ],
+  capsule: {...geometryDiagnostic(), type: 'other'},
+  status: {...geometryDiagnostic(), type: 'static-text', state: 'hittable'},
 });
 const environment = mode => ({
   PAAD_VARIANT: 'ci',
@@ -353,11 +373,86 @@ test.each(INTERACTION_PHASES)('native parser distinguishes the Details interacti
   expect(sanitizeNativeResult(result)).toEqual(result);
 });
 
+test.each(['smoke', 'live'])('resolution evidence preserves native query differences without raw %s UI data', mode => {
+  const resolution = resolutionDiagnostic();
+  const result = {
+    ...nativeResult(mode), outcome: 'failed', stage: 'connecting',
+    applicationState: 'running-foreground', failureCategory: 'not-hittable',
+    nonceSubmitted: false, coldRestored: false,
+    interactionDiagnostics: {...interactionDiagnostic(), resolution},
+  };
+  const dirtyGeometry = value => ({
+    ...value, label: 'RAW_CANARY', value: 'RAW_CANARY', x: 123, y: 456, hierarchy: 'RAW_CANARY',
+  });
+  const dirty = {...result, interactionDiagnostics: {...result.interactionDiagnostics, resolution: {
+    ...resolution,
+    selected: dirtyGeometry(resolution.selected),
+    untypedFirst: dirtyGeometry(resolution.untypedFirst),
+    capsule: dirtyGeometry(resolution.capsule),
+    status: dirtyGeometry(resolution.status),
+    candidates: resolution.candidates.map(dirtyGeometry),
+    count: 123, frame: {x: 123, y: 456}, deviceKey: 'RAW_CANARY',
+  }}};
+  expect(parseNativeLog(`${PREFIX}${JSON.stringify(dirty)}`, mode)).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: dirty}).nativeUi).toEqual(result);
+  expect(nativeFlowPassed(result, mode)).toBe(false);
+});
+
+test.each([
+  null,
+  [],
+  {},
+  {...resolutionDiagnostic(), queryType: 'RAW_CANARY'},
+  ...RESOLUTION_COUNTS.flatMap(key => [
+    {...resolutionDiagnostic(), [key]: 'RAW_CANARY'},
+    {...resolutionDiagnostic(), [key]: 1},
+  ]),
+  ...['selected', 'untypedFirst', 'capsule', 'status'].flatMap(key => [
+    {...resolutionDiagnostic(), [key]: null},
+    {...resolutionDiagnostic(), [key]: {...geometryDiagnostic(), type: 'RAW_CANARY'}},
+    {...resolutionDiagnostic(), [key]: {...geometryDiagnostic(), state: 'RAW_CANARY'}},
+    {...resolutionDiagnostic(), [key]: {...geometryDiagnostic(), frame: {x: 123}}},
+  ]),
+  {...resolutionDiagnostic(), candidates: Array(MAX_RESOLUTION_CANDIDATES + 1).fill(geometryDiagnostic())},
+  {...resolutionDiagnostic(), candidates: [null]},
+  {...resolutionDiagnostic(), candidates: [{...geometryDiagnostic(), type: 'RAW_CANARY'}]},
+])('native resolution evidence rejects arbitrary data and oversized candidate lists (%#)', resolution => {
+  expect(sanitizeNativeResult({
+    ...nativeResult(), interactionDiagnostics: {...interactionDiagnostic(), resolution},
+  })).toBeUndefined();
+});
+
+test.each(FRAME_VISIBILITIES)('native geometry accepts only the fixed frame category %s', frame => {
+  const result = {
+    ...nativeResult(), interactionDiagnostics: {
+      ...interactionDiagnostic(), resolution: {
+        ...resolutionDiagnostic(), selected: {...geometryDiagnostic(), frame},
+      },
+    },
+  };
+  expect(sanitizeNativeResult(result)).toEqual(result);
+});
+
+test('duplicate target evidence cannot substitute for a unique real Details action', () => {
+  const result = {
+    ...nativeResult(), outcome: 'failed', failureCategory: 'ambiguous-element',
+    stage: 'connecting', applicationState: 'running-foreground',
+    nonceSubmitted: false, coldRestored: false,
+    interactionDiagnostics: {
+      ...interactionDiagnostic(), resolution: {...resolutionDiagnostic(), queryMatches: 'two'},
+    },
+  };
+  expect(sanitizeNativeResult(result)).toEqual(result);
+  expect(nativeFlowPassed(result, 'live')).toBe(false);
+});
+
 test('combined bounded diagnostics still fit the existing record limit', () => {
   const result = {
     ...nativeResult('smoke'), observedTargets: TARGETS,
     inputDiagnostics: INPUT_PHASES.map(phase => inputDiagnostic(phase)),
-    interactionDiagnostics: interactionDiagnostic(),
+    interactionDiagnostics: {...interactionDiagnostic(), resolution: {
+      ...resolutionDiagnostic(), candidates: Array(MAX_RESOLUTION_CANDIDATES).fill(geometryDiagnostic()),
+    }},
   };
   const line = `${PREFIX}${JSON.stringify(result)}`;
   expect(Buffer.byteLength(line)).toBeLessThan(4096);
@@ -547,7 +642,9 @@ test('native live orchestration keeps the key and raw logs private, publishing o
 test.each(['waiting-for-hittability', 'dismissing-permission', 'tapping', 'waiting-for-sheet'])(
   'native live failure publishes only fixed %s state without changing proof or log retention',
   phase => {
-    const interactionDiagnostics = {...interactionDiagnostic(), phase};
+    const interactionDiagnostics = {
+      ...interactionDiagnostic(), phase, resolution: resolutionDiagnostic(),
+    };
     withRunner('live', (passed, runner) => {
       expect(passed).toBe(false);
       expect(runner.readDiagnostics()).toMatchObject({
@@ -677,6 +774,9 @@ test('Swift diagnostics use only the parser vocabularies and stable public contr
   expect(values('InteractionPhase').sort()).toEqual([...INTERACTION_PHASES].sort());
   expect(values('InteractionElement').sort()).toEqual([...INTERACTION_ELEMENTS].sort());
   expect(values('PermissionAlert').sort()).toEqual([...PERMISSION_ALERTS].sort());
+  expect(values('MatchCount').sort()).toEqual([...MATCH_COUNTS].sort());
+  expect(values('NativeElementType').sort()).toEqual([...NATIVE_ELEMENT_TYPES].sort());
+  expect(values('FrameVisibility').sort()).toEqual([...FRAME_VISIBILITIES].sort());
   for (const value of values('Failure')) expect(FAILURE_CATEGORIES).toContain(value);
   for (const value of values('Target')) expect(TARGETS).toContain(value);
   expect(swift).toContain('FileHandle.standardOutput.write(Data("PAAD_XCTEST_RESULT:');
@@ -701,6 +801,11 @@ test('Details waits for real header hittability and sheet appearance without swi
   expect(events).toEqual([...events].sort((a, b) => a - b));
   const wait = swift.split('private func waitForDetailsTarget(')[1].split('private func requireIdentity(')[0];
   expect(wait).toContain('NSPredicate { [self] _, _ in');
+  expect(wait).toContain('? app.buttons.matching(identifier: target.rawValue)');
+  expect(wait).toContain('let unique = query.count == 1');
+  expect(wait).toContain('updateInteraction(target, field: field, phase: phase) && unique');
+  expect(wait).toContain('return query.element');
+  expect(wait).toContain('throw Failure.ambiguousElement');
   expect(wait).toContain('dismissKnownPermissionAlert()');
   expect(wait).toContain('ProcessInfo.processInfo.systemUptime + Timeout.standard');
   expect(wait).toContain('while ProcessInfo.processInfo.systemUptime < deadline');
@@ -718,6 +823,28 @@ test('Details waits for real header hittability and sheet appearance without swi
   expect(INTERACTION_TARGETS).toEqual(['connection-details', 'connection-details-sheet']);
   const record = swift.split('override func record(')[1].split('// MARK: Entry point')[0];
   expect(record).not.toMatch(/updateInteraction|app\.|permissionAlertState/);
+});
+
+test('resolution evidence is terminal-only, bounded, and never reads text or drives a coordinate tap', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const wait = swift.split('private func waitForDetailsTarget(')[1].split('private func requireIdentity(')[0];
+  const predicate = wait.split('let predicate =')[1].split('while ProcessInfo')[0];
+  expect(predicate).not.toContain('diagnoseResolution');
+  expect(wait.match(/diagnoseResolution\(/g)).toHaveLength(2);
+  const diagnosis = swift.split('private func diagnoseResolution(')[1].split('private func permissionAlertState(')[0];
+  expect(diagnosis).toContain('0..<min(count, Diagnostic.maximumCandidates)');
+  expect(diagnosis).toContain('matches.element(boundBy: index)');
+  expect(diagnosis).toContain('elementGeometry(matches.firstMatch, viewport: viewport)');
+  expect(diagnosis).toContain('Target.connectionStatusCapsule.rawValue');
+  expect(diagnosis).toContain('capsuleCount == 1');
+  expect(diagnosis).toContain('elementGeometry(element(.connectionStatus), viewport: viewport)');
+  expect(diagnosis).not.toMatch(/\.label\b|\.value\b|debugDescription|screenshot|\.tap\(/);
+  const geometry = swift.split('private func frameVisibility(')[1].split('private func diagnoseResolution(')[0];
+  expect(geometry).toContain('frame.origin.x.isFinite');
+  expect(geometry).toContain('viewport.contains(frame)');
+  expect(geometry).toContain('frameVisibility(field.frame, in: viewport).rawValue');
+  expect(geometry).not.toMatch(/\.label\b|\.value\b|print\(|\.tap\(|coordinate/);
+  expect(swift).toContain(`static let maximumCandidates = ${MAX_RESOLUTION_CANDIDATES}`);
 });
 
 test('explicit and interruption permission handling share a bounded allowlisted denial action', () => {
