@@ -81,6 +81,7 @@ it('starts the editable device property empty with an accessible input and a rea
   expect(input.props.value).toBe('');
   expect(input.props.placeholder).toBe('Enter a value to share');
   expect(input.props.accessibilityLabel).toBe('Device property');
+  expect(input.props.inputStyle.minHeight).toBeGreaterThanOrEqual(48);
   expect(view.root.findByType('Button').props.disabled).toBe(true);
   act(() => input.props.onChangeText('A real device value'));
   expect(view.root.findByType('Button').props.disabled).toBe(false);
