@@ -9,14 +9,18 @@ name: Dismiss only observed stock emulator startup ANRs
           visible:
             id: "registration-manual|connection-status|android:id/alertTitle"
           timeout: 60000
-      - runFlow:
-          when:
-            visible:
-              id: android:id/alertTitle
-              text: "^(Quickstep|System UI) isn't responding$"
+      # Closing Quickstep can reveal an already-stacked System UI dialog.
+      - repeat:
+          times: 2
           commands:
-            - tapOn:
-                id: android:id/aerr_close
-            - assertNotVisible:
-                id: android:id/alertTitle
-                text: "^(Quickstep|System UI) isn't responding$"
+            - runFlow:
+                when:
+                  visible:
+                    id: android:id/alertTitle
+                    text: "^(Quickstep|System UI) isn't responding$"
+                commands:
+                  - tapOn:
+                      id: android:id/aerr_close
+      - assertNotVisible:
+          id: android:id/alertTitle
+          text: "^(Quickstep|System UI) isn't responding$"

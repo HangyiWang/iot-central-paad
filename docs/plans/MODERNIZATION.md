@@ -32,9 +32,17 @@ commit and toolchain; a written workflow is not evidence of a successful run.
 
 The iOS harness presents only its explicitly owned simulator with the pinned
 Xcode Simulator app before Maestro requests XCTest screenshots. GUI launch is
-bounded to ten seconds and rejects live device inputs. This addresses a
+bounded to sixty seconds and rejects live device inputs. This addresses a
 reported headless-runner stability condition without bypassing UI assertions;
 it is not itself evidence of a successful native or cloud run.
+
+Run `35166673016` at `3f6e41cd0ad72af69a44bbb8aca1e437d101bd1e` passed the
+refreshed foundation iOS flow. Its Android flow closed Quickstep successfully,
+then encountered a stacked System UI ANR. Recovery therefore allows at most
+two separately title-checked stock-dialog dismissals; PAAD/unrelated dialogs
+and persistent stock dialogs still fail. The feature iOS run `35166676868`
+stopped during GUI launch under the original ten-second bound, before Maestro; it does
+not establish that the earlier XCTest screenshot failure recurred.
 
 Reference artwork remains local and untracked. Use `image2.png` for information
 structure and `image1.png` for calm visual tone, with selective accents from the
