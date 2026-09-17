@@ -30,6 +30,7 @@ const PROOF_STATUSES = Object.freeze(['Submitted locally']);
 const UI_PRESENCE_IDS = Object.freeze([
   'connection-status', 'assigned-device-id', 'assigned-hub', 'connection-details',
   'connection-details-sheet', 'connection-details-close', 'model-id',
+  'app-busy-overlay', 'navigation-content', 'registration-manual',
 ]);
 const FAILURE_PREFIXES = Object.freeze([
   ['Assertion is false: ', 'assertion-failed'],
@@ -212,7 +213,8 @@ function collectLiveDiagnostics() {
           }
           const commands = entry.name === 'commands.json';
           const hierarchy = path.basename(directory) === 'screen-hierarchy' && entry.name.endsWith('.json');
-          if (!stat.isFile() || (!commands && !hierarchy)) continue;
+          const postFailure = entry.name === 'post-failure-ui.json';
+          if (!stat.isFile() || (!commands && !hierarchy && !postFailure)) continue;
           if (++files > LIMITS.files) throw new DiagnosticUnavailable('file-limit');
           if (stat.size > LIMITS.fileBytes || (bytes += stat.size) > LIMITS.totalBytes) {
             throw new DiagnosticUnavailable('byte-limit');
@@ -231,6 +233,15 @@ function collectLiveDiagnostics() {
             fs.closeSync(fd);
           }
           if (commands) failedCommands.push(...parseCommands(value));
+          else if (postFailure) {
+            if (!object(value) || value.source !== 'post-failure-ios-hierarchy' || !object(value.ui)) {
+              throw new DiagnosticUnavailable('invalid-metadata');
+            }
+            const safe = sanitizeDiagnostics({availability: 'available', ui: value.ui});
+            hierarchyCaptured = true;
+            for (const target of safe.ui?.observedTargets ?? []) observedTargets.add(target);
+            Object.assign(ui, safe.ui);
+          }
           else {
             const hierarchy = parseHierarchy(value);
             hierarchyCaptured = true;

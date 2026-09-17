@@ -675,6 +675,7 @@ test.each([
         'smoke-live-device.sh',
         'live-config.js',
         'live-diagnostics.js',
+        'capture-failed-ios-ui.js',
       ]) {
         fs.copyFileSync(
           `scripts/ci/${file}`,

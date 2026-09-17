@@ -292,8 +292,24 @@ test('distinguishes missing hierarchy from a captured tree without allowlisted t
     'results/commands.json': [command()],
     'results/screen-hierarchy/step.json': node(CANARY, CANARY),
   });
+
   expect(collectLiveDiagnostics().hierarchyCaptured).toBe(true);
   expect(collectLiveDiagnostics().ui).toEqual({});
+});
+
+test('independently sanitizes the bounded post-failure capture without opening raw logs', () => {
+  mockArtifacts({
+    'results/commands.json': [command()],
+    'results/post-failure-ui.json': {
+      source: 'post-failure-ios-hierarchy',
+      ui: {observedTargets: ['app-busy-overlay', CANARY], message: CANARY},
+      rawHierarchy: CANARY,
+    },
+  });
+  const result = collectLiveDiagnostics();
+  expect(result.hierarchyCaptured).toBe(true);
+  expect(result.ui).toEqual({observedTargets: ['app-busy-overlay']});
+  expect(JSON.stringify(result)).not.toContain(CANARY);
 });
 
 test.each([

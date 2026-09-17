@@ -207,6 +207,11 @@ presence, not a claim of current visibility, a successful tap, or cloud proof.
 `hierarchyCaptured` distinguishes an absent hierarchy from a captured tree
 without those targets. Failed commands may include a fixed framework failure
 category; source error messages and operation details are never exported.
+When time remains after an iOS failure, the pinned `maestro hierarchy` command
+may obtain a new snapshot on that same owned simulator. This shares the original
+15-minute Maestro deadline, does not retry the flow, and writes only allowlisted
+fields after parsing in memory. Such presence is post-failure diagnostic context,
+not a reconstruction of the failure instant or a successful UI assertion.
 All iOS lanes allow four minutes for cold XCTest startup within their existing
 overall command and job deadlines.
 

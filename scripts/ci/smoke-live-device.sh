@@ -152,6 +152,7 @@ fi
 export PAAD_LIVE_MAESTRO_DEVICE="$device"
 export PAAD_LIVE_PRIVATE="$private"
 export PAAD_LIVE_MAESTRO_BIN="$maestro"
+export PAAD_LIVE_PLATFORM="$platform"
 flow_attempted=1
 set +e
 # Java does not necessarily honor HOME; isolate its home and scratch explicitly.
@@ -163,13 +164,22 @@ HOME="$private/home" TMPDIR="$private/scratch" \
 JAVA_TOOL_OPTIONS="-Duser.home=$private/home -Djava.io.tmpdir=$private/scratch" \
 node - <<'NODE' > "$private/maestro.log" 2>&1
 const {spawnSync} = require('node:child_process');
+const {captureFailedIosUi} = require('./scripts/ci/capture-failed-ios-ui');
 const path = process.env.PAAD_LIVE_PRIVATE;
+const startedAt = Date.now();
 const result = spawnSync(process.env.PAAD_LIVE_MAESTRO_BIN, [
   '--device', process.env.PAAD_LIVE_MAESTRO_DEVICE, 'test', '--no-ansi',
   '--format', 'junit', '--output', `${path}/results/result.xml`,
   '--debug-output', `${path}/debug`, '--test-output-dir', `${path}/results`,
   '.maestro/live-device.yaml',
 ], {stdio: 'inherit', timeout: 900000, killSignal: 'SIGKILL'});
+if (result.error || result.signal || result.status !== 0) {
+  const capture = captureFailedIosUi({
+    platform: process.env.PAAD_LIVE_PLATFORM, startedAt, privateDirectory: path,
+    maestro: process.env.PAAD_LIVE_MAESTRO_BIN, device: process.env.PAAD_LIVE_MAESTRO_DEVICE,
+  });
+  console.error(`Bounded post-failure UI capture: ${capture}`);
+}
 process.exit(result.error || result.signal ? 1 : (result.status ?? 1));
 NODE
 status=$?
