@@ -10,7 +10,9 @@ name: Credential-free bundled startup and manual-navigation smoke
     visible:
       id: registration-manual
     timeout: 60000
-- assertVisible: "IoT Plug and Play"
+- assertVisible:
+    id: app-header-title
+    text: "^Phone as a device$"
 - assertVisible: "Connect manually"
 - tapOn:
     id: registration-manual
@@ -77,5 +79,7 @@ name: Credential-free bundled startup and manual-navigation smoke
     visible:
       id: registration-manual
     timeout: 60000
-- assertVisible: "IoT Plug and Play"
+- assertVisible:
+    id: app-header-title
+    text: "^Phone as a device$"
 - assertVisible: "Connect manually"

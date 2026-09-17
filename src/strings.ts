@@ -3,6 +3,9 @@
 
 const Strings = {
   Title: 'IoT Plug and Play',
+  Header: {
+    Title: 'Phone as a device',
+  },
   Core: {
     Back: 'Back',
     Retry: 'Retry',

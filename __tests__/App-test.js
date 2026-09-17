@@ -99,7 +99,7 @@ describe('App startup', () => {
       });
 
       expect(app.root.findAllByType(Welcome)).toHaveLength(0);
-      expect(hasText(Strings.Title)).toBe(true);
+      expect(hasText(Strings.Header.Title)).toBe(true);
       expect(hasText(Strings.Registration.Header.Welcome)).toBe(true);
       expect(hasText('Scan QR code')).toBe(true);
       expect(hasText(Strings.Registration.QRCode.Manually)).toBe(true);
@@ -110,8 +110,17 @@ describe('App startup', () => {
       const logo = app.root.findByProps({testID: 'app-header-logo'});
       expect(logo.props.pointerEvents).toBe('none');
       expect(StyleSheet.flatten(logo.props.style)).toMatchObject({
-        width: 30,
-        height: 30,
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+      });
+      const settings = app.root
+        .findAllByProps({testID: 'app-settings'})
+        .find(node => typeof node.type === 'string');
+      expect(settings.props.accessibilityLabel).toBe(Strings.Settings.Title);
+      expect(StyleSheet.flatten(settings.props.style)).toMatchObject({
+        minWidth: 48,
+        minHeight: 48,
       });
       expect(VersionCheck.needUpdate).toHaveBeenCalledTimes(updateChecks);
       if (updateChecks > 0) {
@@ -129,6 +138,7 @@ describe('App startup', () => {
         true,
       );
       expect(hasText(Strings.Title)).toBe(false);
+      expect(hasText(Strings.Header.Title)).toBe(false);
       const dismissWrappers = app.root
         .findAllByType(TouchableWithoutFeedback)
         .filter(node => node.props.onPress === Keyboard.dismiss);
