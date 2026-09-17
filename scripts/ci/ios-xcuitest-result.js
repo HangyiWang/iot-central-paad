@@ -37,6 +37,15 @@ const INPUT_VALUES = Object.freeze([
   'newline-suffix', 'whitespace-difference', 'mismatch',
 ]);
 const INPUT_FLAGS = Object.freeze(['hasNewline', 'uiFocused', 'hittable', 'enabled', 'keyboardVisible']);
+const INTERACTION_TARGETS = Object.freeze(['connection-details', 'connection-details-sheet']);
+const INTERACTION_PHASES = Object.freeze([
+  'waiting-for-hittability', 'dismissing-permission', 'tapping', 'waiting-for-sheet', 'sheet-visible',
+]);
+const INTERACTION_ELEMENTS = Object.freeze(['missing', 'disabled', 'not-hittable', 'hittable']);
+const PERMISSION_ALERTS = Object.freeze(['none', 'other', 'denial-present', 'denial-hittable']);
+const INTERACTION_FLAGS = Object.freeze([
+  'busyOverlay', 'keyboardVisible', 'permissionDismissed', 'permissionLimitReached',
+]);
 
 function sanitizeInputDiagnostics(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > INPUT_PHASES.length ||
@@ -49,6 +58,19 @@ function sanitizeInputDiagnostics(value) {
     target: entry.target, phase: entry.phase, element: entry.element, value: entry.value,
     ...Object.fromEntries(INPUT_FLAGS.map(flag => [flag, entry[flag]])),
   }));
+}
+
+function sanitizeInteractionDiagnostics(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      !INTERACTION_TARGETS.includes(value.target) || !INTERACTION_PHASES.includes(value.phase) ||
+      !INTERACTION_ELEMENTS.includes(value.element) || !PERMISSION_ALERTS.includes(value.systemAlert) ||
+      !PERMISSION_ALERTS.includes(value.applicationAlert) ||
+      INTERACTION_FLAGS.some(flag => typeof value[flag] !== 'boolean')) return undefined;
+  return {
+    target: value.target, phase: value.phase, element: value.element,
+    systemAlert: value.systemAlert, applicationAlert: value.applicationAlert,
+    ...Object.fromEntries(INTERACTION_FLAGS.map(flag => [flag, value[flag]])),
+  };
 }
 
 function sanitizeNativeResult(value) {
@@ -65,6 +87,9 @@ function sanitizeNativeResult(value) {
   const inputDiagnostics = value.inputDiagnostics === undefined ? undefined
     : sanitizeInputDiagnostics(value.inputDiagnostics);
   if (value.inputDiagnostics !== undefined && (value.mode !== 'smoke' || !inputDiagnostics)) return undefined;
+  const interactionDiagnostics = value.interactionDiagnostics === undefined ? undefined
+    : sanitizeInteractionDiagnostics(value.interactionDiagnostics);
+  if (value.interactionDiagnostics !== undefined && !interactionDiagnostics) return undefined;
   return {
     schemaVersion: 1, runner: 'xcuitest', mode: value.mode, outcome: value.outcome,
     stage: value.stage, applicationState: value.applicationState,
@@ -73,6 +98,7 @@ function sanitizeNativeResult(value) {
     connected: value.connected, nonceSubmitted: value.nonceSubmitted, coldRestored: value.coldRestored,
     ...(value.execution ? {execution: value.execution} : {}),
     ...(inputDiagnostics ? {inputDiagnostics} : {}),
+    ...(interactionDiagnostics ? {interactionDiagnostics} : {}),
   };
 }
 
@@ -104,5 +130,6 @@ function nativeFlowPassed(result, mode) {
 module.exports = {
   PREFIX, MAX_LOG_BYTES, STAGES, APPLICATION_STATES, FAILURE_CATEGORIES, EXECUTIONS, TARGETS,
   INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
+  INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };

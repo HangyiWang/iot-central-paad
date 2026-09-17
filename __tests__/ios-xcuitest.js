@@ -13,6 +13,7 @@ const {
   nativeFlowPassed,
   STAGES, APPLICATION_STATES, FAILURE_CATEGORIES, TARGETS,
   INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
+  INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
 } = require('../scripts/ci/ios-xcuitest-result');
 const {sanitizeDiagnostics} = require('../scripts/ci/live-diagnostics');
 const {validateEnvironment} = require('../scripts/ci/run-ios-xcuitest');
@@ -67,6 +68,17 @@ const inputDiagnostic = (phase = 'focused') => ({
   hittable: true,
   enabled: true,
   keyboardVisible: true,
+});
+const interactionDiagnostic = () => ({
+  target: 'connection-details',
+  phase: 'waiting-for-hittability',
+  element: 'not-hittable',
+  systemAlert: 'denial-hittable',
+  applicationAlert: 'none',
+  busyOverlay: false,
+  keyboardVisible: false,
+  permissionDismissed: false,
+  permissionLimitReached: false,
 });
 const environment = mode => ({
   PAAD_VARIANT: 'ci',
@@ -304,6 +316,54 @@ test('native input diagnostics are smoke-only and remain optional for existing r
   }
 });
 
+test.each(['smoke', 'live'])('Details interaction state is safe to publish in %s without raw UI data', mode => {
+  const interactionDiagnostics = interactionDiagnostic();
+  const result = {
+    ...nativeResult(mode), outcome: 'failed', stage: 'connecting',
+    applicationState: 'running-foreground', failureCategory: 'not-hittable',
+    nonceSubmitted: false, coldRestored: false, interactionDiagnostics,
+  };
+  const dirty = {...result, interactionDiagnostics: {
+    ...interactionDiagnostics, label: 'RAW_CANARY', value: 'RAW_CANARY',
+    alert: {title: 'RAW_CANARY'}, deviceKey: 'RAW_CANARY',
+  }};
+  expect(parseNativeLog(`${PREFIX}${JSON.stringify(dirty)}`, mode)).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: dirty}).nativeUi).toEqual(result);
+  expect(nativeFlowPassed(result, mode)).toBe(false);
+});
+
+test.each([
+  null,
+  [],
+  Array(50).fill(interactionDiagnostic()),
+  {},
+  {...interactionDiagnostic(), target: 'connection-deviceKey'},
+  {...interactionDiagnostic(), target: 'RAW_CANARY'},
+  {...interactionDiagnostic(), phase: 'RAW_CANARY'},
+  {...interactionDiagnostic(), element: 'RAW_CANARY'},
+  {...interactionDiagnostic(), systemAlert: 'RAW_CANARY'},
+  {...interactionDiagnostic(), applicationAlert: 'RAW_CANARY'},
+  ...INTERACTION_FLAGS.map(flag => ({...interactionDiagnostic(), [flag]: 'true'})),
+])('native interaction state rejects non-allowlisted or unbounded evidence (%#)', interactionDiagnostics => {
+  expect(sanitizeNativeResult({...nativeResult(), interactionDiagnostics})).toBeUndefined();
+});
+
+test.each(INTERACTION_PHASES)('native parser distinguishes the Details interaction phase %s', phase => {
+  const result = {...nativeResult(), interactionDiagnostics: {...interactionDiagnostic(), phase}};
+  expect(sanitizeNativeResult(result)).toEqual(result);
+});
+
+test('combined bounded diagnostics still fit the existing record limit', () => {
+  const result = {
+    ...nativeResult('smoke'), observedTargets: TARGETS,
+    inputDiagnostics: INPUT_PHASES.map(phase => inputDiagnostic(phase)),
+    interactionDiagnostics: interactionDiagnostic(),
+  };
+  const line = `${PREFIX}${JSON.stringify(result)}`;
+  expect(Buffer.byteLength(line)).toBeLessThan(4096);
+  expect(parseNativeLog(line, 'smoke')).toEqual(sanitizeNativeResult(result));
+});
+
 test.each([
   {stage: 'RAW_CANARY'},
   {applicationState: 'RAW_CANARY'},
@@ -477,6 +537,36 @@ test('native live orchestration keeps the key and raw logs private, publishing o
   });
 });
 
+test.each(['waiting-for-hittability', 'dismissing-permission', 'tapping', 'waiting-for-sheet'])(
+  'native live failure publishes only fixed %s state without changing proof or log retention',
+  phase => {
+    const interactionDiagnostics = {...interactionDiagnostic(), phase};
+    withRunner('live', (passed, runner) => {
+      expect(passed).toBe(false);
+      expect(runner.readDiagnostics()).toMatchObject({
+        availability: 'available',
+        nativeUi: {
+          connected: true, nonceSubmitted: false, coldRestored: false,
+          failureCategory: 'not-hittable', interactionDiagnostics,
+        },
+      });
+      const text = fs.readFileSync('build/live-device-private/results/native-ui.json', 'utf8');
+      expect(text).not.toMatch(/RAW_CANARY|deviceKey|alertTitle/);
+      expect(fs.existsSync('build/ios-ui-smoke.log')).toBe(false);
+    }, {
+      process: {status: 1},
+      result: {
+        ...nativeResult(), outcome: 'failed', stage: 'connecting',
+        applicationState: 'running-foreground', failureCategory: 'not-hittable',
+        nonceSubmitted: false, coldRestored: false,
+        interactionDiagnostics: {
+          ...interactionDiagnostics, alertTitle: 'RAW_CANARY', deviceKey: 'RAW_CANARY',
+        },
+      },
+    });
+  },
+);
+
 test.each([
   {status: 1},
   {status: 0, signal: 'SIGTERM'},
@@ -577,11 +667,77 @@ test('Swift diagnostics use only the parser vocabularies and stable public contr
   expect(values('InputPhase').sort()).toEqual([...INPUT_PHASES].sort());
   expect(values('InputElement').sort()).toEqual([...INPUT_ELEMENTS].sort());
   expect(values('InputValue').sort()).toEqual([...INPUT_VALUES].sort());
+  expect(values('InteractionPhase').sort()).toEqual([...INTERACTION_PHASES].sort());
+  expect(values('InteractionElement').sort()).toEqual([...INTERACTION_ELEMENTS].sort());
+  expect(values('PermissionAlert').sort()).toEqual([...PERMISSION_ALERTS].sort());
   for (const value of values('Failure')) expect(FAILURE_CATEGORIES).toContain(value);
   for (const value of values('Target')) expect(TARGETS).toContain(value);
   expect(swift).toContain('FileHandle.standardOutput.write(Data("PAAD_XCTEST_RESULT:');
   expect(swift).not.toMatch(/screenshot\(\)|debugDescription|XCTAttachment\(/);
   expect(swift).not.toContain('"IoT Plug and Play"');
+});
+
+test('Details waits for real header hittability and sheet appearance without swipes or coordinate taps', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const open = swift.split('private func openDetails()')[1].split('private func waitForDetailsTarget(')[0];
+  const events = [
+    '.connectionDetails, phase: .waitingForHittability, failure: .notHittable',
+    'pendingCategory = .notHittable',
+    'InteractionPhase.tapping.rawValue',
+    'emit(outcome: .inProgress)',
+    'control.tap()',
+    '.connectionDetailsSheet, phase: .waitingForSheet, failure: .missingElement',
+    'InteractionPhase.sheetVisible.rawValue',
+    'advance(to: .details)',
+  ].map(text => open.indexOf(text));
+  expect(events.every(index => index >= 0)).toBe(true);
+  expect(events).toEqual([...events].sort((a, b) => a - b));
+  const wait = swift.split('private func waitForDetailsTarget(')[1].split('private func requireIdentity(')[0];
+  expect(wait).toContain('NSPredicate { [self] _, _ in');
+  expect(wait).toContain('dismissKnownPermissionAlert()');
+  expect(wait).toContain('ProcessInfo.processInfo.systemUptime + Timeout.standard');
+  expect(wait).toContain('while ProcessInfo.processInfo.systemUptime < deadline');
+  expect(wait).toContain('XCTNSPredicateExpectation(predicate: predicate, object: NSNull())');
+  expect(wait).toContain('timeout: min(Timeout.interactionPoll, remaining)');
+  expect(wait).toContain('throw failure');
+  expect(wait.indexOf('XCTWaiter().wait(')).toBeLessThan(wait.indexOf('observe(target)'));
+  expect(wait.split('let predicate =')[1].split('while ProcessInfo')[0]).not.toContain('dismissKnownPermissionAlert');
+  expect(open + wait).not.toMatch(/swipe|coordinate|tap\(\.connectionDetails\)|try find\(|try hittable\(/i);
+  const state = swift.split('private func updateInteraction(')[1].split('private func diagnoseInput(')[0];
+  expect(state).toContain('target == .connectionDetailsSheet ? exists : state == .hittable');
+  expect(state).toContain('targetReady && !busyOverlay && systemAlert == .none && applicationAlert == .none');
+  expect(state).not.toMatch(/\.label\b|\.value\b|placeholderValue|debugDescription|screenshot/);
+  expect(state).toContain('element(.appBusyOverlay).exists');
+  expect(INTERACTION_TARGETS).toEqual(['connection-details', 'connection-details-sheet']);
+  const record = swift.split('override func record(')[1].split('// MARK: Entry point')[0];
+  expect(record).not.toMatch(/updateInteraction|app\.|permissionAlertState/);
+});
+
+test('explicit and interruption permission handling share a bounded allowlisted denial action', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const setup = swift.split('override func setUp()')[1].split('override func tearDown()')[0];
+  expect(setup).toContain('self?.denyPermissionAlert(alert) ?? false');
+  const dismissal = swift.split('private func dismissKnownPermissionAlert()')[1]
+    .split('// MARK: Configuration')[0];
+  expect(dismissal).toContain('[springBoard.alerts.firstMatch, app.alerts.firstMatch]');
+  expect(dismissal).toContain('permissionAttempts < Permission.maximumAttempts, alert.exists');
+  expect(dismissal).toContain('for label in Self.permissionDenyLabels');
+  expect(dismissal).toContain('button.exists && button.isHittable');
+  const events = [
+    'permissionAttempts += 1',
+    'InteractionPhase.dismissingPermission.rawValue', 'emit(outcome: .inProgress)',
+    'button.tap()', 'permissionDismissed = true',
+    'pendingCategory = previousCategory',
+  ].map(text => dismissal.indexOf(text));
+  expect(events.every(index => index >= 0)).toBe(true);
+  expect(events).toEqual([...events].sort((a, b) => a - b));
+  expect(swift).toContain('static let maximumAttempts = 4');
+  expect(dismissal).not.toMatch(/buttons\.firstMatch|coordinate|\.label\b|\.value\b|while /);
+  const classify = swift.split('private func permissionAlertState(')[1]
+    .split('private func updateInteraction(')[0];
+  expect(classify).toContain('var state: PermissionAlert = .other');
+  expect(classify).toContain('return .denialHittable');
+  expect(classify).not.toMatch(/\.tap\(|\.label\b|\.value\b/);
 });
 
 test('input diagnosis brackets real keystrokes, leaves exact proof strict, and excludes live/secure input', () => {

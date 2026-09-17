@@ -78,6 +78,7 @@ private enum Target: String, CaseIterable {
   case connectionStatus = "connection-status"
   case connectionDetails = "connection-details"
   case connectionDetailsSheet = "connection-details-sheet"
+  case appBusyOverlay = "app-busy-overlay"
   case assignedDeviceId = "assigned-device-id"
   case assignedHub = "assigned-hub"
   case modelId = "model-id"
@@ -124,6 +125,28 @@ private enum InputValue: String {
   case mismatch
 }
 
+private enum InteractionPhase: String {
+  case waitingForHittability = "waiting-for-hittability"
+  case dismissingPermission = "dismissing-permission"
+  case tapping
+  case waitingForSheet = "waiting-for-sheet"
+  case sheetVisible = "sheet-visible"
+}
+
+private enum InteractionElement: String {
+  case missing
+  case disabled
+  case notHittable = "not-hittable"
+  case hittable
+}
+
+private enum PermissionAlert: String {
+  case none
+  case other
+  case denialPresent = "denial-present"
+  case denialHittable = "denial-hittable"
+}
+
 // MARK: - Test case configuration
 
 private struct CaseConfig {
@@ -152,6 +175,7 @@ final class PaadLiveUITests: XCTestCase {
   ]
 
   private enum Timeout {
+    static let interactionPoll: TimeInterval = 1
     static let short: TimeInterval = 15
     static let standard: TimeInterval = 30
     static let launch: TimeInterval = 60
@@ -163,6 +187,10 @@ final class PaadLiveUITests: XCTestCase {
   private enum Scroll {
     static let forward = 6
     static let backward = 10
+  }
+
+  private enum Permission {
+    static let maximumAttempts = 4
   }
 
   private var app: XCUIApplication!
@@ -184,6 +212,10 @@ final class PaadLiveUITests: XCTestCase {
   private var pendingCategory: Failure?
   /// Only the current synthetic, nonsecure field; at most five fixed checkpoints.
   private var inputDiagnostics: [[String: Any]] = []
+  /// Cached public UI state only; record/teardown never query a failed interaction.
+  private var interactionDiagnostics: [String: Any]?
+  private var permissionAttempts = 0
+  private var permissionDismissed = false
 
   override func setUp() {
     super.setUp()
@@ -191,15 +223,8 @@ final class PaadLiveUITests: XCTestCase {
     app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
     app.launchArguments = []
     app.launchEnvironment = [:]
-    interruption = addUIInterruptionMonitor(withDescription: "paad-permission") { alert in
-      for label in PaadLiveUITests.permissionDenyLabels {
-        let button = alert.buttons[label]
-        if button.exists && button.isHittable {
-          button.tap()
-          return true
-        }
-      }
-      return false
+    interruption = addUIInterruptionMonitor(withDescription: "paad-permission") { [weak self] alert in
+      return self?.denyPermissionAlert(alert) ?? false
     }
   }
 
@@ -297,7 +322,6 @@ final class PaadLiveUITests: XCTestCase {
     connected = true
     advance(to: .connecting)
 
-    dismissKnownPermissionAlert()
     try openDetails()
     try requireIdentity(config)
 
@@ -329,7 +353,6 @@ final class PaadLiveUITests: XCTestCase {
     coldRestored = true
     advance(to: .restoring)
 
-    dismissKnownPermissionAlert()
     try openDetails()
     try requireIdentity(config)
     advance(to: .restoredIdentity)
@@ -416,9 +439,50 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   private func openDetails() throws {
-    try tap(.connectionDetails)
-    try requireExists(.connectionDetailsSheet, timeout: Timeout.standard)
+    let control = try waitForDetailsTarget(
+      .connectionDetails, phase: .waitingForHittability, failure: .notHittable)
+    pendingCategory = .notHittable
+    interactionDiagnostics?["phase"] = InteractionPhase.tapping.rawValue
+    emit(outcome: .inProgress)
+    control.tap()
+    pendingCategory = nil
+    _ = try waitForDetailsTarget(
+      .connectionDetailsSheet, phase: .waitingForSheet, failure: .missingElement)
+    interactionDiagnostics?["phase"] = InteractionPhase.sheetVisible.rawValue
     advance(to: .details)
+  }
+
+  private func waitForDetailsTarget(
+    _ target: Target, phase: InteractionPhase, failure: Failure
+  ) throws -> XCUIElement {
+    // Details is a fixed header, not scroll content. Give navigation, the busy
+    // overlay and asynchronous sensor permission dialogs time to settle.
+    let field = element(target)
+    let deadline = ProcessInfo.processInfo.systemUptime + Timeout.standard
+    pendingCategory = failure
+    updateInteraction(target, field: field, phase: phase)
+    emit(outcome: .inProgress)
+    let predicate = NSPredicate { [self] _, _ in
+      return updateInteraction(target, field: field, phase: phase)
+    }
+    while ProcessInfo.processInfo.systemUptime < deadline {
+      // Public attribute reads do not trigger interruption monitors. Explicitly
+      // handle known denial buttons between polls, never inside the predicate.
+      dismissKnownPermissionAlert()
+      let remaining = deadline - ProcessInfo.processInfo.systemUptime
+      guard remaining > 0 else {
+        throw failure
+      }
+      let expectation = XCTNSPredicateExpectation(predicate: predicate, object: NSNull())
+      if XCTWaiter().wait(
+        for: [expectation], timeout: min(Timeout.interactionPoll, remaining)
+      ) == .completed {
+        pendingCategory = nil
+        observe(target)
+        return field
+      }
+    }
+    throw failure
   }
 
   private func requireIdentity(_ config: CaseConfig) throws {
@@ -442,7 +506,8 @@ final class PaadLiveUITests: XCTestCase {
     let firstSlice = total / 2
     let first = XCTNSPredicateExpectation(predicate: predicate, object: status)
     if XCTWaiter().wait(for: [first], timeout: firstSlice) != .completed {
-      // A permission dialog is the only sanctioned reason the first slice lapses.
+      // A permission dialog may be blocking the transition. A readable status
+      // alone does not prove that the Details control is ready for interaction.
       dismissKnownPermissionAlert()
       let second = XCTNSPredicateExpectation(predicate: predicate, object: status)
       guard XCTWaiter().wait(for: [second], timeout: total - firstSlice) == .completed else {
@@ -654,17 +719,43 @@ final class PaadLiveUITests: XCTestCase {
   /// dismisses unrelated dialogs.
   private func dismissKnownPermissionAlert() {
     let springBoard = XCUIApplication(bundleIdentifier: Self.springBoardBundleIdentifier)
-    let alert = springBoard.alerts.firstMatch
-    guard alert.exists else {
-      return
+    // System permission dialogs can be exposed by either application's query.
+    for alert in [springBoard.alerts.firstMatch, app.alerts.firstMatch] {
+      if denyPermissionAlert(alert) {
+        return
+      }
+    }
+  }
+
+  private func denyPermissionAlert(_ alert: XCUIElement) -> Bool {
+    guard permissionAttempts < Permission.maximumAttempts, alert.exists else {
+      return false
     }
     for label in Self.permissionDenyLabels {
       let button = alert.buttons[label]
       if button.exists && button.isHittable {
+        let previousPhase = interactionDiagnostics?["phase"]
+        let previousCategory = pendingCategory
+        pendingCategory = .notHittable
+        // Consume the budget before the action, including monitor re-entry.
+        permissionAttempts += 1
+        if interactionDiagnostics != nil {
+          interactionDiagnostics?["phase"] = InteractionPhase.dismissingPermission.rawValue
+          interactionDiagnostics?["permissionLimitReached"] =
+            permissionAttempts == Permission.maximumAttempts
+          emit(outcome: .inProgress)
+        }
         button.tap()
-        return
+        permissionDismissed = true
+        pendingCategory = previousCategory
+        interactionDiagnostics?["phase"] = previousPhase
+        interactionDiagnostics?["permissionDismissed"] = true
+        interactionDiagnostics?["permissionLimitReached"] =
+          permissionAttempts == Permission.maximumAttempts
+        return true
       }
     }
+    return false
   }
 
   // MARK: Configuration
@@ -708,6 +799,57 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   // MARK: Diagnostics
+
+  private func permissionAlertState(_ alert: XCUIElement) -> PermissionAlert {
+    guard alert.exists else {
+      return .none
+    }
+    var state: PermissionAlert = .other
+    for label in Self.permissionDenyLabels {
+      let button = alert.buttons[label]
+      if button.exists {
+        state = .denialPresent
+        if button.isHittable {
+          return .denialHittable
+        }
+      }
+    }
+    return state
+  }
+
+  @discardableResult
+  private func updateInteraction(
+    _ target: Target, field: XCUIElement, phase: InteractionPhase
+  ) -> Bool {
+    let exists = field.exists
+    let state: InteractionElement
+    if !exists {
+      state = .missing
+    } else if !field.isEnabled {
+      state = .disabled
+    } else {
+      state = field.isHittable ? .hittable : .notHittable
+    }
+    let springBoard = XCUIApplication(bundleIdentifier: Self.springBoardBundleIdentifier)
+    let systemAlert = permissionAlertState(springBoard.alerts.firstMatch)
+    let applicationAlert = permissionAlertState(app.alerts.firstMatch)
+    let busyOverlay = element(.appBusyOverlay).exists
+    interactionDiagnostics = [
+      "target": target.rawValue,
+      "phase": phase.rawValue,
+      "element": state.rawValue,
+      "systemAlert": systemAlert.rawValue,
+      "applicationAlert": applicationAlert.rawValue,
+      "busyOverlay": busyOverlay,
+      "keyboardVisible": app.keyboards.firstMatch.exists,
+      "permissionDismissed": permissionDismissed,
+      "permissionLimitReached": permissionAttempts == Permission.maximumAttempts,
+    ]
+    // A sheet container need only exist; its actionable children are checked
+    // individually by the identity/input steps. The header must be hittable.
+    let targetReady = target == .connectionDetailsSheet ? exists : state == .hittable
+    return targetReady && !busyOverlay && systemAlert == .none && applicationAlert == .none
+  }
 
   private func diagnoseInput(
     _ field: XCUIElement, target: Target, phase: InputPhase, expected: String
@@ -825,6 +967,9 @@ final class PaadLiveUITests: XCTestCase {
     }
     if !inputDiagnostics.isEmpty {
       record["inputDiagnostics"] = inputDiagnostics
+    }
+    if let interactionDiagnostics = interactionDiagnostics {
+      record["interactionDiagnostics"] = interactionDiagnostics
     }
     guard
       let data = try? JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]),
