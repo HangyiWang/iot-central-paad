@@ -14,7 +14,6 @@ import {
   NavigationParams,
   Pages,
   NavigationPages,
-  Screens,
   RegistrationScreens,
   // ChartType,
 } from 'types';
@@ -123,9 +122,7 @@ const Navigation = React.memo(() => {
           ) {
             return {
               ...defaultOptions,
-              headerShown:
-                !registrationHasHeader &&
-                childRoute !== Screens.BLUETOOTH_STACK,
+              headerShown: !registrationHasHeader,
               headerTitle: () => (
                 <Text
                   style={{

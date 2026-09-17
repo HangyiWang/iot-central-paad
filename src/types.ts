@@ -94,7 +94,11 @@ export type PagesNavigator = StackNavigationProp<NavigationPages, PagesNames>;
 export type StateUpdater<T> = React.Dispatch<React.SetStateAction<T>>;
 
 export type LogItem = {eventName: string; eventData: string};
-export type TimedLog = {timestamp: number | string; logItem: LogItem}[];
+export type TimedLog = {
+  id: number;
+  timestamp: number | string;
+  logItem: LogItem;
+}[];
 
 export type StyleDefinition = Literal<ViewStyle | TextStyle>;
 

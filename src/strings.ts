@@ -26,6 +26,8 @@ const Strings = {
   },
   Connection: {
     Summary: {
+      Title: 'Cloud connection',
+      OpenDetails: 'Details',
       Connected: 'Connected',
       Disconnected: 'Disconnected',
       Simulated: 'Offline simulation — no cloud connection',
@@ -205,6 +207,8 @@ const Strings = {
     },
   },
   FileUpload: {
+    Title: 'Upload a photo',
+    Description: 'Choose an image from your library or take a photo.',
     Start: 'Select an image to upload to Azure Storage',
     Footer:
       "You'll need to configure file upload in your IoT solution before using this feature. ",
@@ -219,8 +223,30 @@ const Strings = {
     },
   },
   LogScreen: {
-    Header:
-      'Connection information between your device and Azure IoT will show up below.',
+    Title: 'Activity log',
+    Header: 'Connection, uploads and device events, in one place.',
+    All: 'All events',
+    Issues: 'Warnings & errors',
+    Count: '{{0}} events',
+    Latest: 'Jump to latest',
+    Empty: 'No activity yet',
+    EmptyDetail: 'Events will appear here as you use your device.',
+    NoIssues: 'No warning or error events',
+    NoIssuesDetail: 'Choose All events to see the rest of this session.',
+    Details: 'View details',
+    HideDetails: 'Hide details',
+    Levels: {info: 'Info', warning: 'Warning', error: 'Error'},
+  },
+  Bluetooth: {
+    Title: 'Nearby devices',
+    Description: 'Discover Bluetooth devices around your phone.',
+    Refresh: 'Scan again',
+    Scanning: 'Looking for devices',
+    ScanningDetail: 'Keep a supported Bluetooth device nearby and powered on.',
+    Unavailable: 'Bluetooth unavailable',
+    UnavailableDetail:
+      'Enable Bluetooth and allow Nearby Devices access in Settings.',
+    SignalUnavailable: 'Signal unavailable',
   },
   Simulation: {
     Enabled: 'Simulation mode is enabled.',

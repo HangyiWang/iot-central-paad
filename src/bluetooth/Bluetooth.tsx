@@ -17,8 +17,8 @@ import {ItemProps, Pages} from 'types';
 import {Loader, Text} from '../components';
 import {useIoTCentralClient, useTheme} from '../hooks';
 import CardView from 'CardView';
-import {Logo, Profile, styles as appStyles} from 'App';
 import Strings from 'strings';
+import {palette} from '../theme/palette';
 
 type BluetoothStackParamList = {
   [Pages.BLUETOOTH_LIST]: undefined;
@@ -31,33 +31,17 @@ type BluetoothStackParamList = {
 const BluetoothStack = createStackNavigator<BluetoothStackParamList>();
 
 export function BluetoothPage() {
-  const {colors} = useTheme();
-
   return (
     <BluetoothStack.Navigator
       initialRouteName={Pages.BLUETOOTH_LIST}
-      screenOptions={({navigation, route}) => {
+      screenOptions={({route}) => {
         const isListPage: boolean = route.name === Pages.BLUETOOTH_LIST;
 
         return {
-          headerTitle: () => (
-            <Text
-              style={{
-                ...appStyles.logoText,
-                color: colors.text,
-              }}>
-              {isListPage ? Strings.Title : route.params?.deviceName ?? ''}
-            </Text>
-          ),
+          headerShown: !isListPage,
+          headerTitle: route.params?.deviceName ?? Strings.Bluetooth.Title,
           headerTitleAlign: 'left',
-          headerLeft: isListPage ? () => <Logo /> : undefined,
           headerBackButtonDisplayMode: 'minimal',
-          headerRight: () => (
-            <View style={appStyles.headerButtons}>
-              {isListPage && <ReloadButton />}
-              <Profile navigate={navigation.navigate} />
-            </View>
-          ),
         };
       }}>
       <BluetoothStack.Screen
@@ -78,7 +62,8 @@ type BluetoothListProps = StackScreenProps<
 >;
 
 function BluetoothList({navigation}: BluetoothListProps) {
-  const {colors} = useTheme();
+  const {colors, dark} = useTheme();
+  const appearance = palette(dark);
   const [isVisible, setIsVisible] = React.useState(true);
   const {devices, unavailable} = useBluetoothDevicesList(isVisible);
 
@@ -97,15 +82,53 @@ function BluetoothList({navigation}: BluetoothListProps) {
   }, [navigation, setIsVisible]);
 
   return (
-    <View style={styles.container}>
-      {unavailable && (
-        <Text>
-          Bluetooth unavailable. Enable Bluetooth and allow Nearby Devices
-          access in Settings.
-        </Text>
-      )}
+    <View style={[styles.container, {backgroundColor: appearance.background}]}>
+      <View style={styles.heading}>
+        <View style={styles.headingText}>
+          <Text accessibilityRole="header" style={styles.title}>
+            {Strings.Bluetooth.Title}
+          </Text>
+          <Text style={[styles.description, {color: appearance.muted}]}>
+            {Strings.Bluetooth.Description}
+          </Text>
+        </View>
+        <ReloadButton />
+      </View>
       <FlatList<Device>
         data={devices}
+        keyExtractor={device => device.id}
+        contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          unavailable && devices.length > 0 ? (
+            <Text style={[styles.notice, {color: appearance.danger}]}>
+              {Strings.Bluetooth.UnavailableDetail}
+            </Text>
+          ) : null
+        }
+        ListEmptyComponent={
+          <View style={[styles.empty, {backgroundColor: appearance.tints[1]}]}>
+            <View
+              accessible={false}
+              style={[styles.emptyIcon, {backgroundColor: appearance.surface}]}>
+              <Icon
+                name="bluetooth"
+                type="material-community"
+                size={30}
+                color={appearance.text}
+              />
+            </View>
+            <Text style={styles.emptyTitle}>
+              {unavailable
+                ? Strings.Bluetooth.Unavailable
+                : Strings.Bluetooth.Scanning}
+            </Text>
+            <Text style={[styles.emptyDescription, {color: appearance.muted}]}>
+              {unavailable
+                ? Strings.Bluetooth.UnavailableDetail
+                : Strings.Bluetooth.ScanningDetail}
+            </Text>
+          </View>
+        }
         renderItem={({item}) => (
           <BluetoothDeviceListItem
             item={item}
@@ -146,7 +169,8 @@ function BluetoothDeviceListItem({
           deviceName: item.name ?? '',
         });
       }}>
-      <ListItem bottomDivider containerStyle={{backgroundColor: colors.card}}>
+      <ListItem
+        containerStyle={[styles.deviceCard, {backgroundColor: colors.card}]}>
         <ListItem.Content
           style={{
             ...styles.item,
@@ -164,7 +188,11 @@ function BluetoothDeviceListItem({
                 type="material-community"
                 color={colors.text}
               />
-              <Text style={styles.rssiText}>{item.rssi} dBm</Text>
+              <Text style={styles.rssiText}>
+                {item.rssi == null
+                  ? Strings.Bluetooth.SignalUnavailable
+                  : `${item.rssi} dBm`}
+              </Text>
             </View>
           </ListItem.Subtitle>
         </ListItem.Content>
@@ -298,9 +326,10 @@ function BluetoothDetail({
 function ReloadButton() {
   const {colors} = useTheme();
   return (
-    <View>
+    <View style={styles.reload}>
       <Icon
-        style={styles.marginEnd10}
+        accessibilityRole="button"
+        accessibilityLabel={Strings.Bluetooth.Refresh}
         name="reload"
         type={Platform.select({ios: 'ionicon', android: 'material-community'})}
         color={colors.text}
@@ -315,14 +344,41 @@ function ReloadButton() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 0,
   },
-  item: {
+  heading: {padding: 20, flexDirection: 'row', alignItems: 'center', gap: 12},
+  headingText: {flex: 1, gap: 5},
+  title: {fontSize: 24, lineHeight: 31, fontWeight: '600'},
+  description: {fontSize: 13, lineHeight: 20},
+  reload: {
+    minWidth: 48,
+    minHeight: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listContent: {paddingHorizontal: 20, paddingBottom: 24},
+  deviceCard: {borderRadius: 20, marginBottom: 12, padding: 18},
+  notice: {marginBottom: 16, fontSize: 14, lineHeight: 21},
+  empty: {borderRadius: 24, padding: 28, alignItems: 'center', gap: 14},
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
     fontSize: 18,
-    height: 60,
+    lineHeight: 25,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  emptyDescription: {fontSize: 14, lineHeight: 21, textAlign: 'center'},
+  item: {
+    gap: 6,
   },
   itemTitle: {
-    fontWeight: 'bold',
+    fontWeight: '600',
+    fontSize: 16,
   },
   marginEnd10: {
     marginEnd: 10,
