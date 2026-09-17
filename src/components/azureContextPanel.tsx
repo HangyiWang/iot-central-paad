@@ -14,6 +14,7 @@ import {decodeAzureContextInput} from '../onboarding/azureContextInput';
 import {useTheme} from 'hooks';
 import Strings from 'strings';
 import {palette} from '../theme/palette';
+import {detailStyles} from '../theme/detailStyles';
 import {Text} from './typography';
 
 export default function AzureContextPanel({
@@ -104,6 +105,7 @@ export default function AzureContextPanel({
     onPress: () => void,
     id?: string,
     selected?: boolean,
+    tinted = false,
   ) => (
     <Pressable
       key={label}
@@ -117,16 +119,22 @@ export default function AzureContextPanel({
       disabled={busy}
       onPress={onPress}
       style={[
-        styles.action,
-        {borderColor: colors.border, opacity: busy ? 0.5 : 1},
+        detailStyles.action,
+        tinted && {backgroundColor: colors.surface},
+        busy && detailStyles.disabled,
       ]}>
-      <Text style={{color: colors.primary, fontWeight: '600'}}>{label}</Text>
+      <Text style={[detailStyles.actionLabel, {color: colors.primary}]}>
+        {label}
+      </Text>
     </Pressable>
   );
   const value = (label: string, content: string, id?: string) => (
     <View key={label} style={styles.value}>
-      <Text style={[styles.label, {color: colors.muted}]}>{label}</Text>
-      <Text testID={id} selectable>
+      <Text style={[detailStyles.label, {color: colors.muted}]}>{label}</Text>
+      <Text
+        testID={id}
+        selectable
+        style={[detailStyles.value, {color: colors.text}]}>
         {content}
       </Text>
     </View>
@@ -136,35 +144,51 @@ export default function AzureContextPanel({
     name: string,
     resourceId: string,
     id?: string,
+    divided = true,
   ) => (
-    <View key={label}>
+    <View
+      key={label}
+      style={[
+        detailStyles.row,
+        divided && detailStyles.divided,
+        {borderTopColor: colors.border},
+      ]}>
       {value(label, name, id)}
       {showIds && (
-        <Text selectable style={[styles.resourceId, {color: colors.muted}]}>
+        <Text
+          selectable
+          style={[detailStyles.monospace, {color: colors.muted}]}>
           {resourceId}
         </Text>
       )}
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={`${label}: ${text.Portal}`}
+        accessibilityState={{disabled: busy}}
         disabled={busy}
         onPress={() => {
           void open(resourceId);
         }}
-        style={styles.portal}>
-        <Text style={{color: colors.primary}}>{text.Portal}</Text>
+        style={[detailStyles.action, busy && detailStyles.disabled]}>
+        <Text style={[detailStyles.actionLabel, {color: colors.primary}]}>
+          {text.Portal}
+        </Text>
       </Pressable>
     </View>
   );
   return (
     <View
       testID="azure-context-panel"
-      style={[styles.card, {backgroundColor: colors.surface}]}>
-      <Text accessibilityRole="header" style={styles.title}>
+      style={[detailStyles.card, {backgroundColor: colors.inset}]}>
+      <Text
+        accessibilityRole="header"
+        style={[detailStyles.sectionTitle, {color: colors.text}]}>
         {text.Title}
       </Text>
       {!identity ? (
-        <Text style={{color: colors.muted}}>{text.Unavailable}</Text>
+        <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+          {text.Unavailable}
+        </Text>
       ) : (
         <>
           {snapshot ? (
@@ -172,20 +196,22 @@ export default function AzureContextPanel({
               <Text
                 testID="azure-context-namespace"
                 selectable
-                style={[styles.namespace, {color: colors.primary}]}>
+                style={[detailStyles.sectionTitle, {color: colors.text}]}>
                 {snapshot.namespace.name}
               </Text>
-              <Text style={[styles.label, {color: colors.muted}]}>
+              <Text style={[detailStyles.label, {color: colors.muted}]}>
                 {text.Source}
               </Text>
               <Text
                 testID="azure-context-captured"
-                style={{color: colors.muted}}>
+                style={[detailStyles.supporting, {color: colors.muted}]}>
                 {`${text.Captured}: ${new Date(
                   snapshot.capturedAt,
                 ).toLocaleString()}`}
               </Text>
-              <Text style={{color: colors.muted}}>{text.Explanation}</Text>
+              <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+                {text.Explanation}
+              </Text>
               {button(
                 expanded ? text.Hide : text.View,
                 () => setExpanded(!expanded),
@@ -194,61 +220,91 @@ export default function AzureContextPanel({
               )}
               {expanded && (
                 <>
-                  {resource(
-                    text.Namespace,
-                    snapshot.namespace.name,
-                    snapshot.namespace.resourceId,
-                  )}
-                  {resource(
-                    text.Subscription,
-                    snapshot.subscription.name,
-                    `/subscriptions/${snapshot.subscription.id}`,
-                    'azure-context-subscription',
-                  )}
-                  {value(text.SubscriptionId, snapshot.subscription.id)}
-                  {resource(
-                    text.ResourceGroup,
-                    snapshot.resourceGroup.name,
-                    `/subscriptions/${snapshot.subscription.id}/resourceGroups/${snapshot.resourceGroup.name}`,
-                    'azure-context-resource-group',
-                  )}
-                  {value(
-                    text.Region,
-                    snapshot.namespace.location,
-                    'azure-context-region',
-                  )}
-                  {resource(
-                    text.Hub,
-                    snapshot.hub.name,
-                    snapshot.hub.resourceId,
-                  )}
-                  {snapshot.dps &&
-                    resource(
-                      text.Dps,
-                      snapshot.dps.name,
-                      snapshot.dps.resourceId,
+                  <View>
+                    {resource(
+                      text.Namespace,
+                      snapshot.namespace.name,
+                      snapshot.namespace.resourceId,
+                      undefined,
+                      false,
                     )}
-                  {snapshot.registryDevice ? (
-                    resource(
-                      text.Registry,
-                      snapshot.registryDevice.name,
-                      snapshot.registryDevice.resourceId,
-                    )
-                  ) : (
-                    <Text style={{color: colors.muted}}>
-                      {text.RegistryMissing}
-                    </Text>
-                  )}
+                    {resource(
+                      text.Subscription,
+                      snapshot.subscription.name,
+                      `/subscriptions/${snapshot.subscription.id}`,
+                      'azure-context-subscription',
+                    )}
+                    <View
+                      style={[
+                        detailStyles.row,
+                        detailStyles.divided,
+                        {borderTopColor: colors.border},
+                      ]}>
+                      {value(text.SubscriptionId, snapshot.subscription.id)}
+                    </View>
+                    {resource(
+                      text.ResourceGroup,
+                      snapshot.resourceGroup.name,
+                      `/subscriptions/${snapshot.subscription.id}/resourceGroups/${snapshot.resourceGroup.name}`,
+                      'azure-context-resource-group',
+                    )}
+                    <View
+                      style={[
+                        detailStyles.row,
+                        detailStyles.divided,
+                        {borderTopColor: colors.border},
+                      ]}>
+                      {value(
+                        text.Region,
+                        snapshot.namespace.location,
+                        'azure-context-region',
+                      )}
+                    </View>
+                    {resource(
+                      text.Hub,
+                      snapshot.hub.name,
+                      snapshot.hub.resourceId,
+                    )}
+                    {snapshot.dps &&
+                      resource(
+                        text.Dps,
+                        snapshot.dps.name,
+                        snapshot.dps.resourceId,
+                      )}
+                    {snapshot.registryDevice ? (
+                      resource(
+                        text.Registry,
+                        snapshot.registryDevice.name,
+                        snapshot.registryDevice.resourceId,
+                      )
+                    ) : (
+                      <Text
+                        style={[
+                          detailStyles.row,
+                          detailStyles.divided,
+                          detailStyles.supporting,
+                          {
+                            color: colors.muted,
+                            borderTopColor: colors.border,
+                          },
+                        ]}>
+                        {text.RegistryMissing}
+                      </Text>
+                    )}
+                  </View>
                   {button(
                     showIds ? text.HideIds : text.ShowIds,
                     () => setShowIds(!showIds),
                     'azure-context-ids',
                     showIds,
                   )}
-                  <Text accessibilityRole="header" style={styles.title}>
+                  <Text
+                    accessibilityRole="header"
+                    style={[detailStyles.sectionTitle, {color: colors.text}]}>
                     {text.Activities}
                   </Text>
-                  <Text style={{color: colors.muted}}>
+                  <Text
+                    style={[detailStyles.supporting, {color: colors.muted}]}>
                     {text.ActivityExplanation}
                   </Text>
                   {button(
@@ -259,35 +315,69 @@ export default function AzureContextPanel({
                   )}
                   {showActivities &&
                     (snapshot.activities.length ? (
-                      snapshot.activities.map((activity, index) => (
-                        <View
-                          key={`${activity.timestamp}-${index}`}
-                          style={[styles.event, {borderColor: colors.border}]}>
-                          <Text style={[styles.label, {color: colors.muted}]}>
-                            {new Date(activity.timestamp).toLocaleString()}
-                          </Text>
-                          <Text selectable>{activity.operation}</Text>
-                          <Text
-                            style={{
-                              color:
-                                activity.status === 'Failed'
-                                  ? colors.danger
-                                  : colors.text,
-                            }}>
-                            {activity.status}
-                          </Text>
-                          <Text selectable style={{color: colors.muted}}>
-                            {activity.resourceId.split('/').at(-1)}
-                          </Text>
-                          {showIds && (
-                            <Text selectable style={styles.resourceId}>
-                              {activity.resourceId}
+                      <View>
+                        {snapshot.activities.map((activity, index) => (
+                          <View
+                            key={`${activity.timestamp}-${index}`}
+                            style={[
+                              detailStyles.row,
+                              index > 0 && detailStyles.divided,
+                              {borderTopColor: colors.border},
+                            ]}>
+                            <Text
+                              style={[
+                                detailStyles.label,
+                                {color: colors.muted},
+                              ]}>
+                              {new Date(activity.timestamp).toLocaleString()}
                             </Text>
-                          )}
-                        </View>
-                      ))
+                            <Text
+                              selectable
+                              style={[
+                                detailStyles.value,
+                                {color: colors.text},
+                              ]}>
+                              {activity.operation}
+                            </Text>
+                            <Text
+                              style={[
+                                detailStyles.status,
+                                {
+                                  color:
+                                    activity.status === 'Failed'
+                                      ? colors.danger
+                                      : colors.text,
+                                },
+                              ]}>
+                              {activity.status}
+                            </Text>
+                            <Text
+                              selectable
+                              style={[
+                                detailStyles.supporting,
+                                {color: colors.muted},
+                              ]}>
+                              {activity.resourceId.split('/').at(-1)}
+                            </Text>
+                            {showIds && (
+                              <Text
+                                selectable
+                                style={[
+                                  detailStyles.monospace,
+                                  {color: colors.muted},
+                                ]}>
+                                {activity.resourceId}
+                              </Text>
+                            )}
+                          </View>
+                        ))}
+                      </View>
                     ) : (
-                      <Text style={{color: colors.muted}}>
+                      <Text
+                        style={[
+                          detailStyles.supporting,
+                          {color: colors.muted},
+                        ]}>
                         {text.NoActivities}
                       </Text>
                     ))}
@@ -295,12 +385,14 @@ export default function AzureContextPanel({
               )}
             </>
           ) : (
-            <Text style={{color: colors.muted}}>
+            <Text style={[detailStyles.supporting, {color: colors.muted}]}>
               {azureContext ? text.OtherDevice : text.Empty}
             </Text>
           )}
           {azureContextError && (
-            <Text accessibilityRole="alert" style={{color: colors.danger}}>
+            <Text
+              accessibilityRole="alert"
+              style={[detailStyles.status, {color: colors.danger}]}>
               {text.StoredInvalid}
             </Text>
           )}
@@ -313,10 +405,13 @@ export default function AzureContextPanel({
             },
             'azure-context-import-toggle',
             importing,
+            true,
           )}
           {importing && (
             <>
-              <Text style={{color: colors.muted}}>{text.Hint}</Text>
+              <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+                {text.Hint}
+              </Text>
               <TextInput
                 testID="azure-context-input"
                 accessibilityLabel={text.Input}
@@ -332,11 +427,13 @@ export default function AzureContextPanel({
                 textAlignVertical="top"
                 style={[
                   styles.input,
+                  detailStyles.value,
                   {
                     color: colors.text,
                     backgroundColor: colors.inset,
                     borderColor: colors.controlBorder,
                   },
+                  busy && detailStyles.disabled,
                 ]}
               />
               {button(
@@ -345,6 +442,8 @@ export default function AzureContextPanel({
                   void importSnapshot();
                 },
                 'azure-context-import',
+                undefined,
+                true,
               )}
               {button(Strings.Core.Cancel, () => {
                 setImporting(false);
@@ -368,7 +467,7 @@ export default function AzureContextPanel({
           testID="azure-context-error"
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
-          style={{color: colors.danger}}>
+          style={[detailStyles.status, {color: colors.danger}]}>
           {error}
         </Text>
       )}
@@ -377,26 +476,10 @@ export default function AzureContextPanel({
 }
 
 const styles = StyleSheet.create({
-  card: {borderRadius: 20, padding: 18, gap: 12},
-  title: {fontSize: 17, fontWeight: '600'},
-  namespace: {fontSize: 18, lineHeight: 25, fontWeight: '600'},
-  label: {fontSize: 12, lineHeight: 18},
-  value: {gap: 4, paddingTop: 12},
-  resourceId: {fontSize: 12, lineHeight: 18},
-  action: {
-    minHeight: 48,
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-  },
-  portal: {minHeight: 48, justifyContent: 'center'},
+  value: {gap: 4},
   input: {
+    ...detailStyles.input,
     minHeight: 144,
     maxHeight: 220,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 14,
   },
-  event: {gap: 6, paddingVertical: 14, borderTopWidth: 1},
 });

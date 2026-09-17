@@ -425,3 +425,173 @@ it('hides the notice while a connection attempt is in flight', () => {
   );
   expect(text()).toContain('Connecting to the assigned IoT Hub');
 });
+
+it.each([
+  [false, 1],
+  [true, 1],
+  [false, 2.5],
+  [true, 2.5],
+])(
+  'unifies details without scaling or truncating identity values (dark %s, font scale %s)',
+  (dark, fontScale) => {
+    hooks.useTheme.mockReturnValue({dark, colors: {card: '#fff'}});
+    jest.spyOn(require('react-native'), 'useWindowDimensions').mockReturnValue({
+      width: 320,
+      fontScale,
+      height: 800,
+      scale: 2,
+    });
+    connected = false;
+    state.client.identity.operationId = 'operation-id-with-exact-case';
+    state.client.identity.deviceId = `Assigned-${'x'.repeat(128)}`;
+    act(() => {
+      view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+    });
+    act(() => press('Connection details'));
+    const colors = palette(dark);
+    const textNode = content =>
+      view.root
+        .findAllByType('Text')
+        .find(node => node.props.children === content);
+    const style = node => StyleSheet.flatten(node.props.style);
+    const control = id => view.root.findAllByProps({testID: id})[0];
+    const titleStyle = {
+      fontSize: 17,
+      lineHeight: 24,
+      fontWeight: '600',
+      letterSpacing: -0.2,
+      color: colors.text,
+    };
+    for (const title of [
+      Strings.Connection.Summary.Registry,
+      Strings.Connection.Summary.ProofTitle,
+      Strings.AzureContext.Title,
+    ]) {
+      expect(style(textNode(title))).toMatchObject(titleStyle);
+      expect(textNode(title).props.accessibilityRole).toBe('header');
+    }
+    expect(style(textNode(Strings.Connection.Summary.Details))).toMatchObject({
+      fontSize: 24,
+      lineHeight: 31,
+      fontWeight: '600',
+      letterSpacing: -0.5,
+    });
+    for (const [id, value] of [
+      ['assigned-device-id', state.client.identity.deviceId],
+      ['registration-id', state.client.identity.registrationId],
+      [undefined, state.client.identity.operationId],
+    ]) {
+      const node = id ? control(id) : textNode(value);
+      expect(node.props.children).toBe(value);
+      expect(node.props.selectable).toBe(true);
+      expect(style(node)).toMatchObject({
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        fontSize: 14,
+        lineHeight: 22,
+        color: colors.text,
+      });
+    }
+    for (const id of ['assigned-hub', 'model-id']) {
+      expect(control(id).props.selectable).toBe(true);
+      expect(style(control(id))).toMatchObject({
+        fontSize: 15,
+        lineHeight: 22,
+        fontWeight: '400',
+        color: colors.text,
+      });
+      expect(style(control(id)).fontFamily).toBeUndefined();
+    }
+    for (const node of view.root.findAllByType('Text')) {
+      expect(node.props.numberOfLines).toBeUndefined();
+      expect(node.props.maxFontSizeMultiplier).toBeUndefined();
+      expect(node.props.allowFontScaling).not.toBe(false);
+    }
+    const badge = control('registry-status');
+    expect(badge.props.children).toBe('Not checked');
+    expect(style(badge)).toMatchObject({
+      backgroundColor: colors.inset,
+      color: colors.muted,
+      borderColor: colors.border,
+      borderWidth: StyleSheet.hairlineWidth,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: '600',
+    });
+    for (const id of [
+      'connection-details-close',
+      'connection-reconnect',
+      'connection-manual',
+    ]) {
+      expect(style(control(id))).toMatchObject({
+        minHeight: 48,
+        borderRadius: 14,
+        paddingHorizontal: 16,
+        backgroundColor: colors.inset,
+      });
+    }
+    expect(style(textNode(Strings.Connection.Summary.Disconnect)).color).toBe(
+      colors.text,
+    );
+    expect(style(control('connection-forget'))).toMatchObject({
+      backgroundColor: colors.dangerSurface,
+      minHeight: 48,
+      borderRadius: 14,
+    });
+    const card = textNode(Strings.Connection.Summary.Registry).parent;
+    expect(style(card)).toMatchObject({
+      borderRadius: 20,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      gap: 12,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: StyleSheet.hairlineWidth,
+    });
+  },
+);
+
+it('styles share failures and disabled forgetting without changing their actions', async () => {
+  jest.spyOn(Share, 'share').mockRejectedValue(new Error('share unavailable'));
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  let finish;
+  cancel.mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        finish = resolve;
+      }),
+  );
+  act(() => {
+    view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+  });
+  act(() => press('Connection details'));
+  await act(async () => {
+    await press(Strings.Connection.Summary.Share);
+  });
+  const failure = view.root
+    .findAllByType('Text')
+    .find(
+      node => node.props.children === Strings.Connection.Summary.ShareFailed,
+    );
+  expect(StyleSheet.flatten(failure.props.style)).toMatchObject({
+    color: palette(false).danger,
+    fontSize: 13,
+    lineHeight: 18,
+  });
+  expect(failure.props.accessibilityLiveRegion).toBe('polite');
+  act(() => press(Strings.Connection.Summary.Forget));
+  let pending;
+  act(() => {
+    pending = alert.mock.calls[0][2]
+      .find(button => button.style === 'destructive')
+      .onPress();
+  });
+  const forget = view.root.findAllByProps({testID: 'connection-forget'})[0];
+  expect(forget.props.disabled).toBe(true);
+  expect(forget.props.accessibilityState.disabled).toBe(true);
+  expect(StyleSheet.flatten(forget.props.style).opacity).toBe(0.5);
+  await act(async () => {
+    finish();
+    await pending;
+  });
+  expect(cancel).toHaveBeenCalledWith({clear: true});
+});

@@ -1,6 +1,6 @@
 import React, {useContext} from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {Linking} from 'react-native';
+import {Linking, Platform, StyleSheet} from 'react-native';
 import * as Keychain from 'react-native-keychain';
 import AzureContextPanel from '../src/components/azureContextPanel';
 import StorageProvider, {
@@ -9,8 +9,10 @@ import StorageProvider, {
 } from '../src/contexts/storage';
 import {decodeAzureContextInput} from '../src/onboarding/azureContextInput';
 import Strings from '../src/strings';
+import {useTheme} from '../src/hooks';
+import {palette} from '../src/theme/palette';
 
-jest.mock('../src/hooks', () => ({useTheme: () => ({dark: false})}));
+jest.mock('../src/hooks', () => ({useTheme: jest.fn(() => ({dark: false}))}));
 jest.mock('../src/components/typography', () => ({Text: 'Text'}));
 
 const subscription = '11111111-2222-4333-8444-555555555555';
@@ -72,6 +74,7 @@ const press = async id => {
 };
 beforeEach(async () => {
   jest.clearAllMocks();
+  useTheme.mockReturnValue({dark: false});
   Keychain.setGenericPassword.mockReset().mockResolvedValue(true);
   Keychain.getGenericPassword.mockReset().mockResolvedValue(false);
   Keychain.resetGenericPassword.mockReset().mockResolvedValue(true);
@@ -247,4 +250,156 @@ test('supports canonical Base64 without accepting corrupted UTF-8 or credential 
   expect(() =>
     decodeAzureContextInput(JSON.stringify({deviceKey: 'not-a-snapshot'})),
   ).toThrow();
+});
+
+test.each([false, true])(
+  'keeps the snapshot recessed, names neutral and disclosed IDs selectable (dark %s)',
+  async dark => {
+    useTheme.mockReturnValue({dark});
+    const snapshot = fixture();
+    snapshot.namespace.name = `namespace-${'long-name-'.repeat(5)}end`;
+    snapshot.namespace.resourceId = `${scope}/providers/Microsoft.DeviceRegistry/namespaces/${snapshot.namespace.name}`;
+    snapshot.activities[0].resourceId = `${snapshot.namespace.resourceId}/registryDevices/another-device`;
+    snapshot.activities.push({...snapshot.activities[0], status: 'Failed'});
+    await act(async () => {
+      await storage.save({azureContext: snapshot});
+    });
+    const colors = palette(dark);
+    const style = node => StyleSheet.flatten(node.props.style);
+    const textNode = content =>
+      tree.root
+        .findAllByType('Text')
+        .find(node => node.props.children === content);
+    expect(style(control('azure-context-panel'))).toMatchObject({
+      backgroundColor: colors.inset,
+      borderRadius: 20,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      gap: 12,
+    });
+    expect(style(control('azure-context-panel')).borderWidth).toBeUndefined();
+    const name = control('azure-context-namespace');
+    expect(name.props.children).toBe(snapshot.namespace.name);
+    expect(name.props.selectable).toBe(true);
+    expect(style(name)).toEqual(style(textNode(Strings.AzureContext.Title)));
+    expect(style(name)).toMatchObject({
+      fontSize: 17,
+      lineHeight: 24,
+      fontWeight: '600',
+      letterSpacing: -0.2,
+      color: colors.text,
+    });
+    await press('azure-context-toggle');
+    const resourceName = control('azure-context-subscription');
+    expect(style(resourceName)).toMatchObject({
+      fontSize: 15,
+      lineHeight: 22,
+      fontWeight: '400',
+      color: colors.text,
+    });
+    expect(style(resourceName).fontFamily).toBeUndefined();
+    expect(style(resourceName.parent).paddingTop).toBeUndefined();
+    let row = resourceName.parent;
+    while (row && style(row)?.borderTopWidth === undefined) {
+      row = row.parent;
+    }
+    expect(style(row)).toMatchObject({
+      paddingVertical: 14,
+      gap: 4,
+      borderTopWidth: StyleSheet.hairlineWidth,
+    });
+    await press('azure-context-ids');
+    await press('azure-context-activities');
+    for (const resourceId of [
+      snapshot.namespace.resourceId,
+      snapshot.activities[0].resourceId,
+    ]) {
+      const node = textNode(resourceId);
+      expect(node.props.selectable).toBe(true);
+      expect(style(node)).toMatchObject({
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        fontSize: 14,
+        lineHeight: 22,
+      });
+    }
+    expect(style(textNode('Succeeded')).color).toBe(colors.text);
+    expect(style(textNode('Failed')).color).toBe(colors.danger);
+    expect(style(textNode(Strings.AzureContext.Activities))).toEqual(
+      style(name),
+    );
+    expect(content()).toContain(Strings.AzureContext.Source);
+    expect(content()).toContain(Strings.AzureContext.ActivityExplanation);
+    for (const id of [
+      'azure-context-toggle',
+      'azure-context-ids',
+      'azure-context-activities',
+    ]) {
+      expect(style(control(id)).minHeight).toBe(48);
+      expect(style(control(id)).backgroundColor).toBeUndefined();
+    }
+    expect(style(control('azure-context-import-toggle'))).toMatchObject({
+      minHeight: 48,
+      borderRadius: 14,
+      backgroundColor: colors.surface,
+    });
+    for (const node of tree.root.findAllByType('Text')) {
+      expect(node.props.numberOfLines).toBeUndefined();
+      expect(node.props.maxFontSizeMultiplier).toBeUndefined();
+      expect(node.props.allowFontScaling).not.toBe(false);
+    }
+  },
+);
+
+test('keeps importing controls visibly disabled while saving and reports failure in danger', async () => {
+  await act(async () => {
+    await storage.save({azureContext: fixture()});
+  });
+  await press('azure-context-toggle');
+  await enter();
+  let finish;
+  Keychain.setGenericPassword.mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        finish = resolve;
+      }),
+  );
+  let pending;
+  await act(async () => {
+    pending = control('azure-context-import').props.onPress();
+  });
+  const input = control('azure-context-input');
+  expect(input.props.editable).toBe(false);
+  expect(StyleSheet.flatten(input.props.style)).toMatchObject({
+    borderRadius: 14,
+    borderColor: palette(false).controlBorder,
+    backgroundColor: palette(false).inset,
+    opacity: 0.5,
+    fontSize: 15,
+    lineHeight: 22,
+  });
+  for (const node of tree.root.findAll(
+    node =>
+      node.props.onPress &&
+      ['button', 'link'].includes(node.props.accessibilityRole),
+  )) {
+    expect(node.props.disabled).toBe(true);
+    expect(node.props.accessibilityState.disabled).toBe(true);
+    expect(StyleSheet.flatten(node.props.style).opacity).toBe(0.5);
+  }
+  await act(async () => {
+    finish(false);
+    await pending;
+  });
+  expect(control('azure-context-error').props.children).toBe(
+    Strings.AzureContext.SaveFailed,
+  );
+  expect(
+    StyleSheet.flatten(control('azure-context-error').props.style),
+  ).toMatchObject({
+    color: palette(false).danger,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  });
+  expect(control('azure-context-input').props.editable).toBe(true);
 });

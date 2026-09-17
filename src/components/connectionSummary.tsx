@@ -25,6 +25,7 @@ import Strings from 'strings';
 import {connectionDiagnostics} from '../onboarding/diagnostics';
 import {ProofActivity} from '../onboarding/proof';
 import {palette} from '../theme/palette';
+import {detailStyles} from '../theme/detailStyles';
 import ConnectionNotice from './connectionNotice';
 import {Icon} from '@rneui/themed';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -281,7 +282,9 @@ export default function ConnectionSummary({
                 styles.sheetHeader,
                 {borderBottomColor: appearance.border},
               ]}>
-              <Text accessibilityRole="header" style={styles.sheetTitle}>
+              <Text
+                accessibilityRole="header"
+                style={[styles.sheetTitle, {color: appearance.text}]}>
                 {text.Details}
               </Text>
               <Pressable
@@ -289,7 +292,7 @@ export default function ConnectionSummary({
                 accessibilityRole="button"
                 accessibilityLabel={Strings.Core.Close}
                 onPress={() => setDetails(false)}
-                style={[styles.close, {backgroundColor: appearance.surface}]}>
+                style={[styles.close, {backgroundColor: appearance.inset}]}>
                 <Text style={[styles.actionText, {color: appearance.primary}]}>
                   {Strings.Core.Close}
                 </Text>
@@ -304,29 +307,43 @@ export default function ConnectionSummary({
               contentContainerStyle={styles.details}>
               <View
                 style={[
-                  styles.metadata,
-                  {backgroundColor: appearance.surface},
+                  detailStyles.card,
+                  detailStyles.bordered,
+                  {
+                    backgroundColor: appearance.surface,
+                    borderColor: appearance.border,
+                  },
                 ]}>
-                {identity.map((detail, index) => (
-                  <DetailValue
-                    key={detail.label}
-                    {...detail}
-                    mono
-                    divided={index > 0}
-                  />
-                ))}
-                {session.map((detail, index) => (
-                  <DetailValue
-                    key={detail.label}
-                    {...detail}
-                    divided={index > 0 || identity.length > 0}
-                  />
-                ))}
+                <View>
+                  {identity.map((detail, index) => (
+                    <DetailValue
+                      key={detail.label}
+                      {...detail}
+                      mono={
+                        detail.valueTestID === 'assigned-device-id' ||
+                        detail.valueTestID === 'registration-id'
+                      }
+                      divided={index > 0}
+                    />
+                  ))}
+                  {session.map((detail, index) => (
+                    <DetailValue
+                      key={detail.label}
+                      {...detail}
+                      mono={detail.label === text.Operation}
+                      divided={index > 0 || identity.length > 0}
+                    />
+                  ))}
+                </View>
               </View>
               <View
                 style={[
-                  styles.metadata,
-                  {backgroundColor: appearance.surface},
+                  detailStyles.card,
+                  detailStyles.bordered,
+                  {
+                    backgroundColor: appearance.surface,
+                    borderColor: appearance.border,
+                  },
                 ]}>
                 {client && (
                   <Pressable
@@ -349,8 +366,7 @@ export default function ConnectionSummary({
                     }}
                     style={[
                       styles.action,
-                      client ? styles.divided : null,
-                      {borderTopColor: appearance.border},
+                      {backgroundColor: appearance.inset},
                     ]}>
                     <Text
                       style={[styles.actionText, {color: appearance.primary}]}>
@@ -367,8 +383,7 @@ export default function ConnectionSummary({
                   }}
                   style={[
                     styles.action,
-                    client || credentials ? styles.divided : null,
-                    {borderTopColor: appearance.border},
+                    {backgroundColor: appearance.inset},
                   ]}>
                   <Text
                     style={[styles.actionText, {color: appearance.primary}]}>
@@ -378,10 +393,16 @@ export default function ConnectionSummary({
               </View>
               <View
                 style={[
-                  styles.registry,
-                  {backgroundColor: appearance.surface},
+                  detailStyles.card,
+                  detailStyles.bordered,
+                  {
+                    backgroundColor: appearance.surface,
+                    borderColor: appearance.border,
+                  },
                 ]}>
-                <Text style={[styles.label, {color: appearance.muted}]}>
+                <Text
+                  accessibilityRole="header"
+                  style={[detailStyles.sectionTitle, {color: appearance.text}]}>
                   {text.Registry}
                 </Text>
                 <Text
@@ -390,12 +411,14 @@ export default function ConnectionSummary({
                     styles.registryBadge,
                     {
                       backgroundColor: appearance.inset,
-                      color: appearance.text,
+                      borderColor: appearance.border,
+                      color: appearance.muted,
                     },
                   ]}>
                   {text.NotChecked}
                 </Text>
-                <Text style={[styles.supporting, {color: appearance.muted}]}>
+                <Text
+                  style={[detailStyles.supporting, {color: appearance.muted}]}>
                   {text.RegistryExplanation}
                 </Text>
               </View>
@@ -412,7 +435,7 @@ export default function ConnectionSummary({
                 accessibilityLabel={text.Share}
                 style={[
                   styles.secondaryAction,
-                  {backgroundColor: appearance.surface},
+                  {backgroundColor: appearance.inset},
                 ]}
                 onPress={async () => {
                   setShareFailed(false);
@@ -441,7 +464,11 @@ export default function ConnectionSummary({
                 </Text>
               </Pressable>
               {shareFailed && (
-                <Text accessibilityLiveRegion="polite">{text.ShareFailed}</Text>
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={[detailStyles.status, {color: appearance.danger}]}>
+                  {text.ShareFailed}
+                </Text>
               )}
               {credentials && (
                 <Pressable
@@ -453,6 +480,7 @@ export default function ConnectionSummary({
                   style={[
                     styles.secondaryAction,
                     {backgroundColor: appearance.dangerSurface},
+                    (forgetting || loading) && detailStyles.disabled,
                   ]}
                   onPress={() =>
                     Alert.alert(text.ForgetTitle, text.ForgetMessage, [
@@ -580,9 +608,9 @@ function DetailValue({
         selectable
         testID={valueTestID}
         style={[
-          styles.metadataValue,
-          mono ? styles.monospace : null,
-          tone ? {color: tone} : null,
+          detailStyles.value,
+          mono ? detailStyles.monospace : null,
+          {color: tone ?? appearance.text},
         ]}>
         {value}
       </Text>
@@ -676,12 +704,12 @@ const styles = StyleSheet.create({
   },
   stackedAction: {alignSelf: 'stretch'},
   pressedPill: {transform: [{scale: 0.97}]},
-  label: {fontSize: 12, lineHeight: 18, fontWeight: '500'},
+  label: detailStyles.label,
   supporting: {fontSize: 12, lineHeight: 17},
   notice: {paddingTop: 8},
-  action: {minHeight: 52, justifyContent: 'center'},
-  divided: {borderTopWidth: StyleSheet.hairlineWidth},
-  actionText: {fontSize: 15, fontWeight: '600'},
+  action: detailStyles.action,
+  divided: detailStyles.divided,
+  actionText: detailStyles.actionLabel,
   rowAction: {fontSize: 13, lineHeight: 19, fontWeight: '600', flexShrink: 1},
   sheet: {flex: 1},
   handle: {
@@ -703,42 +731,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sheetTitle: {
-    fontSize: 24,
-    lineHeight: 31,
-    fontWeight: '600',
-    letterSpacing: -0.5,
+    ...detailStyles.sheetTitle,
     flexShrink: 1,
   },
-  close: {
-    minHeight: 48,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    borderRadius: 24,
-  },
+  close: detailStyles.action,
   scroll: {flex: 1},
   details: {paddingHorizontal: 20, paddingBottom: 48, gap: 16},
-  metadata: {paddingHorizontal: 20, paddingVertical: 4, borderRadius: 24},
-  detailValue: {gap: 5, paddingVertical: 12},
-  metadataValue: {fontSize: 15, lineHeight: 22, flexShrink: 1},
-  monospace: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  registry: {padding: 20, borderRadius: 24, gap: 10},
+  detailValue: detailStyles.row,
   registryBadge: {
+    ...detailStyles.status,
+    ...detailStyles.bordered,
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    fontSize: 13,
-    fontWeight: '600',
   },
   secondaryAction: {
-    minHeight: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 18,
+    ...detailStyles.action,
+    ...detailStyles.centered,
   },
 });
