@@ -116,6 +116,12 @@ export type ItemProps = {
   simulated: boolean;
   availability?: 'checking' | 'available' | 'unavailable';
   editable?: boolean;
+  presentation?: {
+    description?: string;
+    emptyLabel?: string;
+    placeholder?: string;
+    actionLabel?: string;
+  };
   retry?(): void;
   enable(value?: boolean): void;
   sendInterval(value: number): void;

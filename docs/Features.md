@@ -18,9 +18,18 @@ The following screenshot shows a device view in IoT Central that displays some o
 
 ## Properties
 
-The app reports device status, such as device model and manufacturer. There's also an editable property that you can modify and see the change synchronize in your AzureIoT solution:
+The app reports device information, such as its model and manufacturer. Property
+names use a quiet label above the more prominent value, matching telemetry cards.
+Unavailable device information is labelled **Not reported by this device**.
 
-![Properties](./media/properties.png)
+**Cloud property** shows **Waiting for a cloud update** until the device receives
+a value. **Device property** starts with an empty input and a helpful placeholder;
+no sample value is submitted as if you had entered it. Enter a value and select
+**Submit value** to send it through the connected device client. Local submission
+is not independent confirmation that a downstream cloud application received it.
+The property IDs and Plug and Play payloads are unchanged.
+
+![Properties (earlier UI)](./media/properties.png)
 
 The following screenshot shows the writable property in IoT Central after the property was sent to the device:
 
