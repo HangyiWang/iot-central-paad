@@ -58,8 +58,13 @@ it('retains only the latest 500 sanitized entries and does not retain caller obj
   expect(context.logs).toHaveLength(MAX_LOG_ENTRIES);
   expect(context.logs[0].logItem.eventData).toBe('event-51');
   expect(context.logs.at(-1).logItem).not.toBe(item);
+  expect(new Set(context.logs.map(entry => entry.id)).size).toBe(
+    MAX_LOG_ENTRIES,
+  );
+  const lastId = context.logs.at(-1).id;
   expect(JSON.stringify(context.logs)).not.toContain('private-fixture');
   act(() => context.clear());
   expect(context.logs).toHaveLength(1);
+  expect(context.logs[0].id).toBeGreaterThan(lastId);
   act(() => view.unmount());
 });

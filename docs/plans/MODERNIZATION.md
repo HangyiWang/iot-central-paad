@@ -245,6 +245,15 @@ into fixed-height tiles. Settings are grouped, while availability and simulation
 remain explicit text rather than color-only signals. Reference artwork is not
 copied into the app.
 
+The activity log follows the references' timeline/list pattern: severity icons
+and text badges, timestamps, rounded event cards, optional issue filtering and
+expandable selectable payloads. Chronological ordering and the 500-entry,
+redacted in-memory limit are preserved; stable entry IDs prevent expanded rows
+from being reused for different events. Upload content scrolls and sizes within
+its page rather than using the whole display height. Bluetooth uses the shared
+app header, with its scan control and explicit empty/unavailable states in the
+page content.
+
 Each UI PR must map changed screens to the applicable HIG rows and include
 light/dark, enlarged-text, keyboard and error-state evidence. An Android emulator
 cannot establish iOS HIG conformance. Require physical-iPhone VoiceOver, large
