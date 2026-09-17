@@ -2,7 +2,7 @@ import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import ConnectionSummary from '../src/components/connectionSummary';
 import * as hooks from '../src/hooks';
-import {Alert, Share} from 'react-native';
+import {Alert, Share, Modal, Platform} from 'react-native';
 import {PHONE_MODEL_ID} from '../src/connection/types';
 jest.mock('@rneui/themed', () => ({Icon: 'Icon'}));
 
@@ -71,6 +71,9 @@ it('opens scrollable details with value-only IDs and local-only destructive forg
     view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
   });
   act(() => press('Connection details'));
+  expect(view.root.findByType(Modal).props.allowSwipeDismissal).toBe(
+    Platform.OS === 'ios',
+  );
   const value = id =>
     view.root.findAllByType('Text').find(node => node.props.testID === id)
       ?.props.children;
@@ -118,6 +121,15 @@ it('keeps the status row compact and preserves all actions and exact identity in
   expect(text()).not.toContain('registration-id');
   expect(text()).toContain('Connected');
   expect(text()).not.toContain('connection-disconnect');
+  const disclosure = view.root
+    .findAllByProps({testID: 'connection-details'})
+    .find(node => node.props.onPress);
+  expect(disclosure.props.hitSlop).toBeDefined();
+  expect(
+    view.root
+      .findAllByType('Icon')
+      .some(icon => icon.props.name === 'chevron-right'),
+  ).toBe(true);
   act(() => press('Connection details'));
   expect(text()).toContain('Exact-Assigned-ID');
   expect(text()).toContain('assigned.azure-devices.net');

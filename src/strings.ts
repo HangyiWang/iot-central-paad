@@ -45,6 +45,7 @@ const Strings = {
       Registration: 'Registration ID',
       Operation: 'Operation ID',
       Stage: 'Connection stage',
+      ErrorCode: 'Error code',
       Registry: 'Registry status',
       NotChecked: 'Not checked',
       RegistryExplanation:

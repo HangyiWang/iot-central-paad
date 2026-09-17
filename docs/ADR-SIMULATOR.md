@@ -116,6 +116,10 @@ Connected pages use a compact **Cloud connection** status row. Tap **Details**
 to see the full assigned device ID, Hub and model, or to disconnect, reconnect
 or open manual connection settings. Identity values remain selectable and are
 not shortened; they no longer occupy the top of every tab.
+The connection busy state uses an accessible in-tree overlay so it does not
+compete with the Details sheet's native iOS presentation. Other screen-local
+loading dialogs retain their native blocking behavior. This is presentation
+hardening, not independent evidence of a successful cloud connection.
 
 Open connection details and submit a unique proof nonce. The app sends telemetry
 and a reported property:

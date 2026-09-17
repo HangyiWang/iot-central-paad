@@ -102,149 +102,157 @@ const Navigation = React.memo(() => {
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      <Stack.Navigator
-        initialRouteName={simulated ? Pages.ROOT : Pages.REGISTRATION}
-        screenOptions={({navigation, route}) => {
-          const childRoute = getFocusedRouteNameFromRoute(route);
-          const registrationHasHeader =
-            route.name === Pages.REGISTRATION &&
-            (childRoute === RegistrationScreens.QR ||
-              (childRoute === RegistrationScreens.MANUAL &&
-                (registeringNew || !client?.isConnected())));
-          const defaultOptions = {
-            gestureEnabled: false,
-            headerBackButtonDisplayMode: 'minimal' as const,
-            headerShown: !registrationHasHeader,
-          };
-          if (
-            route.name === Pages.ROOT ||
-            (route.name === Pages.REGISTRATION && !route.params?.previousScreen)
-          ) {
-            return {
-              ...defaultOptions,
+      <View
+        testID="navigation-content"
+        style={{flex: 1}}
+        accessibilityElementsHidden={loading}
+        importantForAccessibility={loading ? 'no-hide-descendants' : 'auto'}>
+        <Stack.Navigator
+          initialRouteName={simulated ? Pages.ROOT : Pages.REGISTRATION}
+          screenOptions={({navigation, route}) => {
+            const childRoute = getFocusedRouteNameFromRoute(route);
+            const registrationHasHeader =
+              route.name === Pages.REGISTRATION &&
+              (childRoute === RegistrationScreens.QR ||
+                (childRoute === RegistrationScreens.MANUAL &&
+                  (registeringNew || !client?.isConnected())));
+            const defaultOptions = {
+              gestureEnabled: false,
+              headerBackButtonDisplayMode: 'minimal' as const,
               headerShown: !registrationHasHeader,
-              headerTitle: () => (
-                <Text
-                  style={{
-                    ...styles.logoText,
-                    color: colors.text,
-                  }}>
-                  {Strings.Title}
-                </Text>
-              ),
-              headerTitleAlign: 'left',
-              headerLeft: () => <Logo />,
-              headerRight: () => (
-                <View style={styles.headerButtons}>
-                  <Profile navigate={navigation.navigate} />
-                </View>
-              ),
             };
-          }
-          return defaultOptions;
-        }}>
-        {/* @ts-ignore */}
-        <Stack.Screen name={Pages.ROOT} component={Home} />
-        {/* @ts-ignore */}
-        <Stack.Screen name={Pages.REGISTRATION} component={Registration} />
-        <Stack.Screen
-          name={Pages.INSIGHT}
-          //@ts-ignore
-          component={Chart}
-          options={({route}) => {
-            let data = {};
-            if (route.params) {
-              const params = route.params as NavigationParams;
-              if (params.title) {
-                data = {...data, headerTitle: params.title};
-              }
-              if (params.backTitle) {
-                data = {...data, headerBackTitle: params.backTitle};
-              }
+            if (
+              route.name === Pages.ROOT ||
+              (route.name === Pages.REGISTRATION &&
+                !route.params?.previousScreen)
+            ) {
+              return {
+                ...defaultOptions,
+                headerShown: !registrationHasHeader,
+                headerTitle: () => (
+                  <Text
+                    style={{
+                      ...styles.logoText,
+                      color: colors.text,
+                    }}>
+                    {Strings.Title}
+                  </Text>
+                ),
+                headerTitleAlign: 'left',
+                headerLeft: () => <Logo />,
+                headerRight: () => (
+                  <View style={styles.headerButtons}>
+                    <Profile navigate={navigation.navigate} />
+                  </View>
+                ),
+              };
             }
-            return data;
-          }}
-        />
-        <Stack.Screen name={Pages.SETTINGS} component={Settings} />
-        <Stack.Screen
-          name={Pages.THEME}
-          options={() => ({
-            stackAnimation: 'flip',
-            headerTitle: Platform.select({
-              ios: undefined,
-              android: Pages.THEME,
-            }),
-          })}>
-          {() => (
-            <Options
-              items={[
-                {
-                  id: 'DEVICE',
-                  name: Strings.Settings.Theme.Device.Name,
-                  details: Strings.Settings.Theme.Device.Detail,
-                },
-                {
-                  id: 'DARK',
-                  name: Strings.Settings.Theme.Dark.Name,
-                  details: Strings.Settings.Theme.Dark.Detail,
-                },
-                {
-                  id: 'LIGHT',
-                  name: Strings.Settings.Theme.Light.Name,
-                  details: Strings.Settings.Theme.Light.Detail,
-                },
-              ]}
-              defaultId={themeType}
-              onChange={(item: Option) => {
-                setThemeMode(item.id);
-              }}
-            />
-          )}
-        </Stack.Screen>
-        <Stack.Screen
-          name={Pages.INTERVAL}
-          options={() => ({
-            stackAnimation: 'flip',
-            headerTitle: Platform.select({
-              ios: undefined,
-              android: Pages.INTERVAL,
-            }),
-          })}>
-          {() => (
-            <Options
-              items={[
-                {
-                  id: '2',
-                  name: Strings.Settings.DeliveryInterval[2],
-                },
-                {
-                  id: '5',
-                  name: Strings.Settings.DeliveryInterval[5],
-                },
-                {
-                  id: '10',
-                  name: Strings.Settings.DeliveryInterval[10],
-                },
-                {
-                  id: '30',
-                  name: Strings.Settings.DeliveryInterval[30],
-                },
-                {
-                  id: '45',
-                  name: Strings.Settings.DeliveryInterval[45],
-                },
-              ]}
-              defaultId={`${deliveryInterval}`}
-              onChange={async (item: Option) => {
-                await setDeliveryInterval(+item.id);
-              }}
-            />
-          )}
-        </Stack.Screen>
-      </Stack.Navigator>
+            return defaultOptions;
+          }}>
+          {/* @ts-ignore */}
+          <Stack.Screen name={Pages.ROOT} component={Home} />
+          {/* @ts-ignore */}
+          <Stack.Screen name={Pages.REGISTRATION} component={Registration} />
+          <Stack.Screen
+            name={Pages.INSIGHT}
+            //@ts-ignore
+            component={Chart}
+            options={({route}) => {
+              let data = {};
+              if (route.params) {
+                const params = route.params as NavigationParams;
+                if (params.title) {
+                  data = {...data, headerTitle: params.title};
+                }
+                if (params.backTitle) {
+                  data = {...data, headerBackTitle: params.backTitle};
+                }
+              }
+              return data;
+            }}
+          />
+          <Stack.Screen name={Pages.SETTINGS} component={Settings} />
+          <Stack.Screen
+            name={Pages.THEME}
+            options={() => ({
+              stackAnimation: 'flip',
+              headerTitle: Platform.select({
+                ios: undefined,
+                android: Pages.THEME,
+              }),
+            })}>
+            {() => (
+              <Options
+                items={[
+                  {
+                    id: 'DEVICE',
+                    name: Strings.Settings.Theme.Device.Name,
+                    details: Strings.Settings.Theme.Device.Detail,
+                  },
+                  {
+                    id: 'DARK',
+                    name: Strings.Settings.Theme.Dark.Name,
+                    details: Strings.Settings.Theme.Dark.Detail,
+                  },
+                  {
+                    id: 'LIGHT',
+                    name: Strings.Settings.Theme.Light.Name,
+                    details: Strings.Settings.Theme.Light.Detail,
+                  },
+                ]}
+                defaultId={themeType}
+                onChange={(item: Option) => {
+                  setThemeMode(item.id);
+                }}
+              />
+            )}
+          </Stack.Screen>
+          <Stack.Screen
+            name={Pages.INTERVAL}
+            options={() => ({
+              stackAnimation: 'flip',
+              headerTitle: Platform.select({
+                ios: undefined,
+                android: Pages.INTERVAL,
+              }),
+            })}>
+            {() => (
+              <Options
+                items={[
+                  {
+                    id: '2',
+                    name: Strings.Settings.DeliveryInterval[2],
+                  },
+                  {
+                    id: '5',
+                    name: Strings.Settings.DeliveryInterval[5],
+                  },
+                  {
+                    id: '10',
+                    name: Strings.Settings.DeliveryInterval[10],
+                  },
+                  {
+                    id: '30',
+                    name: Strings.Settings.DeliveryInterval[30],
+                  },
+                  {
+                    id: '45',
+                    name: Strings.Settings.DeliveryInterval[45],
+                  },
+                ]}
+                defaultId={`${deliveryInterval}`}
+                onChange={async (item: Option) => {
+                  await setDeliveryInterval(+item.id);
+                }}
+              />
+            )}
+          </Stack.Screen>
+        </Stack.Navigator>
+      </View>
       <Loader
         visible={loading}
         modal={true}
+        nativeModal={false}
         message={Strings.Connection.Stages[stage]}
         buttons={[
           {

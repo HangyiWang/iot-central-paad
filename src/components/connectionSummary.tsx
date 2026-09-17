@@ -57,6 +57,42 @@ export default function ConnectionSummary({
   }, [client]);
   const text = Strings.Connection.Summary;
   const operationId = error?.operationId ?? client?.identity?.operationId;
+  const identity =
+    client?.identity && !simulated
+      ? [
+          {
+            label: text.Device,
+            value: client.identity.deviceId,
+            valueTestID: 'assigned-device-id',
+          },
+          {
+            label: text.Hub,
+            value: client.identity.assignedHub,
+            valueTestID: 'assigned-hub',
+          },
+          {
+            label: text.Model,
+            value: client.identity.modelId,
+            valueTestID: 'model-id',
+          },
+          ...(client.identity.registrationId
+            ? [
+                {
+                  label: text.Registration,
+                  value: client.identity.registrationId,
+                  valueTestID: 'registration-id',
+                },
+              ]
+            : []),
+        ]
+      : [];
+  const session = [
+    ...(operationId ? [{label: text.Operation, value: operationId}] : []),
+    {label: text.Stage, value: Strings.Connection.Stages[stage]},
+    ...(error
+      ? [{label: text.ErrorCode, value: error.code, tone: appearance.danger}]
+      : []),
+  ];
   return (
     <View
       testID="connection-summary"
@@ -132,13 +168,14 @@ export default function ConnectionSummary({
             accessibilityRole="button"
             accessibilityLabel={text.Details}
             onPress={() => setDetails(true)}
+            hitSlop={8}
             style={styles.detailsAction}>
-            <Text style={[styles.actionText, {color: appearance.primary}]}>
+            <Text style={[styles.rowAction, {color: appearance.primary}]}>
               {text.OpenDetails}
             </Text>
             <View accessible={false}>
               <Icon
-                name="chevron-down"
+                name="chevron-right"
                 type="material-community"
                 color={appearance.primary}
                 size={18}
@@ -151,8 +188,9 @@ export default function ConnectionSummary({
             testID="connection-cancel"
             accessibilityRole="button"
             onPress={() => cancel()}
+            hitSlop={8}
             style={styles.detailsAction}>
-            <Text style={[styles.actionText, {color: appearance.primary}]}>
+            <Text style={[styles.rowAction, {color: appearance.primary}]}>
               {Strings.Core.Cancel}
             </Text>
           </Pressable>
@@ -172,7 +210,7 @@ export default function ConnectionSummary({
       )}
       {error && (
         <Text
-          style={{color: appearance.danger}}
+          style={[styles.supporting, {color: appearance.danger}]}
           accessibilityLiveRegion="polite">
           {error.message}
         </Text>
@@ -182,16 +220,23 @@ export default function ConnectionSummary({
           visible
           animationType="slide"
           presentationStyle="pageSheet"
+          allowSwipeDismissal={Platform.OS === 'ios'}
           onRequestClose={() => setDetails(false)}>
           <KeyboardAvoidingView
             testID="connection-details-sheet"
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={[styles.sheet, {backgroundColor: appearance.background}]}>
+            {Platform.OS === 'ios' && (
+              <View
+                style={[styles.handle, {backgroundColor: appearance.border}]}
+                accessible={false}
+              />
+            )}
             <View
-              style={[styles.handle, {backgroundColor: appearance.border}]}
-              accessible={false}
-            />
-            <View style={styles.sheetHeader}>
+              style={[
+                styles.sheetHeader,
+                {borderBottomColor: appearance.border},
+              ]}>
               <Text accessibilityRole="header" style={styles.sheetTitle}>
                 {text.Details}
               </Text>
@@ -218,89 +263,74 @@ export default function ConnectionSummary({
                   styles.metadata,
                   {backgroundColor: appearance.surface},
                 ]}>
-                {client?.identity && !simulated && (
-                  <>
-                    <DetailValue
-                      label={text.Device}
-                      value={client.identity.deviceId}
-                      valueTestID="assigned-device-id"
-                    />
-                    <DetailValue
-                      label={text.Hub}
-                      value={client.identity.assignedHub}
-                      valueTestID="assigned-hub"
-                    />
-                    <DetailValue
-                      label={text.Model}
-                      value={client.identity.modelId}
-                      valueTestID="model-id"
-                    />
-                    {client.identity.registrationId && (
-                      <DetailValue
-                        label={text.Registration}
-                        value={client.identity.registrationId}
-                        valueTestID="registration-id"
-                      />
-                    )}
-                  </>
-                )}
-                {operationId && (
-                  <DetailValue label={text.Operation} value={operationId} />
-                )}
-                <DetailValue
-                  label={text.Stage}
-                  value={Strings.Connection.Stages[stage]}
-                />
-                {error && (
-                  <Text selectable style={{color: appearance.danger}}>
-                    {error.code}
-                  </Text>
-                )}
-                <View style={styles.actions}>
-                  {client && (
-                    <Pressable
-                      testID="connection-disconnect"
-                      accessibilityRole="button"
-                      onPress={clear}
-                      style={styles.action}>
-                      <Text
-                        style={[styles.actionText, {color: appearance.muted}]}>
-                        {text.Disconnect}
-                      </Text>
-                    </Pressable>
-                  )}
-                  {credentials && !connected && (
-                    <Pressable
-                      testID="connection-reconnect"
-                      accessibilityRole="button"
-                      onPress={() => {
-                        setDetails(false);
-                        void connect(credentials);
-                      }}
-                      style={styles.action}>
-                      <Text
-                        style={[
-                          styles.actionText,
-                          {color: appearance.primary},
-                        ]}>
-                        {text.Reconnect}
-                      </Text>
-                    </Pressable>
-                  )}
+                {identity.map((detail, index) => (
+                  <DetailValue
+                    key={detail.label}
+                    {...detail}
+                    mono
+                    divided={index > 0}
+                  />
+                ))}
+                {session.map((detail, index) => (
+                  <DetailValue
+                    key={detail.label}
+                    {...detail}
+                    divided={index > 0 || identity.length > 0}
+                  />
+                ))}
+              </View>
+              <View
+                style={[
+                  styles.metadata,
+                  {backgroundColor: appearance.surface},
+                ]}>
+                {client && (
                   <Pressable
-                    testID="connection-manual"
+                    testID="connection-disconnect"
+                    accessibilityRole="button"
+                    onPress={clear}
+                    style={styles.action}>
+                    <Text style={[styles.actionText, {color: appearance.text}]}>
+                      {text.Disconnect}
+                    </Text>
+                  </Pressable>
+                )}
+                {credentials && !connected && (
+                  <Pressable
+                    testID="connection-reconnect"
                     accessibilityRole="button"
                     onPress={() => {
                       setDetails(false);
-                      onManualConnection();
+                      void connect(credentials);
                     }}
-                    style={styles.action}>
+                    style={[
+                      styles.action,
+                      client ? styles.divided : null,
+                      {borderTopColor: appearance.border},
+                    ]}>
                     <Text
                       style={[styles.actionText, {color: appearance.primary}]}>
-                      {text.Manual}
+                      {text.Reconnect}
                     </Text>
                   </Pressable>
-                </View>
+                )}
+                <Pressable
+                  testID="connection-manual"
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setDetails(false);
+                    onManualConnection();
+                  }}
+                  style={[
+                    styles.action,
+                    client || credentials ? styles.divided : null,
+                    {borderTopColor: appearance.border},
+                  ]}>
+                  <Text
+                    style={[styles.actionText, {color: appearance.primary}]}>
+                    {text.Manual}
+                  </Text>
+                </Pressable>
               </View>
               <View
                 style={[
@@ -423,16 +453,35 @@ function DetailValue({
   label,
   value,
   valueTestID,
+  mono,
+  tone,
+  divided,
 }: {
   label: string;
   value: string;
   valueTestID?: string;
+  mono?: boolean;
+  tone?: string;
+  divided?: boolean;
 }) {
   const {dark} = useTheme();
+  const appearance = palette(dark);
   return (
-    <View style={styles.detailValue}>
-      <Text style={[styles.label, {color: palette(dark).muted}]}>{label}</Text>
-      <Text selectable testID={valueTestID} style={styles.metadataValue}>
+    <View
+      style={[
+        styles.detailValue,
+        divided ? styles.divided : null,
+        {borderTopColor: appearance.border},
+      ]}>
+      <Text style={[styles.label, {color: appearance.muted}]}>{label}</Text>
+      <Text
+        selectable
+        testID={valueTestID}
+        style={[
+          styles.metadataValue,
+          mono ? styles.monospace : null,
+          tone ? {color: tone} : null,
+        ]}>
         {value}
       </Text>
     </View>
@@ -475,9 +524,10 @@ const styles = StyleSheet.create({
   },
   label: {fontSize: 12, lineHeight: 18, fontWeight: '500'},
   supporting: {fontSize: 13, lineHeight: 20},
-  actions: {flexDirection: 'row', flexWrap: 'wrap', gap: 16},
-  action: {minHeight: 48, justifyContent: 'center'},
-  actionText: {fontSize: 14, fontWeight: '600'},
+  action: {minHeight: 52, justifyContent: 'center'},
+  divided: {borderTopWidth: StyleSheet.hairlineWidth},
+  actionText: {fontSize: 15, fontWeight: '600'},
+  rowAction: {fontSize: 13, lineHeight: 19, fontWeight: '600'},
   sheet: {flex: 1},
   handle: {
     width: 40,
@@ -488,12 +538,14 @@ const styles = StyleSheet.create({
   },
   sheetHeader: {
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingTop: Platform.select({ios: 14, default: 20}),
+    paddingBottom: 14,
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sheetTitle: {
     fontSize: 24,
@@ -510,9 +562,14 @@ const styles = StyleSheet.create({
   },
   scroll: {flex: 1},
   details: {paddingHorizontal: 20, paddingBottom: 48, gap: 16},
-  metadata: {padding: 20, borderRadius: 24, gap: 18},
-  detailValue: {gap: 5},
+  metadata: {paddingHorizontal: 20, paddingVertical: 4, borderRadius: 24},
+  detailValue: {gap: 5, paddingVertical: 12},
   metadataValue: {fontSize: 15, lineHeight: 22, flexShrink: 1},
+  monospace: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 14,
+    lineHeight: 21,
+  },
   registry: {padding: 20, borderRadius: 24, gap: 10},
   registryBadge: {
     alignSelf: 'flex-start',

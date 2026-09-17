@@ -18,7 +18,7 @@ jest.mock('expo-camera', () => ({
 
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {Alert, AppState, TextInput} from 'react-native';
+import {Alert, AppState, Modal, TextInput} from 'react-native';
 import {requireNativeModule} from 'expo-modules-core';
 import {fetch as httpFetch} from 'expo/fetch';
 import * as Keychain from 'react-native-keychain';
@@ -197,11 +197,33 @@ test('manual individual DPS connects to returned identity and submits genuine co
     'synthetic-service-secret',
   );
   expect(Keychain.setGenericPassword).not.toHaveBeenCalled();
+  const presented = () =>
+    app.root.findAllByType(Modal).filter(node => node.props.visible);
   await act(async () => {
     press('connection-submit');
+  });
+  // The blocking busy state must not hold a native modal: iOS drops a sheet
+  // presented while a previous one is still dismissing.
+  expect(
+    app.root.findAllByProps({testID: 'app-busy-overlay'}).length,
+  ).toBeGreaterThan(0);
+  expect(presented()).toHaveLength(0);
+  expect(
+    app.root.findAllByProps({testID: 'navigation-content'})[0].props,
+  ).toMatchObject({
+    accessibilityElementsHidden: true,
+    importantForAccessibility: 'no-hide-descendants',
+  });
+  await act(async () => {
     await jest.advanceTimersByTimeAsync(500);
   });
   expect(value('connection-status')).toBe('Connected');
+  expect(
+    app.root.findAllByProps({testID: 'navigation-content'})[0].props,
+  ).toMatchObject({
+    accessibilityElementsHidden: false,
+    importantForAccessibility: 'auto',
+  });
   expect(value('assigned-device-id')).toBeUndefined();
   expect(destinations).toEqual([
     'wss://assigned.azure-devices.net/$iothub/websocket',
@@ -212,9 +234,11 @@ test('manual individual DPS connects to returned identity and submits genuine co
   expect(JSON.parse(httpFetch.mock.calls[0][1].body).payload.modelId).toBe(
     PHONE_MODEL_ID,
   );
+  expect(presented()).toHaveLength(0);
   await act(async () => {
     press('connection-details');
   });
+  expect(presented()).toHaveLength(1);
   expect(value('assigned-device-id')).toBe('Assigned-Phone');
   expect(value('assigned-hub')).toBe('assigned.azure-devices.net');
   expect(value('model-id')).toBe(PHONE_MODEL_ID);
