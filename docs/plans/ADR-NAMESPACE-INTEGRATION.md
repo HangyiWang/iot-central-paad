@@ -79,6 +79,18 @@ must not gain Azure management permissions. This future direction does not
 authorize a new backend, Azure sign-in implementation, resources or IAM changes in
 the current simulator acceptance work.
 
+### Native input gate (2026-09-17)
+
+Credential-free native XCTest replay `35276368490`, harness
+`4b7de135587988d45637ddde23aa299c26d11d56`, passed actual launch, manual
+navigation, exact synthetic inputs, masking, endpoint-after-key confirmation and
+cold startup. It reused the pre-secret app `bc0410e` from run `35264683214`;
+it does not establish cloud acceptance or execution of the newer header binary.
+The preceding replay isolated an input mismatch before Return. Individual public
+XCTest key actions passed where burst typing did not; the app's input behavior and
+strict assertions were not changed. Live iOS nonce/connected restoration still
+requires a fresh individual enrollment and independent operator confirmation.
+
 ### Recorded mobile evidence (2026-09-16)
 
 Credential-free Android replay `35149722810` and iOS replay `35149723154`
