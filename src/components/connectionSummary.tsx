@@ -173,9 +173,6 @@ export default function ConnectionSummary({
           />
         </View>
         <View style={styles.statusContent}>
-          <Text style={[styles.label, {color: appearance.muted}]}>
-            {text.Title}
-          </Text>
           <View style={styles.statusBadge}>
             <View
               accessible={false}
@@ -191,6 +188,7 @@ export default function ConnectionSummary({
             />
             <Text
               testID="connection-status"
+              accessibilityHint={text.Title}
               style={[
                 styles.statusText,
                 {

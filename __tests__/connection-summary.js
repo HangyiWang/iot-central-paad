@@ -155,6 +155,15 @@ it('keeps the status row compact and preserves all actions and exact identity in
   expect(text()).not.toContain('assigned.azure-devices.net');
   expect(text()).not.toContain('registration-id');
   expect(text()).toContain('Connected');
+  expect(
+    view.root
+      .findAllByType('Text')
+      .some(node => node.props.children === 'Cloud connection'),
+  ).toBe(false);
+  expect(
+    view.root.findAllByProps({testID: 'connection-status'})[0].props
+      .accessibilityHint,
+  ).toBe('Cloud connection');
   expect(text()).not.toContain('connection-disconnect');
   const disclosure = view.root
     .findAllByProps({testID: 'connection-details'})
