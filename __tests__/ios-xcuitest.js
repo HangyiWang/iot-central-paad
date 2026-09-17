@@ -483,7 +483,8 @@ test('native smoke never submits credentials and live cold restoration uses an a
   expect(swift).toContain('app.wait(for: .notRunning');
   expect(swift.match(/app.launchEnvironment = \[:\]/g)).toHaveLength(3);
   expect(swift).not.toMatch(/app\.launchEnvironment\s*=\s*(?:ProcessInfo|config)/);
-  const finalized = swift.split('private func finalize()')[1].split('private func refreshApplicationState')[0];
+  expect(swift).not.toContain('func finalize(');
+  const finalized = swift.split('private func emitFinalResult()')[1].split('private func refreshApplicationState')[0];
   expect(finalized).not.toContain('app.state');
   expect(finalized).toContain('failureCount');
   expect(finalized).toContain('stage == .finished && applicationState == .notRunning');

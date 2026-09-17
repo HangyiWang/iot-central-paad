@@ -181,7 +181,7 @@ final class PaadLiveUITests: XCTestCase {
     }
     // The authoritative record was already emitted by the test body; repeating
     // it here costs no automation query and survives an aborted flow.
-    finalize()
+    emitFinalResult()
     super.tearDown()
   }
 
@@ -246,7 +246,7 @@ final class PaadLiveUITests: XCTestCase {
 
     try terminateApp()
     advance(to: .finished, queryingState: false)
-    finalize()
+    emitFinalResult()
   }
 
   private func runLive(_ config: CaseConfig) throws {
@@ -308,7 +308,7 @@ final class PaadLiveUITests: XCTestCase {
 
     try terminateApp()
     advance(to: .finished, queryingState: false)
-    finalize()
+    emitFinalResult()
   }
 
   // MARK: Flow steps
@@ -670,7 +670,7 @@ final class PaadLiveUITests: XCTestCase {
 
   /// Emits the authoritative record. Never upgrades a recorded failure to a pass
   /// and never queries the application, so teardown cannot stall.
-  private func finalize() {
+  private func emitFinalResult() {
     let failed = recordedFailure || (testRun?.failureCount ?? 0) > 0
       || (testRun?.unexpectedExceptionCount ?? 0) > 0
     let complete = stage == .finished && applicationState == .notRunning
