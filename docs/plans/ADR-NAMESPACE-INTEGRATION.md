@@ -118,6 +118,27 @@ not distinguish missing capture from missing controls. Temporary device inputs
 were removed. The modal-handoff change is not established as a fix for these
 automation failures.
 
+The final Android UI from run `35227323436`, source
+`d9e8b63034ab6f5b25e2ad70d4a2018af30cc212`, was installed over the retained CI
+app without clearing credentials. Native interaction confirmed the compact row,
+expandable/filterable logs, utility-page layout and exact identity/model.
+The details Close button now works at its center outside the system bar, and
+the log disclosure measured 126 pixels at 420 dpi (48 dp).
+APK SHA256:
+`9351ddfdfef90540887c5e7188cab2048e41cbb4a6d5e8094c2261c7a285cafd`.
+A fresh app-submitted nonce independently matched the Hub twin and existing
+automatic ADR record. A scoped process stop/relaunch restored Connected and the
+same identity without re-entry. This reuses the previously established Android
+registry-creation case rather than claiming a new record was created by the update.
+
+The subsequent iOS live run `35228256697` on source
+`63932ec1ea2a8d3cb1b3782cd0b15a62fbeb6568` again matched assignment, model and
+one automatic ADR record, but failed the initial Connected assertion before
+nonce submission. Its allowlisted category was an assertion failure; a captured
+hierarchy contained none of the fixed target names. That does not identify the
+cause or establish a driver disconnect. Temporary inputs were removed, and the
+iOS nonce/cold-restoration gate remains open.
+
 ## What the experiment proved, and what it did not
 
 The 2026-09-13 isolated cloud experiment used `azure-iot-device` Python SDK
