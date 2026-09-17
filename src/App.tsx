@@ -26,8 +26,6 @@ import {
   StorageContext,
   IoTCContext,
 } from 'contexts';
-import LogoLight from './assets/IoT-Plug-And-Play_Dark.svg';
-import LogoDark from './assets/IoT-Plug-And-Play_Light.svg';
 import {Icon} from '@rneui/themed';
 import {createStackNavigator} from '@react-navigation/stack';
 import {Welcome} from './Welcome';
@@ -47,7 +45,7 @@ import {Option} from 'components/options';
 import Options from 'components/options';
 import {TorchCameraHost} from './tools/Torch';
 import BrandTitle from './components/brandTitle';
-import {palette} from './theme/palette';
+import PhoneMark from './components/phoneMark';
 
 const Stack = createStackNavigator<NavigationPages>();
 
@@ -254,9 +252,7 @@ const Navigation = React.memo(() => {
   );
 });
 
-export const Logo = React.memo(function Logo() {
-  const {colors, dark} = useTheme();
-
+export const Logo = React.memo(function HeaderLogo() {
   return (
     <View
       testID="app-header-logo"
@@ -264,12 +260,8 @@ export const Logo = React.memo(function Logo() {
       accessible={false}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[styles.logoContainer, {backgroundColor: palette(dark).tints[0]}]}>
-      {dark ? (
-        <LogoDark width={22} height={22} fill={colors.primary} />
-      ) : (
-        <LogoLight width={22} height={22} fill={colors.primary} />
-      )}
+      style={styles.logoContainer}>
+      <PhoneMark />
     </View>
   );
 });
@@ -308,13 +300,12 @@ export const Profile = React.memo((props: {navigate: any}) => {
 
 export const styles = StyleSheet.create({
   logoContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    flexDirection: 'row',
+    width: 28,
+    height: 28,
     alignItems: 'center',
-    justifyContent: 'space-around',
-    marginHorizontal: 10,
+    justifyContent: 'center',
+    marginLeft: 14,
+    marginRight: 8,
   },
   logoText: {
     fontWeight: '600',

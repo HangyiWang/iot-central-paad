@@ -51,6 +51,12 @@ secure hardware and physical-phone suspension still require device acceptance.
 
 ### Optional local development
 
+The header uses the bundled Quicksand Bold typeface and an original rounded
+phone mark. The font is embedded by `expo-font` during native prebuild, without a
+runtime download; changing it requires rebuilding the native app, not only Metro.
+Its complete SIL Open Font License is bundled in the public app configuration and
+is readable under **Settings → Quicksand font license**.
+
 The application is available for both Android and iOS.
 It can run on a simulator as well (Android Studio or Xcode required).
 Unavailable hardware is reported as unavailable; generated data requires explicit

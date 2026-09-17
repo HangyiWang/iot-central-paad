@@ -1,3 +1,10 @@
+const fs = require('node:fs');
+const displayFont =
+  './node_modules/@expo-google-fonts/quicksand/700Bold/Quicksand_700Bold.ttf';
+const fontLicense = fs.readFileSync(
+  require.resolve('@expo-google-fonts/quicksand/LICENSE_FONT'),
+  'utf8',
+);
 const isCI =
   process.env.PAAD_VARIANT === 'ci' ||
   ['true', '1'].includes(process.env.CI) ||
@@ -14,6 +21,7 @@ module.exports = ({config}) => ({
   extra: {
     ...config.extra,
     androidMapsConfigured: Boolean(androidMapsKey),
+    headerFontLicense: fontLicense,
   },
   ios: {
     ...config.ios,
@@ -127,8 +135,15 @@ module.exports = ({config}) => ({
             './node_modules/react-native-vector-icons/Fonts/Ionicons.ttf',
             './node_modules/react-native-vector-icons/Fonts/MaterialIcons.ttf',
             './node_modules/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf',
+            {
+              fontFamily: 'Quicksand-Bold',
+              fontDefinitions: [
+                {path: displayFont, weight: 700, style: 'normal'},
+              ],
+            },
           ],
         },
+        ios: {fonts: [displayFont]},
       },
     ],
     ['./app.plugin.js', {isCI}],

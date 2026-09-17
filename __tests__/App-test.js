@@ -113,10 +113,12 @@ describe('App startup', () => {
       const logo = app.root.findByProps({testID: 'app-header-logo'});
       expect(logo.props.pointerEvents).toBe('none');
       expect(StyleSheet.flatten(logo.props.style)).toMatchObject({
-        width: 36,
-        height: 36,
-        borderRadius: 12,
+        width: 28,
+        height: 28,
+        marginLeft: 14,
+        marginRight: 8,
       });
+      expect(StyleSheet.flatten(logo.props.style).backgroundColor).toBeUndefined();
       const settings = app.root
         .findAllByProps({testID: 'app-settings'})
         .find(node => typeof node.type === 'string');

@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const base = require('../../app.json').expo;
 const configure = require('../../app.config');
 
@@ -13,11 +14,64 @@ assert.deepEqual(ci.ios.entitlements['keychain-access-groups'], [
 assert.equal(ci.ios.appleTeamId, undefined);
 const fonts = ci.plugins.find(plugin => plugin[0] === 'expo-font')[1];
 assert.equal(fonts.fonts, undefined);
-assert.equal(fonts.ios, undefined);
+const displayFont =
+  './node_modules/@expo-google-fonts/quicksand/700Bold/Quicksand_700Bold.ttf';
+assert.deepEqual(fonts.ios, {fonts: [displayFont]});
 assert.deepEqual(
-  fonts.android.fonts.map(font => font.split('/').pop()),
+  fonts.android.fonts
+    .filter(font => typeof font === 'string')
+    .map(font => font.split('/').pop()),
   ci.ios.infoPlist.UIAppFonts,
 );
+assert.deepEqual(
+  fonts.android.fonts.filter(font => typeof font === 'object'),
+  [
+    {
+      fontFamily: 'Quicksand-Bold',
+      fontDefinitions: [{path: displayFont, weight: 700, style: 'normal'}],
+    },
+  ],
+);
+assert.equal(
+  ci.extra.headerFontLicense,
+  fs.readFileSync(
+    require.resolve('@expo-google-fonts/quicksand/LICENSE_FONT'),
+    'utf8',
+  ),
+);
+assert.match(ci.extra.headerFontLicense, /SIL OPEN FONT LICENSE Version 1\.1/);
+assert.equal(
+  fs.readFileSync('LICENSE.quicksand', 'utf8').replace(/[ \t]+$/gm, '').trim(),
+  ci.extra.headerFontLicense.replace(/[ \t]+$/gm, '').trim(),
+);
+const font = fs.readFileSync(displayFont);
+const tables = new Map();
+for (let index = 0; index < font.readUInt16BE(4); index += 1) {
+  const entry = 12 + index * 16;
+  tables.set(
+    font.toString('ascii', entry, entry + 4),
+    font.readUInt32BE(entry + 8),
+  );
+}
+assert.equal(font.readUInt16BE(tables.get('OS/2') + 4), 700);
+const names = tables.get('name');
+const strings = names + font.readUInt16BE(names + 4);
+const postscriptNames = [];
+for (let index = 0; index < font.readUInt16BE(names + 2); index += 1) {
+  const entry = names + 6 + index * 12;
+  if (font.readUInt16BE(entry + 6) !== 6) continue;
+  const start = strings + font.readUInt16BE(entry + 10);
+  const value = Buffer.from(
+    font.subarray(start, start + font.readUInt16BE(entry + 8)),
+  );
+  postscriptNames.push(
+    [0, 3].includes(font.readUInt16BE(entry))
+      ? value.swap16().toString('utf16le')
+      : value.toString('latin1'),
+  );
+}
+assert.ok(postscriptNames.length > 0);
+assert.ok(postscriptNames.every(name => name === 'Quicksand-Bold'));
 
 delete process.env.CI;
 delete process.env.PAAD_VARIANT;
@@ -34,4 +88,6 @@ assert.equal(
   '/phone-as-device-app-store',
 );
 assert.equal(production.ios.appleTeamId, undefined);
-console.log('Native production ownership and credential-free CI isolation verified.');
+console.log(
+  'Native production ownership and credential-free CI isolation verified.',
+);
