@@ -7,6 +7,7 @@ struct IosWebSocketProbe {
       let port = Int(CommandLine.arguments[1]), (1...65535).contains(port),
       let timeout = Double(CommandLine.arguments[2]), [15.0, 180.0].contains(timeout)
     else { exit(2) }
+    FileHandle.standardError.write(Data("PROBE_STARTED\n".utf8))
 
     let configuration = URLSessionConfiguration.ephemeral
     configuration.timeoutIntervalForRequest = timeout
@@ -31,6 +32,7 @@ struct IosWebSocketProbe {
       let first = try await socket.receive()
       guard case .data(let data) = first, data == Data([1]) else { exit(3) }
       firstReceived = true
+      FileHandle.standardError.write(Data("PROBE_FIRST_FRAME\n".utf8))
       started = ProcessInfo.processInfo.systemUptime
       let second = try await socket.receive()
       guard case .data(let data) = second, data == Data([2]) else { exit(3) }
@@ -46,5 +48,7 @@ struct IosWebSocketProbe {
       let output = String(data: data, encoding: .utf8)
     else { exit(4) }
     print(output)
+    fflush(stdout)
+    exit(0)
   }
 }

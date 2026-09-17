@@ -55,6 +55,7 @@ async function runCase(port, timeout) {
       clearTimeout(deadline);
       if (failure || code !== 0) {
         fs.appendFileSync(path.join(directory, 'command-errors.log'),
+          Buffer.concat(chunks).toString('utf8') +
           Buffer.concat(errors).toString('utf8') +
           (errorBytes > 32768 ? '\nProbe stderr exceeded its capture limit.\n' : ''));
         reject(new Error(failure || 'PROBE_CASE_FAILED'));
