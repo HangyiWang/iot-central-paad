@@ -12,6 +12,7 @@ import {
   StyleSheet,
   View,
   Pressable,
+  useWindowDimensions,
 } from 'react-native';
 import {Text} from './typography';
 import {
@@ -41,6 +42,8 @@ export default function ConnectionSummary({
   const {dark} = useTheme();
   const insets = useSafeAreaInsets();
   const appearance = palette(dark);
+  const {fontScale} = useWindowDimensions();
+  const stacked = fontScale > 1.45;
   const [connected, setConnected] = useState(false);
   const [details, setDetails] = useState(false);
   const [shareFailed, setShareFailed] = useState(false);
@@ -60,6 +63,12 @@ export default function ConnectionSummary({
     return () => clearInterval(timer);
   }, [client]);
   const text = Strings.Connection.Summary;
+  const online = !simulated && connected;
+  const emblemColor = online
+    ? appearance.positive
+    : error && !loading && !simulated
+    ? appearance.danger
+    : appearance.muted;
   const operationId = error?.operationId ?? client?.identity?.operationId;
   const identity =
     client?.identity && !simulated
@@ -141,116 +150,101 @@ export default function ConnectionSummary({
   return (
     <View
       testID="connection-summary"
-      style={[
-        styles.container,
-        {
-          backgroundColor: appearance.background,
-          borderColor: appearance.border,
-        },
-      ]}>
-      <View style={styles.header}>
+      style={[styles.container, {backgroundColor: appearance.background}]}>
+      <View
+        testID="connection-status-capsule"
+        style={[
+          styles.header,
+          stacked && styles.stackedHeader,
+          {
+            backgroundColor: appearance.surface,
+            borderColor: appearance.border,
+            shadowColor: appearance.text,
+            shadowOpacity: dark ? 0 : 0.06,
+            elevation: dark ? 0 : 1,
+          },
+        ]}>
         <View
-          accessible={false}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={[
-            styles.connectionIcon,
-            {
-              backgroundColor:
-                !simulated && connected
+          testID="connection-status-group"
+          style={[styles.statusGroup, stacked && styles.stackedGroup]}>
+          <View
+            testID="connection-status-emblem"
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[
+              styles.connectionIcon,
+              {
+                backgroundColor: online
                   ? appearance.positiveSurface
                   : appearance.inset,
-            },
-          ]}>
-          <Icon
-            name={
-              !simulated && connected ? 'cloud-check-outline' : 'cloud-outline'
-            }
-            type="material-community"
-            size={20}
-            color={
-              !simulated && connected ? appearance.positive : appearance.muted
-            }
-          />
-        </View>
-        <View style={styles.statusContent}>
-          <View style={styles.statusBadge}>
+              },
+            ]}>
+            <Icon
+              name={online ? 'cloud-check-outline' : 'cloud-outline'}
+              type="material-community"
+              size={19}
+              color={emblemColor}
+            />
+            <View style={[styles.emblemRing, {borderColor: emblemColor}]} />
             <View
-              accessible={false}
               style={[
-                styles.statusDot,
+                styles.emblemBead,
                 {
-                  backgroundColor:
-                    !simulated && connected
-                      ? appearance.positive
-                      : appearance.muted,
+                  backgroundColor: emblemColor,
+                  borderColor: appearance.surface,
                 },
               ]}
             />
+          </View>
+          <View style={styles.statusContent}>
             <Text
               testID="connection-status"
               accessibilityHint={text.Title}
               style={[
                 styles.statusText,
                 {
-                  color:
-                    !simulated && connected
-                      ? appearance.positive
-                      : appearance.muted,
+                  color: online ? appearance.positive : appearance.muted,
                 },
               ]}
               accessibilityRole="header"
               accessibilityLiveRegion="polite">
-              {!simulated && connected ? text.Connected : text.Disconnected}
+              {online ? text.Connected : text.Disconnected}
             </Text>
+            {simulated && (
+              <Text style={[styles.supporting, {color: appearance.muted}]}>
+                {text.Simulated}
+              </Text>
+            )}
+            {loading && (
+              <Text
+                style={[styles.supporting, {color: appearance.muted}]}
+                accessibilityLiveRegion="polite">
+                {Strings.Connection.Stages[stage]}
+              </Text>
+            )}
           </View>
         </View>
         {!loading && (
-          <Pressable
-            testID="connection-details"
-            accessibilityRole="button"
-            accessibilityLabel={text.Details}
+          <SummaryAction
+            id="connection-details"
+            label={text.Details}
+            title={text.OpenDetails}
+            stacked={stacked}
+            disclosure
             onPress={() => setDetails(true)}
-            hitSlop={8}
-            style={styles.detailsAction}>
-            <Text style={[styles.rowAction, {color: appearance.primary}]}>
-              {text.OpenDetails}
-            </Text>
-            <View accessible={false}>
-              <Icon
-                name="chevron-right"
-                type="material-community"
-                color={appearance.primary}
-                size={18}
-              />
-            </View>
-          </Pressable>
+          />
         )}
         {loading && (
-          <Pressable
-            testID="connection-cancel"
-            accessibilityRole="button"
+          <SummaryAction
+            id="connection-cancel"
+            label={Strings.Core.Cancel}
+            title={Strings.Core.Cancel}
+            stacked={stacked}
             onPress={() => cancel()}
-            hitSlop={8}
-            style={styles.detailsAction}>
-            <Text style={[styles.rowAction, {color: appearance.primary}]}>
-              {Strings.Core.Cancel}
-            </Text>
-          </Pressable>
+          />
         )}
       </View>
-      {simulated && (
-        <Text style={[styles.supporting, {color: appearance.muted}]}>
-          {text.Simulated}
-        </Text>
-      )}
-      {loading && (
-        <Text
-          style={[styles.supporting, {color: appearance.muted}]}
-          accessibilityLiveRegion="polite">
-          {Strings.Connection.Stages[stage]}
-        </Text>
-      )}
       {error && !loading && (
         <View style={styles.notice}>
           <ConnectionNotice error={error} action={noticeAction} />
@@ -502,6 +496,61 @@ export default function ConnectionSummary({
   );
 }
 
+function SummaryAction({
+  id,
+  label,
+  title,
+  stacked,
+  disclosure = false,
+  onPress,
+}: {
+  id: 'connection-details' | 'connection-cancel';
+  label: string;
+  title: string;
+  stacked: boolean;
+  disclosure?: boolean;
+  onPress(): void;
+}) {
+  const {dark} = useTheme();
+  const appearance = palette(dark);
+  return (
+    <Pressable
+      testID={id}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      hitSlop={8}
+      style={[styles.detailsAction, stacked && styles.stackedAction]}>
+      {({pressed}) => (
+        <View
+          style={[
+            styles.actionPill,
+            stacked && styles.stackedAction,
+            {backgroundColor: pressed ? appearance.border : appearance.inset},
+            pressed && styles.pressedPill,
+          ]}>
+          <Text style={[styles.rowAction, {color: appearance.primary}]}>
+            {title}
+          </Text>
+          {disclosure && (
+            <View
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants">
+              <Icon
+                name="chevron-right"
+                type="material-community"
+                color={appearance.primary}
+                size={16}
+              />
+            </View>
+          )}
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
 function DetailValue({
   label,
   value,
@@ -543,45 +592,97 @@ function DetailValue({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 10,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    minHeight: 60,
+    paddingVertical: 6,
+    paddingLeft: 12,
+    paddingRight: 8,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+    shadowRadius: 12,
+    shadowOffset: {width: 0, height: 4},
   },
+  stackedHeader: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 10,
+    paddingRight: 12,
+  },
+  statusGroup: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  stackedGroup: {flex: 0},
   connectionIcon: {
     width: 36,
     height: 36,
-    borderRadius: 13,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statusContent: {flex: 1, minWidth: 0, gap: 2},
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
+  emblemRing: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    opacity: 0.35,
   },
-  statusDot: {width: 7, height: 7, borderRadius: 4},
-  statusText: {fontSize: 14, lineHeight: 20, fontWeight: '600', flexShrink: 1},
+  emblemBead: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+  },
+  statusContent: {flex: 1, minWidth: 0, gap: 3},
+  statusText: {
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '600',
+    letterSpacing: -0.1,
+    flexShrink: 1,
+  },
   detailsAction: {
     minHeight: 48,
+    minWidth: 92,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionPill: {
+    minHeight: 40,
+    minWidth: 92,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    gap: 2,
   },
+  stackedAction: {alignSelf: 'stretch'},
+  pressedPill: {transform: [{scale: 0.97}]},
   label: {fontSize: 12, lineHeight: 18, fontWeight: '500'},
-  supporting: {fontSize: 13, lineHeight: 20},
-  notice: {paddingTop: 4},
+  supporting: {fontSize: 12, lineHeight: 17},
+  notice: {paddingTop: 8},
   action: {minHeight: 52, justifyContent: 'center'},
   divided: {borderTopWidth: StyleSheet.hairlineWidth},
   actionText: {fontSize: 15, fontWeight: '600'},
-  rowAction: {fontSize: 13, lineHeight: 19, fontWeight: '600'},
+  rowAction: {fontSize: 13, lineHeight: 19, fontWeight: '600', flexShrink: 1},
   sheet: {flex: 1},
   handle: {
     width: 40,

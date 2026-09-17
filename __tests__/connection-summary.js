@@ -6,6 +6,7 @@ import {Alert, Share, Modal, Platform, StyleSheet} from 'react-native';
 import {PHONE_MODEL_ID} from '../src/connection/types';
 import {ConnectionError} from '../src/connection/errors';
 import {palette} from '../src/theme/palette';
+import Strings from '../src/strings';
 jest.mock('@rneui/themed', () => ({Icon: 'Icon'}));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({top: 60, bottom: 24, left: 14, right: 8}),
@@ -15,7 +16,7 @@ jest.mock('../src/hooks', () => ({
   useConnectIoTCentralClient: jest.fn(),
   useIoTCentralClient: jest.fn(),
   useSimulation: jest.fn(),
-  useTheme: () => ({colors: {card: '#fff'}}),
+  useTheme: jest.fn(),
 }));
 jest.mock('../src/components/typography', () => ({Text: 'Text', Name: 'Text'}));
 
@@ -69,6 +70,7 @@ beforeEach(() => {
     {deviceId: 'registration-id'},
   ]);
   hooks.useSimulation.mockReturnValue([false]);
+  hooks.useTheme.mockReturnValue({dark: false, colors: {card: '#fff'}});
 });
 it('opens scrollable details with value-only IDs and local-only destructive forgetting', async () => {
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -117,7 +119,141 @@ afterEach(() => {
   jest.runAllTicks();
   expect(jest.getTimerCount()).toBe(0);
   jest.useRealTimers();
+  jest.restoreAllMocks();
   Platform.OS = originalOS;
+});
+
+it.each([false, true])(
+  'uses a spaced, theme-aware status emblem and tactile Details pill (%s)',
+  dark => {
+    hooks.useTheme.mockReturnValue({dark, colors: {card: '#fff'}});
+    act(() => {
+      view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+    });
+    const capsule = view.root.findByProps({
+      testID: 'connection-status-capsule',
+    });
+    expect(StyleSheet.flatten(capsule.props.style)).toMatchObject({
+      backgroundColor: palette(dark).surface,
+      borderRadius: 20,
+      minHeight: 60,
+      shadowOpacity: dark ? 0 : 0.06,
+    });
+    const group = view.root.findByProps({testID: 'connection-status-group'});
+    expect(StyleSheet.flatten(group.props.style).gap).toBeGreaterThanOrEqual(
+      14,
+    );
+    const emblem = view.root.findByProps({testID: 'connection-status-emblem'});
+    expect(emblem.props).toMatchObject({
+      accessible: false,
+      accessibilityElementsHidden: true,
+      importantForAccessibility: 'no-hide-descendants',
+    });
+    expect(emblem.findByType('Icon').props).toMatchObject({
+      name: 'cloud-check-outline',
+      color: palette(dark).positive,
+    });
+    const disclosure = view.root
+      .findAllByProps({testID: 'connection-details'})
+      .find(node => typeof node.props.children === 'function');
+    expect(StyleSheet.flatten(disclosure.props.style)).toMatchObject({
+      minHeight: 48,
+      minWidth: 92,
+    });
+    expect(
+      StyleSheet.flatten(
+        disclosure.props.children({pressed: false}).props.style,
+      ),
+    ).toMatchObject({
+      backgroundColor: palette(dark).inset,
+      minHeight: 40,
+      borderRadius: 14,
+    });
+    expect(
+      StyleSheet.flatten(
+        disclosure.props.children({pressed: true}).props.style,
+      ),
+    ).toMatchObject({
+      backgroundColor: palette(dark).border,
+      transform: [{scale: 0.97}],
+    });
+  },
+);
+
+it.each([
+  [320, 1, 'row'],
+  [320, 1.45, 'row'],
+  [320, 1.8, 'column'],
+  [390, 2.5, 'column'],
+])(
+  'reflows the status/action without truncating text at width %s and scale %s',
+  (width, fontScale, direction) => {
+    jest.spyOn(require('react-native'), 'useWindowDimensions').mockReturnValue({
+      width,
+      fontScale,
+      height: 800,
+      scale: 2,
+    });
+    connected = false;
+    act(() => {
+      view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+    });
+    const capsule = view.root.findByProps({
+      testID: 'connection-status-capsule',
+    });
+    expect(StyleSheet.flatten(capsule.props.style).flexDirection).toBe(
+      direction,
+    );
+    const status = view.root.findByProps({testID: 'connection-status'});
+    expect(status.props.children).toBe('Disconnected');
+    expect(status.props.numberOfLines).toBeUndefined();
+    expect(status.props.maxFontSizeMultiplier).toBeUndefined();
+    const action = view.root
+      .findAllByProps({testID: 'connection-details'})
+      .find(node => typeof node.props.children === 'function');
+    expect(
+      StyleSheet.flatten(action.props.style).minHeight,
+    ).toBeGreaterThanOrEqual(48);
+    if (direction === 'column') {
+      expect(StyleSheet.flatten(action.props.style).alignSelf).toBe('stretch');
+      expect(
+        StyleSheet.flatten(action.props.children({pressed: false}).props.style)
+          .alignSelf,
+      ).toBe('stretch');
+    }
+  },
+);
+
+it('keeps simulation honest during loading and gives Cancel the same real touch target', async () => {
+  hooks.useSimulation.mockReturnValue([true]);
+  state = {...state, loading: true, stage: 'connecting'};
+  act(() => {
+    view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+  });
+  const group = view.root.findByProps({testID: 'connection-status-group'});
+  expect(group.findAllByType('Text').map(node => node.props.children)).toEqual(
+    expect.arrayContaining([
+      'Disconnected',
+      'Offline simulation — no cloud connection',
+      Strings.Connection.Stages.connecting,
+    ]),
+  );
+  const emblem = view.root.findByProps({testID: 'connection-status-emblem'});
+  expect(emblem.findByType('Icon').props).toMatchObject({
+    name: 'cloud-outline',
+    color: palette(false).muted,
+  });
+  const action = view.root
+    .findAllByProps({testID: 'connection-cancel'})
+    .find(node => typeof node.props.children === 'function');
+  expect(StyleSheet.flatten(action.props.style)).toMatchObject({
+    minHeight: 48,
+    minWidth: 92,
+  });
+  await act(async () => {
+    await action.props.onPress();
+  });
+  expect(cancel).toHaveBeenCalledTimes(1);
 });
 it.each(['android', 'ios'])(
   'protects Android modal controls from system insets without double-insetting the iOS page sheet (%s)',
