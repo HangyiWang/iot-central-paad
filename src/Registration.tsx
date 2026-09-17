@@ -65,6 +65,7 @@ import {
 } from 'components';
 import {IoTCContext, StorageContext} from 'contexts';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {palette} from './theme/palette';
 
 const Stack = createStackNavigator();
 const screens = RegistrationScreens;
@@ -223,6 +224,8 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
     const {orientation} = useScreenDimensions();
     const [startSubmit, setStartSubmit] = useBoolean(false);
     const {bottom} = useSafeAreaInsets();
+    const {dark} = useTheme();
+    const colors = palette(dark);
     const {parentNavigatorKey, parentRoutes} = route.params;
     const style = useMemo<StyleDefinition>(
       () => ({
@@ -239,16 +242,27 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
         },
         footer: {
           alignItems: 'center',
+          gap: 12,
+          paddingTop: 20,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
           marginBottom: Platform.select({ios: bottom, android: 20}),
           marginTop: Platform.select({ios: bottom, android: 20}),
         },
         bodyGroup: {flex: 1},
         bodyGroupContainerStyle: {marginVertical: 10},
         manualBody: {flex: 2},
-        registerNewContainer: {marginBottom: 5},
-        clearBtn: {color: 'red'},
+        footerAction: {minHeight: 52, paddingVertical: 14},
+        footerTitle: {fontSize: 15, lineHeight: 20, fontWeight: '600'},
+        registerNewButton: {backgroundColor: colors.primary},
+        clearButton: {
+          borderWidth: 1,
+          borderColor: colors.danger,
+          backgroundColor: colors.dangerSurface,
+        },
+        clearBtn: {color: colors.danger},
       }),
-      [orientation, bottom],
+      [orientation, bottom, colors],
     );
 
     const readonly = !registeringNew && !!client && client?.isConnected();
@@ -410,7 +424,9 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
               <Button
                 key="register-new-device"
                 title={Strings.Registration.Manual.RegisterNew.Title}
-                containerStyle={style.registerNewContainer}
+                type="solid"
+                buttonStyle={[style.footerAction, style.registerNewButton]}
+                titleStyle={style.footerTitle}
                 onPress={() => {
                   Alert.alert(
                     Strings.Registration.Manual.RegisterNew.Alert.Title,
@@ -451,7 +467,9 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
               <Button
                 key="clear-device-credentials"
                 title={Strings.Registration.Manual.Clear.Title}
-                titleStyle={style.clearBtn}
+                type="outline"
+                buttonStyle={[style.footerAction, style.clearButton]}
+                titleStyle={[style.footerTitle, style.clearBtn]}
                 onPress={() => {
                   Alert.alert(
                     Strings.Registration.Manual.Clear.Alert.Title,
