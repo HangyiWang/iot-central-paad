@@ -195,6 +195,7 @@ test('iOS replay has owner/manual guards, narrowly scoped registration, pinned t
   expect([...script.matchAll(/run_bounded (\d+)/g)].reduce((sum, match) => sum + Number(match[1]), 60000))
     .toBeLessThan(900000);
   expect(script).toContain('run_bounded 400000 "$maestro"');
+  expect(script).toContain('export MAESTRO_DRIVER_STARTUP_TIMEOUT=240000');
   expect(script).toContain('run_bounded 60000 xcrun simctl create');
   expect(script).toContain("timeout: Number(milliseconds), killSignal: 'SIGKILL'");
   expect(script).not.toMatch(/\btimeout --|--version|rm -rf|fs\.rmSync|printenv|set -x|live-device\.yaml/);

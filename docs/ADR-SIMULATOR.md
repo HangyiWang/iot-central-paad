@@ -120,6 +120,9 @@ The connection busy state uses an accessible in-tree overlay so it does not
 compete with the Details sheet's native iOS presentation. Other screen-local
 loading dialogs retain their native blocking behavior. This is presentation
 hardening, not independent evidence of a successful cloud connection.
+The full-screen Android details sheet applies system safe-area insets so its
+Close button and content remain outside system bars; iOS keeps its native
+page-sheet inset behavior.
 
 Open connection details and submit a unique proof nonce. The app sends telemetry
 and a reported property:
@@ -201,6 +204,11 @@ raw errors or paths, and unavailability alone does not establish a UI timeout.
 Diagnostics may also list a small fixed set of UI target names observed in
 captured failure hierarchies, without their values. This is accumulated target
 presence, not a claim of current visibility, a successful tap, or cloud proof.
+`hierarchyCaptured` distinguishes an absent hierarchy from a captured tree
+without those targets. Failed commands may include a fixed framework failure
+category; source error messages and operation details are never exported.
+All iOS lanes allow four minutes for cold XCTest startup within their existing
+overall command and job deadlines.
 
 A UI success report still says independent Azure verification is pending.
 Pair it with the operator verifier's result. Downstream telemetry consumption,

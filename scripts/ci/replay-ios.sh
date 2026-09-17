@@ -136,6 +136,7 @@ bash scripts/ci/show-ios-simulator.sh "$device" \
   > "$diagnostics/logs/simulator-ui.log" 2>&1
 
 flow_attempted=1
+export MAESTRO_DRIVER_STARTUP_TIMEOUT=240000
 HOME="$state/home" TMPDIR="$state/scratch" \
 JAVA_TOOL_OPTIONS="-Duser.home=$state/home -Djava.io.tmpdir=$state/scratch" \
 run_bounded 400000 "$maestro" --device "$device" test --no-ansi \

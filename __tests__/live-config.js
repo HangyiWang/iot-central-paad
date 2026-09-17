@@ -616,6 +616,7 @@ test('cleanup and launcher stay private, owned and do not silence simulator clea
   expect(cleanup.run).toContain('::warning::');
   expect(smoke).toContain('maestro="$PWD/build/ci-tools/maestro/bin/maestro"');
   expect(smoke).toContain('HOME="$private/home" TMPDIR="$private/scratch"');
+  expect(smoke).toContain('export MAESTRO_DRIVER_STARTUP_TIMEOUT=240000');
   expect(smoke).toContain(
     'env -u MAESTRO_DEVICE_KEY -u PAAD_LIVE_CONFIG \\\n    bash scripts/ci/show-ios-simulator.sh "$device" > "$private/simulator-ui.log" 2>&1',
   );

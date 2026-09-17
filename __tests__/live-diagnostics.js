@@ -53,6 +53,31 @@ test.each(['tapOnElement', 'scrollUntilVisible'])('reads pinned selector shape f
   expect(parseCommands([input])[0].targetId).toBe('proof-send');
 });
 
+test.each([
+  ['Assertion is false: ', 'assertion-failed'],
+  ['Device became unreachable during ', 'device-unreachable'],
+  ['iOS driver not ready in time,', 'ios-driver-startup-timeout'],
+  ['Failed to get screenshot: Timed out while requesting screenshot.', 'screenshot-timeout'],
+])('classifies fixed framework error prefixes without exporting their details (%#)', (prefix, category) => {
+  const input = command();
+  input.metadata.error.message = prefix + CANARY;
+  const commands = parseCommands([input]);
+  expect(commands[0].failureCategory).toBe(category);
+  const result = sanitizeDiagnostics({availability: 'available', failedCommands: commands});
+  expect(result.failedCommands[0].failureCategory).toBe(category);
+  expect(JSON.stringify(result)).not.toContain(CANARY);
+});
+
+test('rejects arbitrary failure categories and untyped hierarchy availability', () => {
+  const result = sanitizeDiagnostics({
+    availability: 'available', hierarchyCaptured: CANARY,
+    failedCommands: [{sequenceNumber: 1, commandKind: 'assertCommand', failureCategory: CANARY}],
+  });
+  expect(result).toEqual({
+    availability: 'available', failedCommands: [{sequenceNumber: 1, commandKind: 'assertCommand'}], ui: {},
+  });
+});
+
 test('ignores unknown kinds, nonfailed commands and invalid sequence numbers', () => {
   for (const value of [CANARY, -1, Infinity, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
     const input = command();
@@ -232,7 +257,7 @@ test('unions fixed target presence across failure captures without claiming visi
     ]),
   });
   expect(collectLiveDiagnostics()).toEqual({
-    availability: 'available', failedCommands: [],
+    availability: 'available', failedCommands: [], hierarchyCaptured: true,
     ui: {observedTargets: ['connection-details', 'connection-details-close', 'model-id']},
   });
 });
@@ -252,10 +277,23 @@ test('traverses only fixed private results/debug and never follows links or open
   expect(result.availability).toBe('available');
   expect(result.failedCommands[0].sequenceNumber).toBe(42);
   expect(result.ui.connectionErrorCode).toBe('AUTHENTICATION_FAILED');
+  expect(result.hierarchyCaptured).toBe(true);
   expect(opened.mock.calls.map(call => path.relative(root, call[0]))).toEqual([
     'results/session/flow/commands.json', 'results/session/flow/screen-hierarchy/step-042.json',
   ]);
   expect(JSON.stringify(result)).not.toContain(CANARY);
+});
+
+test('distinguishes missing hierarchy from a captured tree without allowlisted targets', () => {
+  mockArtifacts({'results/commands.json': [command()]});
+  expect(collectLiveDiagnostics().hierarchyCaptured).toBe(false);
+  jest.restoreAllMocks();
+  mockArtifacts({
+    'results/commands.json': [command()],
+    'results/screen-hierarchy/step.json': node(CANARY, CANARY),
+  });
+  expect(collectLiveDiagnostics().hierarchyCaptured).toBe(true);
+  expect(collectLiveDiagnostics().ui).toEqual({});
 });
 
 test.each([

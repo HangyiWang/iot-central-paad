@@ -25,6 +25,7 @@ import {connectionDiagnostics} from '../onboarding/diagnostics';
 import {ProofActivity} from '../onboarding/proof';
 import {palette} from '../theme/palette';
 import {Icon} from '@rneui/themed';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 export default function ConnectionSummary({
   onManualConnection,
@@ -36,6 +37,7 @@ export default function ConnectionSummary({
   const [, credentials] = useIoTCentralClient();
   const [simulated] = useSimulation();
   const {dark} = useTheme();
+  const insets = useSafeAreaInsets();
   const appearance = palette(dark);
   const [connected, setConnected] = useState(false);
   const [details, setDetails] = useState(false);
@@ -225,7 +227,16 @@ export default function ConnectionSummary({
           <KeyboardAvoidingView
             testID="connection-details-sheet"
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={[styles.sheet, {backgroundColor: appearance.background}]}>
+            style={[
+              styles.sheet,
+              {backgroundColor: appearance.background},
+              Platform.OS === 'android' && {
+                paddingTop: insets.top,
+                paddingBottom: insets.bottom,
+                paddingLeft: insets.left,
+                paddingRight: insets.right,
+              },
+            ]}>
             {Platform.OS === 'ios' && (
               <View
                 style={[styles.handle, {backgroundColor: appearance.border}]}

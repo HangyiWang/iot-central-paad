@@ -2,9 +2,12 @@ import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import ConnectionSummary from '../src/components/connectionSummary';
 import * as hooks from '../src/hooks';
-import {Alert, Share, Modal, Platform} from 'react-native';
+import {Alert, Share, Modal, Platform, StyleSheet} from 'react-native';
 import {PHONE_MODEL_ID} from '../src/connection/types';
 jest.mock('@rneui/themed', () => ({Icon: 'Icon'}));
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({top: 60, bottom: 24, left: 14, right: 8}),
+}));
 
 jest.mock('../src/hooks', () => ({
   useConnectIoTCentralClient: jest.fn(),
@@ -21,6 +24,7 @@ const connect = jest.fn(async () => ({ok: true}));
 const cancel = jest.fn(async () => {});
 const clear = jest.fn();
 const manual = jest.fn();
+const originalOS = Platform.OS;
 const text = () => JSON.stringify(view.toJSON());
 const press = label =>
   view.root
@@ -111,7 +115,36 @@ afterEach(() => {
   jest.runAllTicks();
   expect(jest.getTimerCount()).toBe(0);
   jest.useRealTimers();
+  Platform.OS = originalOS;
 });
+it.each(['android', 'ios'])(
+  'protects Android modal controls from system insets without double-insetting the iOS page sheet (%s)',
+  os => {
+    Platform.OS = os;
+    act(() => {
+      view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+    });
+    act(() => press('Connection details'));
+    const sheet = view.root.findAllByProps({
+      testID: 'connection-details-sheet',
+    })[0];
+    const style = StyleSheet.flatten(sheet.props.style);
+    if (os === 'android') {
+      expect(style).toMatchObject({
+        paddingTop: 60,
+        paddingBottom: 24,
+        paddingLeft: 14,
+        paddingRight: 8,
+      });
+    } else {
+      expect(style.paddingTop).toBeUndefined();
+    }
+    act(() => press('Close'));
+    expect(
+      view.root.findAllByProps({testID: 'connection-details-sheet'}),
+    ).toHaveLength(0);
+  },
+);
 it('keeps the status row compact and preserves all actions and exact identity in details', async () => {
   act(() => {
     view = renderer.create(<ConnectionSummary onManualConnection={manual} />);

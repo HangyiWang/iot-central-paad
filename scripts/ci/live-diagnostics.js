@@ -31,6 +31,13 @@ const UI_PRESENCE_IDS = Object.freeze([
   'connection-status', 'assigned-device-id', 'assigned-hub', 'connection-details',
   'connection-details-sheet', 'connection-details-close', 'model-id',
 ]);
+const FAILURE_PREFIXES = Object.freeze([
+  ['Assertion is false: ', 'assertion-failed'],
+  ['Device became unreachable during ', 'device-unreachable'],
+  ['iOS driver not ready in time,', 'ios-driver-startup-timeout'],
+  ['Failed to get screenshot: Timed out while requesting screenshot.', 'screenshot-timeout'],
+]);
+const FAILURE_CATEGORIES = FAILURE_PREFIXES.map(([, category]) => category);
 const SYSTEM_DIALOGS = new Map([
   ["Quickstep isn't responding", 'quickstep-anr'],
   ["System UI isn't responding", 'system-ui-anr'],
@@ -72,6 +79,11 @@ function parseCommands(value) {
     const commandKind = kinds[0];
     const command = entry.command[commandKind];
     const result = {sequenceNumber, commandKind};
+    const message = object(entry.metadata.error) ? entry.metadata.error.message : undefined;
+    if (typeof message === 'string') {
+      const failure = FAILURE_PREFIXES.find(([prefix]) => message.startsWith(prefix));
+      if (failure) result.failureCategory = failure[1];
+    }
     for (const selector of [command.selector, command.visible, command.notVisible,
       command.condition?.visible, command.condition?.notVisible]) {
       if (object(selector) && TARGET_IDS.includes(selector.idRegex)) {
@@ -136,6 +148,7 @@ function sanitizeDiagnostics(value) {
         if (!object(entry) || !integer(entry.sequenceNumber) || !COMMAND_KINDS.includes(entry.commandKind)) continue;
         const command = {sequenceNumber: entry.sequenceNumber, commandKind: entry.commandKind};
         if (TARGET_IDS.includes(entry.targetId)) command.targetId = entry.targetId;
+        if (FAILURE_CATEGORIES.includes(entry.failureCategory)) command.failureCategory = entry.failureCategory;
         failedCommands.push(command);
       }
     }
@@ -154,7 +167,10 @@ function sanitizeDiagnostics(value) {
       if (SYSTEM_DIALOG_CODES.includes(value.ui.systemDialog)) ui.systemDialog = value.ui.systemDialog;
     }
     return failedCommands.length || Object.keys(ui).length
-      ? {availability: 'available', failedCommands, ui} : unavailable();
+      ? {
+        availability: 'available', failedCommands, ui,
+        ...(typeof value.hierarchyCaptured === 'boolean' ? {hierarchyCaptured: value.hierarchyCaptured} : {}),
+      } : unavailable();
   } catch {
     return unavailable();
   }
@@ -175,6 +191,7 @@ function collectLiveDiagnostics() {
     const failedCommands = [];
     const ui = {};
     const observedTargets = new Set();
+    let hierarchyCaptured = false;
     function walk(directory, depth) {
       requireDirectory(directory);
       if (depth > LIMITS.directoryDepth) throw new DiagnosticUnavailable('depth-limit');
@@ -216,6 +233,7 @@ function collectLiveDiagnostics() {
           if (commands) failedCommands.push(...parseCommands(value));
           else {
             const hierarchy = parseHierarchy(value);
+            hierarchyCaptured = true;
             for (const target of hierarchy.observedTargets ?? []) observedTargets.add(target);
             Object.assign(ui, hierarchy);
           }
@@ -236,7 +254,7 @@ function collectLiveDiagnostics() {
     }
     // Presence across captured failure hierarchies is not current visibility.
     if (observedTargets.size) ui.observedTargets = [...observedTargets].sort();
-    const result = sanitizeDiagnostics({availability: 'available', failedCommands, ui});
+    const result = sanitizeDiagnostics({availability: 'available', failedCommands, ui, hierarchyCaptured});
     return result.availability === 'available' ? result : unavailable('no-supported-data');
   } catch (error) {
     return unavailable(error instanceof DiagnosticUnavailable ? error.reason

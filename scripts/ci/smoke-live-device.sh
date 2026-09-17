@@ -136,6 +136,7 @@ if [[ "$platform" = android ]]; then
   adb -s "$device" install -r build/ci-artifacts/foundation-ci.apk > "$private/install.log" 2>&1
   adb -s "$device" logcat -c > "$private/clear.log" 2>&1
 else
+  export MAESTRO_DRIVER_STARTUP_TIMEOUT=240000
   export DEVELOPER_DIR="$IOS_SIMULATOR_DEVELOPER_DIR"
   candidate="${IOS_SIMULATOR_UDID:-}"
   [[ "$candidate" =~ ^[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}$ ]]

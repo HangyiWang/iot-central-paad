@@ -109,6 +109,15 @@ DPS assignment, Hub model and one automatic ADR record. Its details-screen
 model-field assertion failed before nonce submission; connected cold restoration
 was not reached. The owned temporary device input was removed afterward.
 
+Run `35193531988` on source `af399da31f93cede305936808a1f712dfcc762d6`
+used the in-tree connection loading overlay. The iOS Connected assertion failed,
+although independent reads again confirmed exact DPS assignment and the phone
+model in the Hub twin. The expected nonce was absent; cold restoration remains
+unproven. Its safe report did not contain UI target presence, which alone does
+not distinguish missing capture from missing controls. Temporary device inputs
+were removed. The modal-handoff change is not established as a fix for these
+automation failures.
+
 ## What the experiment proved, and what it did not
 
 The 2026-09-13 isolated cloud experiment used `azure-iot-device` Python SDK
