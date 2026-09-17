@@ -233,7 +233,7 @@ const Value = React.memo<{
             shake={() => null}
             value={draft}
             onChangeText={setEdited}
-            inputStyle={{color: textColor, fontSize: 17}}
+            inputStyle={{color: textColor, fontSize: 17, minHeight: 48}}
             inputContainerStyle={styles.inputFrame}
             containerStyle={styles.editInput}
             renderErrorMessage={false}
