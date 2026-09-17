@@ -1,13 +1,12 @@
-/* eslint-disable react/no-unstable-nested-components */
 import {createStackNavigator, StackScreenProps} from '@react-navigation/stack';
-import {Icon, ListItem} from '@rneui/themed';
+import {Icon} from '@rneui/themed';
 import * as React from 'react';
 import {
   View,
   FlatList,
   StyleSheet,
   Platform,
-  TouchableOpacity,
+  Pressable,
   RefreshControl,
 } from 'react-native';
 import {Device, UUID} from 'react-native-ble-plx';
@@ -18,7 +17,7 @@ import {Loader, Text} from '../components';
 import {useIoTCentralClient, useTheme} from '../hooks';
 import CardView from 'CardView';
 import Strings from 'strings';
-import {palette} from '../theme/palette';
+import {cardTint, palette} from '../theme/palette';
 
 type BluetoothStackParamList = {
   [Pages.BLUETOOTH_LIST]: undefined;
@@ -106,35 +105,22 @@ function BluetoothList({navigation}: BluetoothListProps) {
           ) : null
         }
         ListEmptyComponent={
-          <View style={[styles.empty, {backgroundColor: appearance.tints[1]}]}>
-            <View
-              accessible={false}
-              style={[styles.emptyIcon, {backgroundColor: appearance.surface}]}>
-              <Icon
-                name="bluetooth"
-                type="material-community"
-                size={30}
-                color={appearance.text}
-              />
-            </View>
-            <Text style={styles.emptyTitle}>
-              {unavailable
+          <StatusCard
+            icon={unavailable ? 'bluetooth-off' : 'bluetooth'}
+            title={
+              unavailable
                 ? Strings.Bluetooth.Unavailable
-                : Strings.Bluetooth.Scanning}
-            </Text>
-            <Text style={[styles.emptyDescription, {color: appearance.muted}]}>
-              {unavailable
+                : Strings.Bluetooth.Scanning
+            }
+            description={
+              unavailable
                 ? Strings.Bluetooth.UnavailableDetail
-                : Strings.Bluetooth.ScanningDetail}
-            </Text>
-          </View>
+                : Strings.Bluetooth.ScanningDetail
+            }
+          />
         }
         renderItem={({item}) => (
-          <BluetoothDeviceListItem
-            item={item}
-            colors={colors}
-            navigation={navigation}
-          />
+          <BluetoothDeviceListItem item={item} navigation={navigation} />
         )}
         onRefresh={() => IotcBleManager.getInstance().resetDeviceList()}
         refreshing={!unavailable && devices.length === 0}
@@ -150,54 +136,90 @@ function BluetoothList({navigation}: BluetoothListProps) {
   );
 }
 
+function StatusCard({
+  icon,
+  title,
+  description,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+}) {
+  const {dark} = useTheme();
+  const appearance = palette(dark);
+  return (
+    <View style={[styles.empty, {backgroundColor: appearance.tints[1]}]}>
+      <View
+        accessible={false}
+        style={[styles.emptyIcon, {backgroundColor: appearance.surface}]}>
+        <Icon
+          name={icon}
+          type="material-community"
+          size={30}
+          color={appearance.text}
+        />
+      </View>
+      <Text accessibilityRole="header" style={styles.emptyTitle}>
+        {title}
+      </Text>
+      <Text style={[styles.emptyDescription, {color: appearance.muted}]}>
+        {description}
+      </Text>
+    </View>
+  );
+}
+
 interface BluetoothDeviceListItemProps {
   item: Device;
-  colors: ReturnType<typeof useTheme>['colors'];
   navigation: BluetoothListProps['navigation'];
 }
 
 function BluetoothDeviceListItem({
   item,
-  colors,
   navigation,
 }: BluetoothDeviceListItemProps) {
+  const {dark} = useTheme();
+  const appearance = palette(dark);
+  const signal =
+    item.rssi == null
+      ? Strings.Bluetooth.SignalUnavailable
+      : `${item.rssi} dBm`;
   return (
-    <TouchableOpacity
-      onPress={_e => {
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${item.name ?? ''}, ${signal}`}
+      onPress={() => {
         navigation.navigate(Pages.BLUETOOTH_DETAIL, {
           deviceId: item.id,
           deviceName: item.name ?? '',
         });
-      }}>
-      <ListItem
-        containerStyle={[styles.deviceCard, {backgroundColor: colors.card}]}>
-        <ListItem.Content
-          style={{
-            ...styles.item,
-            backgroundColor: colors.card,
-          }}>
-          <ListItem.Title style={{...styles.itemTitle, color: colors.text}}>
-            {item.name}
-          </ListItem.Title>
-
-          <ListItem.Subtitle
-            style={{...styles.subtitleContainer, color: colors.text}}>
-            <View style={styles.subtitleContent}>
-              <Icon
-                name="signal"
-                type="material-community"
-                color={colors.text}
-              />
-              <Text style={styles.rssiText}>
-                {item.rssi == null
-                  ? Strings.Bluetooth.SignalUnavailable
-                  : `${item.rssi} dBm`}
-              </Text>
-            </View>
-          </ListItem.Subtitle>
-        </ListItem.Content>
-      </ListItem>
-    </TouchableOpacity>
+      }}
+      style={[styles.deviceCard, {backgroundColor: appearance.surface}]}>
+      <View
+        accessible={false}
+        style={[styles.deviceIcon, {backgroundColor: cardTint(item.id, dark)}]}>
+        <Icon
+          name="bluetooth"
+          type="material-community"
+          size={20}
+          color={appearance.text}
+        />
+      </View>
+      <View style={styles.deviceBody}>
+        <Text style={styles.itemTitle}>{item.name}</Text>
+        <Text style={[styles.rssiText, {color: appearance.muted}]}>
+          {signal}
+        </Text>
+      </View>
+      <View accessible={false}>
+        <Icon
+          name="chevron-right"
+          type="material-community"
+          size={20}
+          color={appearance.muted}
+        />
+      </View>
+    </Pressable>
   );
 }
 
@@ -301,10 +323,13 @@ function BluetoothDetail({
 
   if (unavailable) {
     return (
-      <Text>
-        Bluetooth unavailable. Enable Bluetooth and allow Nearby Devices access
-        in Settings.
-      </Text>
+      <View style={styles.detailStatus}>
+        <StatusCard
+          icon="bluetooth-off"
+          title={Strings.Bluetooth.Unavailable}
+          description={Strings.Bluetooth.UnavailableDetail}
+        />
+      </View>
     );
   }
 
@@ -324,20 +349,28 @@ function BluetoothDetail({
 }
 
 function ReloadButton() {
-  const {colors} = useTheme();
+  const {dark} = useTheme();
+  const appearance = palette(dark);
   return (
-    <View style={styles.reload}>
-      <Icon
-        accessibilityRole="button"
-        accessibilityLabel={Strings.Bluetooth.Refresh}
-        name="reload"
-        type={Platform.select({ios: 'ionicon', android: 'material-community'})}
-        color={colors.text}
-        onPress={() => {
-          IotcBleManager.getInstance().resetDeviceList();
-        }}
-      />
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={Strings.Bluetooth.Refresh}
+      onPress={() => {
+        IotcBleManager.getInstance().resetDeviceList();
+      }}
+      style={[styles.reload, {backgroundColor: appearance.surface}]}>
+      <View accessible={false}>
+        <Icon
+          name="reload"
+          type={Platform.select({
+            ios: 'ionicon',
+            android: 'material-community',
+          })}
+          size={22}
+          color={appearance.text}
+        />
+      </View>
+    </Pressable>
   );
 }
 
@@ -350,13 +383,31 @@ const styles = StyleSheet.create({
   title: {fontSize: 24, lineHeight: 31, fontWeight: '600'},
   description: {fontSize: 13, lineHeight: 20},
   reload: {
-    minWidth: 48,
-    minHeight: 48,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
   listContent: {paddingHorizontal: 20, paddingBottom: 24},
-  deviceCard: {borderRadius: 20, marginBottom: 12, padding: 18},
+  deviceCard: {
+    borderRadius: 20,
+    marginBottom: 12,
+    padding: 16,
+    minHeight: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  deviceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deviceBody: {flex: 1, minWidth: 0, gap: 2},
+  detailStatus: {padding: 20},
   notice: {marginBottom: 16, fontSize: 14, lineHeight: 21},
   empty: {borderRadius: 24, padding: 28, alignItems: 'center', gap: 14},
   emptyIcon: {
@@ -379,6 +430,7 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontWeight: '600',
     fontSize: 16,
+    lineHeight: 23,
   },
   marginEnd10: {
     marginEnd: 10,
@@ -398,7 +450,8 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   rssiText: {
-    marginStart: 5,
+    fontSize: 13,
+    lineHeight: 19,
   },
   listLoaderContainer: {
     height: '100%',

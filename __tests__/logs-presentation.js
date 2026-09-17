@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {FlatList} from 'react-native';
+import {FlatList, StyleSheet} from 'react-native';
 import Logs, {LogEvent, logLevel} from '../src/Logs';
 import * as hooks from '../src/hooks';
 import LogsProvider, {LogsContext} from '../src/contexts/logs';
@@ -72,6 +72,16 @@ test('an event shows a severity badge and expands the exact selectable payload',
     view = renderer.create(<LogEvent entry={item} />);
   });
   expect(visibleText()).toContain('Error');
+  expect(visibleText()).not.toContain('View details');
+  expect(
+    view.root.findAllByProps({testID: 'log-toggle-42'})[0].props
+      .accessibilityLabel,
+  ).toContain('View details');
+  expect(
+    StyleSheet.flatten(
+      view.root.findAllByProps({testID: 'log-toggle-42'})[0].props.style,
+    ),
+  ).toMatchObject({minWidth: 44, minHeight: 44});
   expect(view.root.findAllByProps({testID: 'log-payload-42'})).toHaveLength(0);
   act(() => press('log-toggle-42'));
   const payload = view.root.findAllByProps({testID: 'log-payload-42'})[0];

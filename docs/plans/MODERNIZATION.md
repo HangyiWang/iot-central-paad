@@ -254,6 +254,16 @@ its page rather than using the whole display height. Bluetooth uses the shared
 app header, with its scan control and explicit empty/unavailable states in the
 page content.
 
+A second design pass used the local references alongside Apple HIG
+[lists](https://developer.apple.com/design/human-interface-guidelines/lists-and-tables),
+[sheets](https://developer.apple.com/design/human-interface-guidelines/sheets)
+and [accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility),
+plus Material 3 [lists](https://m3.material.io/components/lists/guidelines)
+and [cards](https://m3.material.io/components/cards/overview). It keeps one
+subject per card, separates primary content from supporting text, uses explicit
+drill-in affordances and preserves actual touch-target size rather than relying
+on hit slop. No reference artwork or custom font is bundled.
+
 Each UI PR must map changed screens to the applicable HIG rows and include
 light/dark, enlarged-text, keyboard and error-state evidence. An Android emulator
 cannot establish iOS HIG conformance. Require physical-iPhone VoiceOver, large

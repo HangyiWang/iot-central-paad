@@ -33,20 +33,15 @@ const Logs = React.memo(() => {
   return (
     <View style={[styles.container, {backgroundColor: appearance.background}]}>
       <View style={styles.heading}>
-        <Headline>{text.Title}</Headline>
-        <Text style={[styles.supporting, {color: appearance.muted}]}>
-          {text.Header}
-        </Text>
-        <View style={styles.toolbar}>
-          <Text style={[styles.supporting, {color: appearance.muted}]}>
-            {resolveString(text.Count, String(entries.length))}
-          </Text>
+        <View style={styles.headingRow}>
+          <Headline style={styles.headingTitle}>{text.Title}</Headline>
           <Pressable
             testID="logs-latest"
             accessibilityRole="button"
             accessibilityState={{disabled: !entries.length}}
             disabled={!entries.length}
             onPress={() => list.current?.scrollToEnd({animated: true})}
+            hitSlop={8}
             style={styles.textAction}>
             <Text
               style={[
@@ -57,41 +52,49 @@ const Logs = React.memo(() => {
             </Text>
           </Pressable>
         </View>
-        <View style={styles.filters}>
-          {[false, true].map(issues => (
-            <Pressable
-              key={String(issues)}
-              testID={issues ? 'logs-filter-issues' : 'logs-filter-all'}
-              accessibilityRole="button"
-              accessibilityState={{selected: issuesOnly === issues}}
-              onPress={() => setIssuesOnly(issues)}
-              style={[
-                styles.filter,
-                {
-                  backgroundColor:
-                    issuesOnly === issues
-                      ? appearance.primary
-                      : appearance.surface,
-                  borderColor:
-                    issuesOnly === issues
-                      ? appearance.primary
-                      : appearance.controlBorder,
-                },
-              ]}>
-              <Text
+        <Text style={[styles.supporting, {color: appearance.muted}]}>
+          {text.Header}
+        </Text>
+        <View style={styles.toolbar}>
+          <View style={styles.filters}>
+            {[false, true].map(issues => (
+              <Pressable
+                key={String(issues)}
+                testID={issues ? 'logs-filter-issues' : 'logs-filter-all'}
+                accessibilityRole="button"
+                accessibilityState={{selected: issuesOnly === issues}}
+                onPress={() => setIssuesOnly(issues)}
                 style={[
-                  styles.actionLabel,
+                  styles.filter,
                   {
-                    color:
+                    backgroundColor:
                       issuesOnly === issues
-                        ? appearance.onPrimary
-                        : appearance.text,
+                        ? appearance.primary
+                        : appearance.surface,
+                    borderColor:
+                      issuesOnly === issues
+                        ? appearance.primary
+                        : appearance.controlBorder,
                   },
                 ]}>
-                {issues ? text.Issues : text.All}
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={[
+                    styles.actionLabel,
+                    {
+                      color:
+                        issuesOnly === issues
+                          ? appearance.onPrimary
+                          : appearance.text,
+                    },
+                  ]}>
+                  {issues ? text.Issues : text.All}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={[styles.count, {color: appearance.muted}]}>
+            {resolveString(text.Count, String(entries.length))}
+          </Text>
         </View>
       </View>
       <FlatList
@@ -99,7 +102,9 @@ const Logs = React.memo(() => {
         testID="logs-list"
         data={entries}
         keyExtractor={entry => String(entry.id)}
-        renderItem={({item}) => <LogEvent entry={item} />}
+        renderItem={({item, index}) => (
+          <LogEvent entry={item} last={index === entries.length - 1} />
+        )}
         contentContainerStyle={styles.feed}
         ListEmptyComponent={
           <View style={[styles.empty, {backgroundColor: appearance.surface}]}>
@@ -129,110 +134,127 @@ const Logs = React.memo(() => {
   );
 });
 
-export const LogEvent = React.memo(({entry}: {entry: TimedLog[number]}) => {
-  const {dark} = useTheme();
-  const appearance = palette(dark);
-  const [expanded, setExpanded] = useState(false);
-  const level = logLevel(entry.logItem.eventName);
-  const foreground = level === 'error' ? appearance.danger : appearance.text;
-  const background =
-    level === 'error'
-      ? appearance.dangerSurface
-      : level === 'warning'
-      ? appearance.tints[3]
-      : appearance.tints[1];
-  const text = Strings.LogScreen;
-  return (
-    <View testID={`log-event-${entry.id}`} style={styles.eventRow}>
-      <View accessible={false} style={styles.timeline}>
-        <View style={[styles.eventIcon, {backgroundColor: background}]}>
-          <Icon
-            name={
-              level === 'error'
-                ? 'alert-circle-outline'
-                : level === 'warning'
-                ? 'alert-outline'
-                : 'information-outline'
-            }
-            type="material-community"
-            size={18}
-            color={foreground}
-          />
-        </View>
-        <View
-          style={[styles.timelineLine, {backgroundColor: appearance.border}]}
-        />
-      </View>
-      <View style={[styles.eventCard, {backgroundColor: appearance.surface}]}>
-        <View style={styles.eventMeta}>
-          <Text
-            style={[
-              styles.level,
-              {backgroundColor: background, color: foreground},
-            ]}>
-            {text.Levels[level]}
-          </Text>
-          <Text style={[styles.timestamp, {color: appearance.muted}]}>
-            {typeof entry.timestamp === 'number'
-              ? new Date(entry.timestamp).toLocaleString()
-              : entry.timestamp}
-          </Text>
-        </View>
-        <Text selectable style={styles.eventTitle}>
-          {entry.logItem.eventName}
-        </Text>
-        {!expanded && (
-          <Text numberOfLines={3} style={styles.preview}>
-            {entry.logItem.eventData}
-          </Text>
-        )}
-        <Pressable
-          testID={`log-toggle-${entry.id}`}
-          accessibilityRole="button"
-          accessibilityLabel={`${expanded ? text.HideDetails : text.Details}: ${
-            entry.logItem.eventName
-          }`}
-          accessibilityState={{expanded}}
-          onPress={() => setExpanded(current => !current)}
-          style={styles.textAction}>
-          <Text style={[styles.actionLabel, {color: appearance.primary}]}>
-            {expanded ? text.HideDetails : text.Details}
-          </Text>
-          <View accessible={false}>
+export const LogEvent = React.memo(
+  ({entry, last}: {entry: TimedLog[number]; last?: boolean}) => {
+    const {dark} = useTheme();
+    const appearance = palette(dark);
+    const [expanded, setExpanded] = useState(false);
+    const level = logLevel(entry.logItem.eventName);
+    const foreground = level === 'error' ? appearance.danger : appearance.text;
+    const background =
+      level === 'error'
+        ? appearance.dangerSurface
+        : level === 'warning'
+        ? appearance.tints[3]
+        : appearance.tints[1];
+    const text = Strings.LogScreen;
+    return (
+      <View testID={`log-event-${entry.id}`} style={styles.eventRow}>
+        <View accessible={false} style={styles.timeline}>
+          <View style={[styles.eventIcon, {backgroundColor: background}]}>
             <Icon
-              name={expanded ? 'chevron-up' : 'chevron-down'}
+              name={
+                level === 'error'
+                  ? 'alert-circle-outline'
+                  : level === 'warning'
+                  ? 'alert-outline'
+                  : 'information-outline'
+              }
               type="material-community"
               size={18}
-              color={appearance.primary}
+              color={foreground}
             />
           </View>
-        </Pressable>
-        {expanded && (
-          <View style={[styles.payload, {backgroundColor: appearance.inset}]}>
+          {!last && (
+            <View
+              style={[
+                styles.timelineLine,
+                {backgroundColor: appearance.border},
+              ]}
+            />
+          )}
+        </View>
+        <View style={[styles.eventCard, {backgroundColor: appearance.surface}]}>
+          <View style={styles.eventMeta}>
             <Text
-              testID={`log-payload-${entry.id}`}
-              selectable
-              style={styles.payloadText}>
+              style={[
+                styles.level,
+                {backgroundColor: background, color: foreground},
+              ]}>
+              {text.Levels[level]}
+            </Text>
+            <Text style={[styles.timestamp, {color: appearance.muted}]}>
+              {typeof entry.timestamp === 'number'
+                ? new Date(entry.timestamp).toLocaleString()
+                : entry.timestamp}
+            </Text>
+            <Pressable
+              testID={`log-toggle-${entry.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${
+                expanded ? text.HideDetails : text.Details
+              }: ${entry.logItem.eventName}`}
+              accessibilityState={{expanded}}
+              onPress={() => setExpanded(current => !current)}
+              hitSlop={12}
+              style={styles.disclosure}>
+              <View accessible={false}>
+                <Icon
+                  name={expanded ? 'chevron-up' : 'chevron-down'}
+                  type="material-community"
+                  size={20}
+                  color={appearance.primary}
+                />
+              </View>
+            </Pressable>
+          </View>
+          <Text selectable style={styles.eventTitle}>
+            {entry.logItem.eventName}
+          </Text>
+          {expanded ? (
+            <View style={[styles.payload, {backgroundColor: appearance.inset}]}>
+              <Text
+                testID={`log-payload-${entry.id}`}
+                selectable
+                style={styles.payloadText}>
+                {entry.logItem.eventData}
+              </Text>
+            </View>
+          ) : (
+            <Text
+              numberOfLines={2}
+              style={[styles.preview, {color: appearance.muted}]}>
               {entry.logItem.eventData}
             </Text>
-          </View>
-        )}
+          )}
+        </View>
       </View>
-    </View>
-  );
-});
+    );
+  },
+);
 
 const styles = StyleSheet.create({
   container: {flex: 1},
-  heading: {paddingHorizontal: 20, paddingTop: 18, gap: 4},
+  heading: {paddingHorizontal: 20, paddingTop: 14, gap: 6},
+  headingRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  headingTitle: {flexShrink: 1},
   supporting: {fontSize: 13, lineHeight: 20},
   toolbar: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
   },
-  filters: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16},
+  count: {fontSize: 13, lineHeight: 20},
+  filters: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
   filter: {
     minHeight: 44,
     justifyContent: 'center',
@@ -247,7 +269,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    alignSelf: 'flex-start',
+  },
+  disclosure: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   feed: {paddingHorizontal: 20, paddingBottom: 24, flexGrow: 1},
   eventRow: {flexDirection: 'row', gap: 10},
@@ -275,7 +302,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 8,
   },
-  timestamp: {fontSize: 11, lineHeight: 17, flexShrink: 1},
+  timestamp: {fontSize: 11, lineHeight: 17, flexGrow: 1, flexShrink: 1},
   eventTitle: {fontSize: 14, lineHeight: 21, fontWeight: '600'},
   preview: {fontSize: 14, lineHeight: 21},
   payload: {padding: 12, borderRadius: 12},

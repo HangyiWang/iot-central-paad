@@ -16,7 +16,10 @@ jest.mock('expo-image-picker', () => ({launchImageLibraryAsync: jest.fn()}));
 jest.mock('../src/tools/Torch', () => ({acquireCamera: jest.fn()}));
 jest.mock('../src/components/bottomPopup', () => 'BottomPopup');
 jest.mock('../src/CardView', () => 'CardView');
-jest.mock('../src/components', () => require('../src/components/typography'));
+jest.mock('../src/components', () => ({
+  ...require('../src/components/typography'),
+  Loader: 'Loader',
+}));
 jest.mock('react-native-progress', () => ({CircleSnail: 'CircleSnail'}));
 jest.mock('../src/bluetooth/BleManager', () => ({
   IotcBleManager: {getInstance: jest.fn()},
@@ -182,4 +185,47 @@ test('Bluetooth does not duplicate the app header and keeps scanning failures ex
   view = undefined;
   expect(remove).toHaveBeenCalledTimes(1);
   expect(unsubscribe).toHaveBeenCalledTimes(2);
+});
+
+test('Bluetooth scanning control meets the minimum touch target and the detail screen explains unavailability', () => {
+  const remove = jest.fn();
+  const manager = {
+    observeAdvertisements: jest.fn(() => ({remove})),
+    setResetDeviceListCallback: jest.fn(),
+    resetDeviceList: jest.fn(),
+  };
+  IotcBleManager.getInstance.mockReturnValue(manager);
+  hooks.useIoTCentralClient.mockReturnValue([null]);
+  act(() => {
+    view = renderer.create(<BluetoothPage />);
+  });
+  const screens = view.root.findAllByType('BluetoothScreen');
+  const List = screens[0].props.component;
+  const Detail = screens[1].props.component;
+  act(() => {
+    view.update(<List navigation={{addListener: jest.fn(() => jest.fn())}} />);
+  });
+  const scan = view.root
+    .findAll(
+      node =>
+        node.props.accessibilityRole === 'button' &&
+        node.props.accessibilityLabel === 'Scan again',
+    )
+    .find(node => node.props.onPress);
+  const target = StyleSheet.flatten(scan.props.style);
+  expect(target.width).toBeGreaterThanOrEqual(44);
+  expect(target.height).toBeGreaterThanOrEqual(44);
+  act(() => scan.props.onPress());
+  expect(manager.resetDeviceList).toHaveBeenCalledTimes(1);
+
+  act(() => {
+    view.update(
+      <Detail route={{params: {deviceId: 'abc', deviceName: 'Test device'}}} />,
+    );
+  });
+  act(() => manager.observeAdvertisements.mock.calls.slice(-1)[0][1]());
+  expect(visibleText()).toContain('Bluetooth unavailable');
+  expect(visibleText()).toContain(
+    'Enable Bluetooth and allow Nearby Devices access in Settings.',
+  );
 });
