@@ -66,6 +66,19 @@ the Hub model/nonce and the actual ADR record using an existing Entra CLI sessio
 It requests no keys and performs no cloud writes. See the
 [simulator guide](../ADR-SIMULATOR.md) for manual use and evidence boundaries.
 
+### Follow-up: automatic Azure details
+
+The intended follow-up experience populates Azure details automatically, without
+requiring app users to export or import a snapshot. The current optional snapshot
+is a prototype bridge, not a required step in device onboarding.
+
+Choose the authorized delivery mechanism separately: static resource context can
+accompany onboarding configuration, while fresh inventory and management activity
+need an appropriately authorized Azure user session or backend. Device credentials
+must not gain Azure management permissions. This future direction does not
+authorize a new backend, Azure sign-in implementation, resources or IAM changes in
+the current simulator acceptance work.
+
 ### Recorded mobile evidence (2026-09-16)
 
 Credential-free Android replay `35149722810` and iOS replay `35149723154`
