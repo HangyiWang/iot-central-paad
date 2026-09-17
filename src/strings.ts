@@ -163,6 +163,10 @@ const Strings = {
   },
   Settings: {
     Title: 'Settings',
+    Font: {
+      Title: 'Quicksand font license',
+      Unavailable: 'The bundled font license is unavailable in this build.',
+    },
     Theme: {
       Title: 'Theme',
       Dark: {

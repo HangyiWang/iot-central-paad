@@ -30,8 +30,8 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
-    // @generated begin xml-fonts-init - expo prebuild (DO NOT MODIFY) sync-da39a3ee5e6b4b0d3255bfef95601890afd80709
-
+    // @generated begin xml-fonts-init - expo prebuild (DO NOT MODIFY) sync-58733c5716224de9fad8bd2aef6577dc10c5d513
+    ReactFontManager.getInstance().addCustomFont(this, "Quicksand-Bold", R.font.xml_quicksand_bold)
     // @generated end xml-fonts-init
     DefaultNewArchitectureEntryPoint.releaseLevel = try {
       ReleaseLevel.valueOf(BuildConfig.REACT_NATIVE_RELEASE_LEVEL.uppercase())

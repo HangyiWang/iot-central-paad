@@ -1,52 +1,40 @@
 import React from 'react';
-import {Platform, StyleSheet, View} from 'react-native';
+import {Platform, StyleSheet} from 'react-native';
 import {useTheme} from 'hooks';
 import Strings from 'strings';
 import {palette} from '../theme/palette';
 import {Text} from './typography';
+import {DISPLAY_FONT_FAMILY} from '../theme/fonts';
 
 export default function BrandTitle() {
   const {dark} = useTheme();
   const colors = palette(dark);
   return (
-    <View
-      style={[
-        styles.frame,
-        {backgroundColor: colors.tints[0], borderColor: colors.border},
-      ]}>
+    <Text
+      testID="app-header-title"
+      accessibilityRole="header"
+      accessibilityLabel={Strings.Header.Title}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.85}
+      maxFontSizeMultiplier={1.4}
+      style={[styles.title, {color: colors.muted}]}>
       <Text
-        testID="app-header-title"
-        accessibilityRole="header"
-        accessibilityLabel={Strings.Header.Title}
-        style={[styles.title, {color: colors.text}]}>
-        <Text style={[styles.brand, {color: colors.primary}]}>
-          {Strings.Header.Brand}
-        </Text>
-        {` ${Strings.Header.Descriptor}`}
+        style={[styles.title, {color: colors.primary}]}
+        maxFontSizeMultiplier={1.4}>
+        {Strings.Header.Brand}
       </Text>
-    </View>
+      {` ${Strings.Header.Descriptor}`}
+    </Text>
   );
 }
 
 const styles = StyleSheet.create({
-  frame: {
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    flexShrink: 1,
-  },
   title: {
-    fontFamily: Platform.select({ios: 'System', android: 'sans-serif'}),
-    fontSize: 16,
-    fontWeight: '500',
-    lineHeight: 27,
-    letterSpacing: -0.3,
-  },
-  brand: {
-    fontSize: 22,
-    fontWeight: '700',
-    lineHeight: 27,
-    letterSpacing: -0.7,
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 20,
+    fontWeight: Platform.OS === 'android' ? '700' : undefined,
+    lineHeight: 26,
+    letterSpacing: 0.2,
   },
 });
