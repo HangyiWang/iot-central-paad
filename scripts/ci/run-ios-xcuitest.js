@@ -135,7 +135,8 @@ function executeNative(mode, env = process.env) {
       fs.writeSync(descriptor, 'Native bootstrap: simulator boot\n');
       command('xcrun', ['simctl', 'boot', env.IOS_SIMULATOR_UDID], 15000);
       smokeBooted = true;
-      command('xcrun', ['simctl', 'bootstatus', env.IOS_SIMULATOR_UDID, '-b'], 180000);
+      // A fresh iOS 26 runtime can still be migrating location data after three minutes.
+      command('xcrun', ['simctl', 'bootstatus', env.IOS_SIMULATOR_UDID, '-b'], 300000);
       fs.writeSync(descriptor, 'Native bootstrap: app install\n');
       command('xcrun', ['simctl', 'install', env.IOS_SIMULATOR_UDID, path.resolve(APP)], 60000);
       fs.writeSync(descriptor, 'Native bootstrap: simulator presentation\n');

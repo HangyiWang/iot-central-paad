@@ -505,6 +505,13 @@ function withRunner(mode, body, overrides = {}) {
         expect(mode).toBe('smoke');
         return overrides.runtime || {status: 0};
       }
+      if (binary === 'xcrun' && args[1] === 'bootstatus') {
+        expect(mode).toBe('smoke');
+        expect(options.timeout).toBe(300000);
+        expect(options.killSignal).toBe('SIGKILL');
+        expect(args).toEqual(['simctl', 'bootstatus', environment(mode).IOS_SIMULATOR_UDID, '-b']);
+        return {status: 0};
+      }
       if (binary === 'xcrun' || binary === 'bash') return {status: 0};
       throw new Error('Unexpected fixture command');
     });
