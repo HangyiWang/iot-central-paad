@@ -142,7 +142,9 @@ describe('App startup', () => {
         true,
       );
       expect(hasText(Strings.Title)).toBe(false);
-      expect(hasText(Strings.Header.Title)).toBe(false);
+      expect(
+        app.root.findAllByProps({testID: 'app-header-title'}),
+      ).toHaveLength(0);
       const dismissWrappers = app.root
         .findAllByType(TouchableWithoutFeedback)
         .filter(node => node.props.onPress === Keyboard.dismiss);
