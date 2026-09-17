@@ -34,20 +34,24 @@ name: Credential-free bundled startup and manual-navigation smoke
     text: "^0ne00000000$"
 - scrollUntilVisible:
     element:
-      id: connection-deviceKey
-    direction: DOWN
-- tapOn:
-    id: connection-deviceKey
-- inputText: "synthetic+not/a-device-key="
-- pressKey: Enter
-- scrollUntilVisible:
-    element:
       id: connection-provisioningHost
     direction: DOWN
 - tapOn:
     id: connection-provisioningHost
 - eraseText
 - inputText: "global-canary.azure-devices-provisioning.net"
+- pressKey: Enter
+- assertVisible:
+    id: connection-provisioningHost
+    text: '^global-canary\.azure-devices-provisioning\.net$'
+# Match the real flow: finish the endpoint before focusing the secure input.
+- scrollUntilVisible:
+    element:
+      id: connection-deviceKey
+    direction: UP
+- tapOn:
+    id: connection-deviceKey
+- inputText: "synthetic+not/a-device-key="
 - pressKey: Enter
 - assertVisible:
     id: connection-provisioningHost

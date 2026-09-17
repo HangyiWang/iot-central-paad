@@ -45,6 +45,10 @@ Foundation run `35193089860`, source
 lanes with the Opus-informed activity-log and utility-page refinements.
 Follow-up log controls use actual 48 dp/pt minimum touch regions rather than
 relying on hit slop outside a parent's bounds.
+The synthetic startup flow follows the real flow's endpoint-before-key input
+order and rechecks the endpoint afterward. Credential-free run `35227323436`
+otherwise left the endpoint at its default while the secure field changed
+after an attempted endpoint edit; a completed tap was not proof of focus.
 
 Run `35166673016` at `3f6e41cd0ad72af69a44bbb8aca1e437d101bd1e` passed the
 refreshed foundation iOS flow. Its Android flow closed Quickstep successfully,
