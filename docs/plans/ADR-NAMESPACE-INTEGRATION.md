@@ -126,6 +126,30 @@ proof for the retained device, not a new automatic registry-creation case.
 APK SHA256:
 `6192bd6e0a9181c29b888cb267c3641362e983a7694c942f09b37721561a7584`.
 
+### Registration and Details refinement (2026-09-17)
+
+Feature source `31e7e8e7658abb7c152fa038bb8c98b4ecd7cf2c` passed JavaScript,
+Android and iOS lanes in `35285951515`. The corresponding foundation-only footer
+adaptation, `113ac715d29215077c005632d7497c704ddff687`, passed all three in
+`35284774063`. Foundation retains its legacy registration/clear confirmation
+flows; the feature retains its distinct Close/new-device flow and ADR sheet.
+
+The feature uses scoped shared Details typography, card spacing and action styles
+across identity, registry, proof and Azure context. Static values are neutral;
+unknown registry state remains neutral and snapshot activity remains historical.
+The accepted display header and connection capsule are unchanged.
+
+The Android APK was installed over the retained app without clearing data.
+Settings-to-Registration interaction confirmed separate approximately 52 dp
+buttons, the nominal 12 dp gap, and Close returning to the connected device.
+The inspection did not invoke new registration. Saved Azure context/activity
+survived without reimport, and an exact newly submitted proof nonce independently
+matched assignment, model and the existing automatic ADR record. This is
+retained-device update/traffic evidence, not a new registry-creation case or a
+separate force-stop assertion for this binary.
+APK SHA256:
+`d6d48debef8d548abdf44d494c67eeac1e9f435223da2232718c6fc7aa80ab6c`.
+
 ### Recorded mobile evidence (2026-09-16)
 
 Credential-free Android replay `35149722810` and iOS replay `35149723154`
