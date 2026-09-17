@@ -2,7 +2,12 @@
  * @format
  */
 
-import {Keyboard, StyleSheet, Text, TouchableWithoutFeedback} from 'react-native';
+import {
+  Keyboard,
+  StyleSheet,
+  Text,
+  TouchableWithoutFeedback,
+} from 'react-native';
 import React from 'react';
 import App from '../src/App';
 import {Welcome} from '../src/Welcome';
@@ -93,7 +98,11 @@ describe('App startup', () => {
       });
 
       expect(app.root.findAllByType(Welcome)).toHaveLength(0);
-      expect(hasText(Strings.Header.Title)).toBe(true);
+      expect(
+        app.root
+          .findAllByProps({testID: 'app-header-title'})
+          .some(node => node.props.accessibilityLabel === Strings.Header.Title),
+      ).toBe(true);
       expect(hasText(Strings.Registration.Header.Welcome)).toBe(true);
       expect(hasText('Scan QR code')).toBe(true);
       expect(hasText(Strings.Registration.QRCode.Manually)).toBe(true);
@@ -132,7 +141,9 @@ describe('App startup', () => {
         true,
       );
       expect(hasText(Strings.Title)).toBe(false);
-      expect(hasText(Strings.Header.Title)).toBe(false);
+      expect(
+        app.root.findAllByProps({testID: 'app-header-title'}),
+      ).toHaveLength(0);
       const dismissWrappers = app.root
         .findAllByType(TouchableWithoutFeedback)
         .filter(node => node.props.onPress === Keyboard.dismiss);
