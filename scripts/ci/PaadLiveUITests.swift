@@ -319,7 +319,7 @@ final class PaadLiveUITests: XCTestCase {
     app.launchArguments = []
     app.launchEnvironment = [:]
     pendingCategory = .launchFailed
-    app.launch()
+    app.activate()
     pendingCategory = nil
     guard app.wait(for: .runningForeground, timeout: Timeout.launch) else {
       throw Failure.launchFailed
@@ -333,8 +333,11 @@ final class PaadLiveUITests: XCTestCase {
     // solely on data the application itself saved.
     app.launchArguments = []
     app.launchEnvironment = [:]
+    guard app.state == .notRunning else {
+      throw Failure.terminationFailed
+    }
     pendingCategory = .launchFailed
-    app.launch()
+    app.activate()
     pendingCategory = nil
     guard app.wait(for: .runningForeground, timeout: Timeout.launch) else {
       throw Failure.launchFailed

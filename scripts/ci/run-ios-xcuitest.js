@@ -176,6 +176,31 @@ function executeNative(mode, env = process.env) {
     if (descriptor !== undefined) fs.closeSync(descriptor);
     if (mode === 'smoke') {
       if (smokeBooted) {
+        if (env.PAAD_NATIVE_SMOKE_DIAGNOSTICS === 'true') {
+          try {
+            const runtime = spawnSync('xcrun', [
+              'simctl', 'spawn', env.IOS_SIMULATOR_UDID, 'log', 'show',
+              '--style', 'compact', '--last', '5m', '--predicate',
+              'process == "IoTPnP" OR ((process == "SpringBoard" OR process == "runningboardd") AND eventMessage CONTAINS "com.microsoft.iotpnp.ci")',
+            ], {
+              env: cleanEnv, encoding: 'utf8', timeout: 20000,
+              killSignal: 'SIGKILL', maxBuffer: 256 * 1024,
+            });
+            const incomplete = runtime.error || runtime.signal || runtime.status !== 0;
+            if (incomplete) console.error('Credential-free runtime diagnostics are incomplete.');
+            const output = fs.openSync(log,
+              fs.constants.O_WRONLY | fs.constants.O_APPEND | fs.constants.O_NOFOLLOW);
+            try {
+              fs.writeSync(output, `\nNative synthetic runtime diagnostics (${incomplete ? 'incomplete' : 'complete'}):\n`);
+              fs.writeSync(output, runtime.stdout || '');
+              fs.writeSync(output, runtime.stderr || '');
+            } finally {
+              fs.closeSync(output);
+            }
+          } catch {
+            console.error('Credential-free runtime diagnostics could not be recorded.');
+          }
+        }
         const shutdown = spawnSync('xcrun', ['simctl', 'shutdown', env.IOS_SIMULATOR_UDID], {
           env: cleanEnv, stdio: 'ignore', timeout: 60000, killSignal: 'SIGKILL',
         });

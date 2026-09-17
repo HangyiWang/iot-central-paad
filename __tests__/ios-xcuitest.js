@@ -378,6 +378,10 @@ function withRunner(mode, body, overrides = {}) {
         );
         return overrides.process || {status: 0};
       }
+      if (binary === 'xcrun' && args[1] === 'spawn') {
+        expect(mode).toBe('smoke');
+        return overrides.runtime || {status: 0};
+      }
       if (binary === 'xcrun' || binary === 'bash') return {status: 0};
       throw new Error('Unexpected fixture command');
     });
@@ -448,6 +452,17 @@ test('explicit credential-free smoke retains a bounded log but still removes pri
   }, {env: {PAAD_NATIVE_SMOKE_DIAGNOSTICS: 'true'}});
 });
 
+test('an unavailable optional no-secret runtime log does not replace UI proof or prevent cleanup', () => {
+  withRunner('smoke', passed => {
+    expect(passed).toBe(true);
+    expect(fs.existsSync('build/ios-ui-smoke-private')).toBe(false);
+    expect(fs.readFileSync('build/ios-ui-smoke.log', 'utf8')).toContain('runtime diagnostics (incomplete)');
+  }, {
+    env: {PAAD_NATIVE_SMOKE_DIAGNOSTICS: 'true'},
+    runtime: {status: 1, stderr: 'SYNTHETIC_RUNTIME_ONLY'},
+  });
+});
+
 test('oversized native output fails proof while credential-free diagnostics retain at most one MiB', () => {
   withRunner('smoke', passed => {
     expect(passed).toBe(false);
@@ -481,6 +496,9 @@ test('native smoke never submits credentials and live cold restoration uses an a
   expect(smoke).toContain('requireExists(.formSubmit');
   expect(swift).toContain('app.terminate()');
   expect(swift).toContain('app.wait(for: .notRunning');
+  expect(swift).toContain('guard app.state == .notRunning else');
+  expect(swift.match(/app\.activate\(\)/g)).toHaveLength(2);
+  expect(swift).not.toContain('app.launch()');
   expect(swift.match(/app.launchEnvironment = \[:\]/g)).toHaveLength(3);
   expect(swift).not.toMatch(/app\.launchEnvironment\s*=\s*(?:ProcessInfo|config)/);
   expect(swift).not.toContain('func finalize(');

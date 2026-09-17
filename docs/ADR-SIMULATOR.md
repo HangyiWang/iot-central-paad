@@ -331,6 +331,16 @@ entirely. Only this no-secret mode also retains a bounded synthetic runner log
 (final 1 MiB, three days). Credentialed runs export only fixed-category summaries;
 their raw native output and result bundles remain private and are deleted.
 
+For harness-only iteration, `replay-ios.yml` also accepts `ios_driver=xcuitest`.
+Supply a completed authorized live-workflow `source_run` and exact `source_sha`;
+the existing verifier downloads only its pre-secret simulator app and checks its
+identity and hash. The replay builds only the small native runner, creates a
+fresh owned simulator and exercises synthetic input without Connect. Its
+diagnostics bind the older app source separately from the current harness.
+This is not current-source mobile/cloud acceptance. The native harness uses
+Apple's application activation API; a cold-restoration assertion still requires
+actual termination and an observed not-running state before reactivation.
+
 Android map preview needs a restricted key configured at native build time;
 without one, coordinates remain available. Image upload also requires Hub-side
 storage configuration; this workflow does not create that infrastructure.

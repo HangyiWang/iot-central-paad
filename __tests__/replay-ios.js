@@ -26,6 +26,14 @@ const environment = {
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 let sequence = 0;
 
+test.each(['maestro', 'xcuitest', 'unsupported'])('replay driver guard fails closed for %s', driver => {
+  const guard = workflow.jobs.replay.steps.find(step => step.name === 'Reject unsupported replay drivers');
+  const result = spawnSync('/bin/bash', ['-c', guard.run], {
+    env: {PATH: process.env.PATH, IOS_REPLAY_DRIVER: driver},
+  });
+  expect(result.status).toBe(driver === 'unsupported' ? 1 : 0);
+});
+
 function withFixture(testBody, {download = false} = {}) {
   const directory = path.resolve(`.replay-ios-fixture-${process.pid}-${sequence++}`);
   fs.mkdirSync(directory, {mode: 0o700});
@@ -167,7 +175,14 @@ test('iOS replay has owner/manual guards, narrowly scoped registration, pinned t
   expect(workflow.on.push).toEqual({
     branches: ['feature/adr-onboarding'], paths: ['.github/workflows/replay-ios.yml'],
   });
-  expect(workflow.on.workflow_dispatch.inputs).toEqual(android.on.workflow_dispatch.inputs);
+  expect(workflow.on.workflow_dispatch.inputs).toMatchObject(android.on.workflow_dispatch.inputs);
+  expect(workflow.on.workflow_dispatch.inputs.ios_driver).toEqual({
+    description: 'Credential-free iOS replay driver',
+    type: 'choice',
+    options: ['maestro', 'xcuitest'],
+    default: 'maestro',
+    required: true,
+  });
   expect(workflow.jobs.replay.if).toBe(android.jobs.replay.if);
   expect(workflow.jobs['register-manual-entrypoint'].if).toBe("github.event_name == 'push'");
   expect(workflow.jobs['register-manual-entrypoint'].steps).toEqual([
@@ -183,15 +198,28 @@ test('iOS replay has owner/manual guards, narrowly scoped registration, pinned t
   const steps = workflow.jobs.replay.steps;
   for (const step of steps.filter(candidate => candidate.uses)) {
     expect(step.uses).toMatch(/@[a-f0-9]{40}$/);
-    expect(android.jobs.replay.steps.some(candidate => candidate.uses === step.uses)).toBe(true);
   }
   expect(steps.find(step => step.uses?.startsWith('actions/checkout@')).with['persist-credentials']).toBe(false);
   expect(steps.find(step => step.uses?.startsWith('actions/setup-node@')).with).toEqual({'node-version': '24.19.0'});
-  expect(steps.find(step => step.uses?.startsWith('actions/setup-java@')).with).toEqual({
+  const java = steps.find(step => step.uses?.startsWith('actions/setup-java@'));
+  expect(java.with).toEqual({
     distribution: 'temurin', 'java-version': '21',
   });
-  expect(steps.some(step => step.run === 'bash scripts/ci/install-maestro.sh')).toBe(true);
-  expect(steps.find(step => step.run === 'bash scripts/ci/replay-ios.sh')['timeout-minutes']).toBeLessThanOrEqual(15);
+  expect(java.if).toBe("inputs.ios_driver == 'maestro'");
+  const maestroInstall = steps.find(step => step.run === 'bash scripts/ci/install-maestro.sh');
+  expect(maestroInstall.if).toBe("inputs.ios_driver == 'maestro'");
+  const maestroReplay = steps.find(step => step.run === 'bash scripts/ci/replay-ios.sh');
+  expect(maestroReplay.if).toBe("inputs.ios_driver == 'maestro'");
+  expect(maestroReplay['timeout-minutes']).toBeLessThanOrEqual(15);
+  const ruby = steps.find(step => step.uses?.startsWith('ruby/setup-ruby@'));
+  expect(ruby).toMatchObject({
+    uses: 'ruby/setup-ruby@984c0c890880bbf811283d6f09c4607c62d210a4',
+    if: "inputs.ios_driver == 'xcuitest'",
+    with: {'ruby-version': '3.3.8', bundler: '2.5.23', 'bundler-cache': true},
+  });
+  expect(steps.find(step => step.run === 'node scripts/ci/replay-native-ios.js')).toMatchObject({
+    if: "inputs.ios_driver == 'xcuitest'", 'timeout-minutes': 15,
+  });
   expect([...script.matchAll(/run_bounded (\d+)/g)].reduce((sum, match) => sum + Number(match[1]), 60000))
     .toBeLessThan(900000);
   expect(script).toContain('run_bounded 400000 "$maestro"');
@@ -214,15 +242,23 @@ test('only source download receives a token; uploads exclude app, HOME, scratch 
   });
   expect(steps.find(step => step.run === 'bash scripts/ci/replay-ios.sh').env).toBeUndefined();
   const uploads = steps.filter(step => step.uses?.startsWith('actions/upload-artifact@'));
-  expect(uploads).toHaveLength(1);
+  expect(uploads).toHaveLength(2);
   expect(uploads[0].with.path.trim().split('\n')).toEqual([
     'build/ci-artifacts/identity.txt', 'build/ci-artifacts/replay-ios/',
   ]);
-  expect(uploads[0].with['retention-days']).toBe(3);
-  expect(uploads[0].with['if-no-files-found']).toBe('error');
-  expect(uploads[0].if).toContain("steps.source.outcome == 'success'");
-  expect(uploads[0].if).toContain('!cancelled()');
-  expect(uploads[0].if).toContain("hashFiles('build/ci-artifacts/replay-ios/replay-identity.json')");
+  expect(uploads[0].if).toContain("inputs.ios_driver == 'maestro'");
+  expect(uploads[1].with.path.trim().split('\n')).toEqual([
+    'build/ci-artifacts/identity.txt', 'build/ci-artifacts/replay-ios/',
+    'build/ios-ui-smoke-summary.json', 'build/ios-ui-smoke.log',
+  ]);
+  expect(uploads[1].if).toContain("inputs.ios_driver == 'xcuitest'");
+  for (const upload of uploads) {
+    expect(upload.with['retention-days']).toBe(3);
+    expect(upload.with['if-no-files-found']).toBe('error');
+    expect(upload.if).toContain("steps.source.outcome == 'success'");
+    expect(upload.if).toContain('!cancelled()');
+    expect(upload.if).toContain("hashFiles('build/ci-artifacts/replay-ios/replay-identity.json')");
+  }
 });
 
 test.each([
