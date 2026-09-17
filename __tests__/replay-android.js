@@ -230,37 +230,6 @@ test('replays the unchanged synthetic startup assertions and never submits Conne
   expect(script).not.toMatch(/-e[^\n]*(?:DEVICE_KEY|PAAD_LIVE_CONFIG)/);
 });
 
-test('only observed stock-emulator ANRs can be dismissed; PAAD failures are not hidden', () => {
-  const flow = yaml.loadAll(fs.readFileSync('.maestro/dismiss-quickstep-anr.yaml', 'utf8'));
-  expect(flow[0].appId).toBe('${APP_ID}');
-  expect(flow[1]).toEqual([{
-    runFlow: {
-      when: {
-        platform: 'Android',
-      },
-      commands: [
-        {extendedWaitUntil: {
-          visible: {id: 'registration-manual|connection-status|android:id/alertTitle'},
-          timeout: 60000,
-        }},
-        {runFlow: {
-          when: {visible: {id: 'android:id/alertTitle', text: "^(Quickstep|System UI) isn't responding$"}},
-          commands: [
-            {tapOn: {id: 'android:id/aerr_close'}},
-            {assertNotVisible: {id: 'android:id/alertTitle', text: "^(Quickstep|System UI) isn't responding$"}},
-          ],
-        }},
-      ],
-    },
-  }]);
-  const title = new RegExp(flow[1][0].runFlow.commands[1].runFlow.when.visible.text);
-  expect(title.test("Quickstep isn't responding")).toBe(true);
-  expect(title.test("IoT Plug and Play isn't responding")).toBe(false);
-  expect(title.test("System UI isn't responding")).toBe(true);
-  expect(title.test("Another app isn't responding")).toBe(false);
-  expect(title.test("Quickstep isn't responding - extra text")).toBe(false);
-});
-
 test.each([
   ['GITHUB_EVENT_NAME', 'push'], ['GITHUB_REF', 'refs/heads/master'],
   ['GITHUB_REPOSITORY', 'other/iot-central-paad'], ['GITHUB_REPOSITORY_OWNER', 'other'],

@@ -138,7 +138,7 @@ bash scripts/ci/show-ios-simulator.sh "$device" \
 flow_attempted=1
 HOME="$state/home" TMPDIR="$state/scratch" \
 JAVA_TOOL_OPTIONS="-Duser.home=$state/home -Djava.io.tmpdir=$state/scratch" \
-run_bounded 450000 "$maestro" --device "$device" test --no-ansi \
+run_bounded 400000 "$maestro" --device "$device" test --no-ansi \
   --format junit --output "$diagnostics/results/result.xml" \
   --debug-output "$diagnostics/debug" --test-output-dir "$diagnostics/results" \
   -e APP_ID=com.microsoft.iotpnp.ci .maestro/startup.yaml \

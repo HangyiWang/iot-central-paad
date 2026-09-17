@@ -88,9 +88,14 @@ APK SHA256:
 `e03817b61d15a7e678c1c26ed1a8cef2ea12838df5685b3535089ca1e04ba3ba`.
 Lab-specific proof reports remain private and are not committed.
 
+The refreshed Android UI from run `35164148425`, source
+`41be7a028c9e4fc2aee7ed8b09d8d3049a73449e`, was installed over that CI app with
+`adb -e install -r`. Private native UI inspection confirmed Connected and the
+same assigned device/Hub without credential re-entry. No app data was cleared.
+
 Android's manual cloud/cold-restore case is complete. iOS still needs the exact
-nonce and connected cold-restoration evidence; CI selector failures remain under
-investigation. None of this establishes physical-device parity or downstream
+nonce and connected cold-restoration evidence; XCTest screenshot and simulator
+startup reliability remain under investigation. None of this establishes physical-device parity or downstream
 telemetry receipt.
 
 ## What the experiment proved, and what it did not
