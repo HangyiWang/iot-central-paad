@@ -30,6 +30,12 @@ navigation/cold-restart scenarios. Builds use isolated `.ci` application IDs,
 not production signing or credentials. Results must identify the exact built
 commit and toolchain; a written workflow is not evidence of a successful run.
 
+The iOS harness presents only its explicitly owned simulator with the pinned
+Xcode Simulator app before Maestro requests XCTest screenshots. GUI launch is
+bounded to ten seconds and rejects live device inputs. This addresses a
+reported headless-runner stability condition without bypassing UI assertions;
+it is not itself evidence of a successful native or cloud run.
+
 Reference artwork remains local and untracked. Use `image2.png` for information
 structure and `image1.png` for calm visual tone, with selective accents from the
 other two images. Produce an original design, not copied artwork.

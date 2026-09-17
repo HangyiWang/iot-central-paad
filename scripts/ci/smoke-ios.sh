@@ -24,6 +24,7 @@ collect_evidence() {
   exit "$result"
 }
 trap collect_evidence EXIT
+bash scripts/ci/show-ios-simulator.sh "$IOS_SIMULATOR_UDID"
 maestro --version
 maestro --device "$IOS_SIMULATOR_UDID" test --no-ansi --format junit \
   --output build/ci-artifacts/maestro-ios.xml \
