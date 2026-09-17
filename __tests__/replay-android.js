@@ -205,13 +205,13 @@ test('reuses pinned live actions, Java 21, Maestro installer and identical emula
     .toBe(liveSteps.find(step => step.name === 'Enable standard runner KVM').run);
 });
 
-test('replays the unchanged synthetic startup assertions and never submits Connect', () => {
+test('replays the shared synthetic startup assertions and never submits Connect', () => {
   const flow = yaml.loadAll(fs.readFileSync('.maestro/startup.yaml', 'utf8'));
   const commands = flow[1];
   expect(flow[0].appId).toBe('${APP_ID}');
   expect(commands.filter(command => command.inputText).map(command => command.inputText)).toEqual([
-    'ci-input-fixture', '0ne00000000', 'synthetic+not/a-device-key=',
-    'global-canary.azure-devices-provisioning.net',
+    'ci-input-fixture', '0ne00000000',
+    'global-canary.azure-devices-provisioning.net', 'synthetic+not/a-device-key=',
   ]);
   for (const [id, text] of [
     ['connection-registrationId', '^ci-input-fixture$'],
