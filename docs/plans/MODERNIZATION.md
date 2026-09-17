@@ -45,6 +45,11 @@ Foundation run `35193089860`, source
 lanes with the Opus-informed activity-log and utility-page refinements.
 Follow-up log controls use actual 48 dp/pt minimum touch regions rather than
 relying on hit slop outside a parent's bounds.
+The later header/input refinement
+`3e4a1529ad522cdceb50a235c6562802b8b58068` passed all three lanes in run
+`35257843934`. It retains the foundation's legacy onboarding form, with the
+shared restrained header, explicit 48 dp/pt Settings target and actual editable
+input minimum height.
 Foundation run `35247956689`, source
 `3bf1f3a11731dd52f3697d12265ce69a0447f2b2`, passed JavaScript and both native
 lanes. It distinguishes a lost established session (`CONNECTION_LOST`) from an
