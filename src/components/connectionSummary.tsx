@@ -11,6 +11,7 @@ import {
   useTheme,
 } from 'hooks';
 import Strings from 'strings';
+import ConnectionNotice from './connectionNotice';
 
 export default function ConnectionSummary({
   onManualConnection,
@@ -51,7 +52,7 @@ export default function ConnectionSummary({
           {Strings.Connection.Stages[stage]}
         </Text>
       )}
-      {error && <Text accessibilityLiveRegion="polite">{error.message}</Text>}
+      {error && !loading && <ConnectionNotice error={error} diagnostics />}
       <View style={styles.actions}>
         {loading ? (
           <Pressable

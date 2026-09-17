@@ -46,6 +46,15 @@ lanes with the Opus-informed activity-log and utility-page refinements.
 Follow-up log controls use actual 48 dp/pt minimum touch regions rather than
 relying on hit slop outside a parent's bounds.
 
+Foundation run `35247956689`, source
+`3bf1f3a11731dd52f3697d12265ce69a0447f2b2`, passed JavaScript and both native
+lanes. It distinguishes an interrupted established session (`CONNECTION_LOST`)
+from an initial failure without inferring a network cause or adding automatic
+reconnection. Follow-up property cards remove the synthetic editable value,
+provide clear empty states and distinguish labels from values. Connection
+failures now appear in the connection summary or onboarding area, not below the
+tab bar; the existing legacy foundation form remains unchanged.
+
 Run `35166673016` at `3f6e41cd0ad72af69a44bbb8aca1e437d101bd1e` passed the
 refreshed foundation iOS flow. Its Android flow closed Quickstep successfully,
 then encountered a stacked System UI ANR. Recovery therefore allows at most

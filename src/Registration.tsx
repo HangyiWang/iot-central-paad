@@ -61,6 +61,7 @@ import {
   Text,
   ButtonGroup,
   ButtonGroupItem,
+  ConnectionNotice,
 } from 'components';
 import {IoTCContext, StorageContext} from 'contexts';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -73,8 +74,7 @@ export const Registration = React.memo<{
   navigation?: PagesNavigator;
 }>(({navigation: parentNavigator}) => {
   const {colors} = useTheme();
-  const [connect, , , {client, loading}] =
-    useConnectIoTCentralClient();
+  const [connect, , , {client, loading, error}] = useConnectIoTCentralClient();
   const {registeringNew, setRegisteringNew} = useContext(IoTCContext);
   const previousLoading = usePrevious(loading);
   const qrcodeRef = useRef<QRCodeScanner>(null);
@@ -106,57 +106,64 @@ export const Registration = React.memo<{
   }, [client, loading, parentNavigator, previousLoading]);
 
   return (
-    <Stack.Navigator
-      initialRouteName={
-        client && client.isConnected() ? screens.MANUAL : screens.EMPTY
-      }
-      screenOptions={{
-        headerBackButtonDisplayMode: 'minimal',
-        headerBackAccessibilityLabel: Strings.Core.Back,
-        headerBackTestID: 'registration-back',
-        headerMode: 'float',
-      }}>
-      <Stack.Screen
-        name={screens.EMPTY}
-        options={() => ({
-          headerShown: false,
-          headerLeft: () => (
-            <HeaderCloseButton
-              goBack={parentNavigator?.goBack}
-              title={Pages.REGISTRATION}
-            />
-          ),
-          headerTitle: Pages.REGISTRATION,
-        })}
-        component={EmptyClient}
-      />
-      <Stack.Screen
-        name={screens.QR}
-        options={{
-          headerTransparent: true,
-          headerTitle: '',
-          headerTintColor: colors.text,
+    <View style={{flex: 1}}>
+      {error && !loading && (
+        <View style={{padding: 16}}>
+          <ConnectionNotice error={error} diagnostics />
+        </View>
+      )}
+      <Stack.Navigator
+        initialRouteName={
+          client && client.isConnected() ? screens.MANUAL : screens.EMPTY
+        }
+        screenOptions={{
+          headerBackButtonDisplayMode: 'minimal',
+          headerBackAccessibilityLabel: Strings.Core.Back,
+          headerBackTestID: 'registration-back',
+          headerMode: 'float',
         }}>
-        {() => {
-          /**
-           * ---- UX TWEAK ----
-           * All connection screens (qrcode and manual) must run on full screen.
-           * If parent navigator is running, hide headers and footers.
-           * For "EmptyClient" screen show immediate parent.
-           */
-          return <QRCodeScreen scannerRef={qrcodeRef} connect={connect} />;
-        }}
-      </Stack.Screen>
-      <Stack.Screen
-        name={screens.MANUAL}
-        options={() => ({
-          headerTitle: Strings.Registration.Manual.Title,
-          headerShown: registeringNew || !client || !client.isConnected(), // hide header when connecting and when clearing registration
-        })}
-        initialParams={{parentNavigatorKey, parentRoutes}}
-        component={ManualConnect}
-      />
-    </Stack.Navigator>
+        <Stack.Screen
+          name={screens.EMPTY}
+          options={() => ({
+            headerShown: false,
+            headerLeft: () => (
+              <HeaderCloseButton
+                goBack={parentNavigator?.goBack}
+                title={Pages.REGISTRATION}
+              />
+            ),
+            headerTitle: Pages.REGISTRATION,
+          })}
+          component={EmptyClient}
+        />
+        <Stack.Screen
+          name={screens.QR}
+          options={{
+            headerTransparent: true,
+            headerTitle: '',
+            headerTintColor: colors.text,
+          }}>
+          {() => {
+            /**
+             * ---- UX TWEAK ----
+             * All connection screens (qrcode and manual) must run on full screen.
+             * If parent navigator is running, hide headers and footers.
+             * For "EmptyClient" screen show immediate parent.
+             */
+            return <QRCodeScreen scannerRef={qrcodeRef} connect={connect} />;
+          }}
+        </Stack.Screen>
+        <Stack.Screen
+          name={screens.MANUAL}
+          options={() => ({
+            headerTitle: Strings.Registration.Manual.Title,
+            headerShown: registeringNew || !client || !client.isConnected(), // hide header when connecting and when clearing registration
+          })}
+          initialParams={{parentNavigatorKey, parentRoutes}}
+          component={ManualConnect}
+        />
+      </Stack.Navigator>
+    </View>
   );
 });
 
