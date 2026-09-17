@@ -112,6 +112,11 @@ the QR itself contains a device credential.
 
 ## Local activity versus independent Azure confirmation
 
+Connected pages use a compact **Cloud connection** status row. Tap **Details**
+to see the full assigned device ID, Hub and model, or to disconnect, reconnect
+or open manual connection settings. Identity values remain selectable and are
+not shortened; they no longer occupy the top of every tab.
+
 Open connection details and submit a unique proof nonce. The app sends telemetry
 and a reported property:
 

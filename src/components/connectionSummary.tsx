@@ -24,6 +24,7 @@ import Strings from 'strings';
 import {connectionDiagnostics} from '../onboarding/diagnostics';
 import {ProofActivity} from '../onboarding/proof';
 import {palette} from '../theme/palette';
+import {Icon} from '@rneui/themed';
 
 export default function ConnectionSummary({
   onManualConnection,
@@ -34,7 +35,7 @@ export default function ConnectionSummary({
     useConnectIoTCentralClient();
   const [, credentials] = useIoTCentralClient();
   const [simulated] = useSimulation();
-  const {colors, dark} = useTheme();
+  const {dark} = useTheme();
   const appearance = palette(dark);
   const [connected, setConnected] = useState(false);
   const [details, setDetails] = useState(false);
@@ -58,17 +59,21 @@ export default function ConnectionSummary({
   const operationId = error?.operationId ?? client?.identity?.operationId;
   return (
     <View
+      testID="connection-summary"
       style={[
         styles.container,
         {
-          backgroundColor: colors.card,
+          backgroundColor: appearance.background,
           borderColor: appearance.border,
         },
       ]}>
       <View style={styles.header}>
         <View
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
           style={[
-            styles.statusBadge,
+            styles.connectionIcon,
             {
               backgroundColor:
                 !simulated && connected
@@ -76,33 +81,50 @@ export default function ConnectionSummary({
                   : appearance.inset,
             },
           ]}>
-          <View
-            accessible={false}
-            style={[
-              styles.statusDot,
-              {
-                backgroundColor:
-                  !simulated && connected
-                    ? appearance.positive
-                    : appearance.muted,
-              },
-            ]}
+          <Icon
+            name={
+              !simulated && connected ? 'cloud-check-outline' : 'cloud-outline'
+            }
+            type="material-community"
+            size={20}
+            color={
+              !simulated && connected ? appearance.positive : appearance.muted
+            }
           />
-          <Text
-            testID="connection-status"
-            style={[
-              styles.statusText,
-              {
-                color:
-                  !simulated && connected
-                    ? appearance.positive
-                    : appearance.muted,
-              },
-            ]}
-            accessibilityRole="header"
-            accessibilityLiveRegion="polite">
-            {!simulated && connected ? text.Connected : text.Disconnected}
+        </View>
+        <View style={styles.statusContent}>
+          <Text style={[styles.label, {color: appearance.muted}]}>
+            {text.Title}
           </Text>
+          <View style={styles.statusBadge}>
+            <View
+              accessible={false}
+              style={[
+                styles.statusDot,
+                {
+                  backgroundColor:
+                    !simulated && connected
+                      ? appearance.positive
+                      : appearance.muted,
+                },
+              ]}
+            />
+            <Text
+              testID="connection-status"
+              style={[
+                styles.statusText,
+                {
+                  color:
+                    !simulated && connected
+                      ? appearance.positive
+                      : appearance.muted,
+                },
+              ]}
+              accessibilityRole="header"
+              accessibilityLiveRegion="polite">
+              {!simulated && connected ? text.Connected : text.Disconnected}
+            </Text>
+          </View>
         </View>
         {!loading && (
           <Pressable
@@ -112,7 +134,26 @@ export default function ConnectionSummary({
             onPress={() => setDetails(true)}
             style={styles.detailsAction}>
             <Text style={[styles.actionText, {color: appearance.primary}]}>
-              {text.Details}
+              {text.OpenDetails}
+            </Text>
+            <View accessible={false}>
+              <Icon
+                name="chevron-down"
+                type="material-community"
+                color={appearance.primary}
+                size={18}
+              />
+            </View>
+          </Pressable>
+        )}
+        {loading && (
+          <Pressable
+            testID="connection-cancel"
+            accessibilityRole="button"
+            onPress={() => cancel()}
+            style={styles.detailsAction}>
+            <Text style={[styles.actionText, {color: appearance.primary}]}>
+              {Strings.Core.Cancel}
             </Text>
           </Pressable>
         )}
@@ -121,25 +162,6 @@ export default function ConnectionSummary({
         <Text style={[styles.supporting, {color: appearance.muted}]}>
           {text.Simulated}
         </Text>
-      )}
-      {client?.identity && !simulated && (
-        <View style={styles.identity}>
-          <Text style={[styles.label, {color: appearance.muted}]}>
-            {text.Device}
-          </Text>
-          <Text
-            selectable
-            testID="assigned-device-id"
-            style={styles.identityValue}>
-            {client.identity.deviceId}
-          </Text>
-          <Text style={[styles.label, {color: appearance.muted}]}>
-            {text.Hub}
-          </Text>
-          <Text selectable testID="assigned-hub" style={styles.identityValue}>
-            {client.identity.assignedHub}
-          </Text>
-        </View>
       )}
       {loading && (
         <Text
@@ -155,53 +177,6 @@ export default function ConnectionSummary({
           {error.message}
         </Text>
       )}
-      <View style={styles.actions}>
-        {loading ? (
-          <Pressable
-            testID="connection-cancel"
-            accessibilityRole="button"
-            onPress={() => cancel()}
-            style={styles.action}>
-            <Text style={[styles.actionText, {color: appearance.primary}]}>
-              {Strings.Core.Cancel}
-            </Text>
-          </Pressable>
-        ) : (
-          <>
-            {client ? (
-              <Pressable
-                testID="connection-disconnect"
-                accessibilityRole="button"
-                onPress={clear}
-                style={styles.action}>
-                <Text style={[styles.actionText, {color: appearance.muted}]}>
-                  {text.Disconnect}
-                </Text>
-              </Pressable>
-            ) : null}
-            {credentials && !connected ? (
-              <Pressable
-                testID="connection-reconnect"
-                accessibilityRole="button"
-                onPress={() => connect(credentials)}
-                style={styles.action}>
-                <Text style={[styles.actionText, {color: appearance.primary}]}>
-                  {text.Reconnect}
-                </Text>
-              </Pressable>
-            ) : null}
-            <Pressable
-              testID="connection-manual"
-              accessibilityRole="button"
-              onPress={onManualConnection}
-              style={styles.action}>
-              <Text style={[styles.actionText, {color: appearance.primary}]}>
-                {text.Manual}
-              </Text>
-            </Pressable>
-          </>
-        )}
-      </View>
       {details && (
         <Modal
           visible
@@ -246,6 +221,16 @@ export default function ConnectionSummary({
                 {client?.identity && !simulated && (
                   <>
                     <DetailValue
+                      label={text.Device}
+                      value={client.identity.deviceId}
+                      valueTestID="assigned-device-id"
+                    />
+                    <DetailValue
+                      label={text.Hub}
+                      value={client.identity.assignedHub}
+                      valueTestID="assigned-hub"
+                    />
+                    <DetailValue
                       label={text.Model}
                       value={client.identity.modelId}
                       valueTestID="model-id"
@@ -271,6 +256,51 @@ export default function ConnectionSummary({
                     {error.code}
                   </Text>
                 )}
+                <View style={styles.actions}>
+                  {client && (
+                    <Pressable
+                      testID="connection-disconnect"
+                      accessibilityRole="button"
+                      onPress={clear}
+                      style={styles.action}>
+                      <Text
+                        style={[styles.actionText, {color: appearance.muted}]}>
+                        {text.Disconnect}
+                      </Text>
+                    </Pressable>
+                  )}
+                  {credentials && !connected && (
+                    <Pressable
+                      testID="connection-reconnect"
+                      accessibilityRole="button"
+                      onPress={() => {
+                        setDetails(false);
+                        void connect(credentials);
+                      }}
+                      style={styles.action}>
+                      <Text
+                        style={[
+                          styles.actionText,
+                          {color: appearance.primary},
+                        ]}>
+                        {text.Reconnect}
+                      </Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    testID="connection-manual"
+                    accessibilityRole="button"
+                    onPress={() => {
+                      setDetails(false);
+                      onManualConnection();
+                    }}
+                    style={styles.action}>
+                    <Text
+                      style={[styles.actionText, {color: appearance.primary}]}>
+                      {text.Manual}
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
               <View
                 style={[
@@ -411,38 +441,39 @@ function DetailValue({
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 20,
-    marginTop: 8,
-    paddingHorizontal: 18,
-    paddingTop: 8,
-    borderRadius: 24,
-    borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   header: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 4,
+    gap: 10,
   },
+  connectionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusContent: {flex: 1, minWidth: 0, gap: 2},
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
   },
   statusDot: {width: 7, height: 7, borderRadius: 4},
-  statusText: {fontSize: 13, lineHeight: 19, fontWeight: '600'},
+  statusText: {fontSize: 14, lineHeight: 20, fontWeight: '600', flexShrink: 1},
   detailsAction: {
     minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
+    gap: 4,
   },
-  identity: {gap: 2, paddingTop: 4},
   label: {fontSize: 12, lineHeight: 18, fontWeight: '500'},
-  identityValue: {fontSize: 13, lineHeight: 19, marginBottom: 5, flexShrink: 1},
   supporting: {fontSize: 13, lineHeight: 20},
   actions: {flexDirection: 'row', flexWrap: 'wrap', gap: 16},
   action: {minHeight: 48, justifyContent: 'center'},

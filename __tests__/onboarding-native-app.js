@@ -181,7 +181,10 @@ test('manual individual DPS connects to returned identity and submits genuine co
   httpFetch.mockResolvedValueOnce({
     status: 400,
     headers: {get: () => null},
-    json: async () => ({errorCode: 400123, message: 'synthetic-service-secret'}),
+    json: async () => ({
+      errorCode: 400123,
+      message: 'synthetic-service-secret',
+    }),
   });
   await act(async () => {
     press('connection-submit');
@@ -190,15 +193,16 @@ test('manual individual DPS connects to returned identity and submits genuine co
   expect(value('connection-error-code')).toBe('PROVISIONING_FAILED');
   expect(value('connection-http-status')).toBe('HTTP 400');
   expect(value('connection-service-code')).toBe(400123);
-  expect(JSON.stringify(app.toJSON())).not.toContain('synthetic-service-secret');
+  expect(JSON.stringify(app.toJSON())).not.toContain(
+    'synthetic-service-secret',
+  );
   expect(Keychain.setGenericPassword).not.toHaveBeenCalled();
   await act(async () => {
     press('connection-submit');
     await jest.advanceTimersByTimeAsync(500);
   });
   expect(value('connection-status')).toBe('Connected');
-  expect(value('assigned-device-id')).toBe('Assigned-Phone');
-  expect(value('assigned-hub')).toBe('assigned.azure-devices.net');
+  expect(value('assigned-device-id')).toBeUndefined();
   expect(destinations).toEqual([
     'wss://assigned.azure-devices.net/$iothub/websocket',
   ]);
@@ -211,6 +215,8 @@ test('manual individual DPS connects to returned identity and submits genuine co
   await act(async () => {
     press('connection-details');
   });
+  expect(value('assigned-device-id')).toBe('Assigned-Phone');
+  expect(value('assigned-hub')).toBe('assigned.azure-devices.net');
   expect(value('model-id')).toBe(PHONE_MODEL_ID);
   expect(value('registration-id')).toBe('registration-phone');
   expect(value('registry-status')).toBe('Not checked');
@@ -269,6 +275,9 @@ test('one-shot restored real client lands Home even with batched connection upda
     startup: 0,
   });
   expect(value('connection-status')).toBe('Connected');
+  await act(async () => {
+    press('connection-details');
+  });
   expect(value('assigned-device-id')).toBe('Assigned-Phone');
   expect(httpFetch).not.toHaveBeenCalled();
   expect(destinations).toHaveLength(1);
@@ -284,6 +293,9 @@ test('one-shot restored real client lands Home even with batched connection upda
   await act(async () => {
     press('registration-close');
     await jest.advanceTimersByTimeAsync(500);
+  });
+  await act(async () => {
+    press('connection-details');
   });
   await act(async () => {
     press('connection-disconnect');

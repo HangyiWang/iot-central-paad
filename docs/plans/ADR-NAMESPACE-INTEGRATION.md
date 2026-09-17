@@ -93,6 +93,11 @@ The refreshed Android UI from run `35164148425`, source
 `adb -e install -r`. Private native UI inspection confirmed Connected and the
 same assigned device/Hub without credential re-entry. No app data was cleared.
 
+The follow-up design keeps a compact connection status row on every tab and
+moves full identity plus secondary connection actions into the details sheet.
+The live UI flow checks the same exact assigned values inside that sheet;
+registry status and local-submission semantics are unchanged.
+
 Android's manual cloud/cold-restore case is complete. iOS still needs the exact
 nonce and connected cold-restoration evidence; XCTest screenshot and simulator
 startup reliability remain under investigation. None of this establishes physical-device parity or downstream

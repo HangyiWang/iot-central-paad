@@ -326,7 +326,12 @@ test('live flow does not capture screenshots, simulate cloud, or use key command
   expect(flow).not.toMatch(/takeScreenshot|startRecording/);
   expect(flow).toContain('inputText: ${MAESTRO_DEVICE_KEY}');
   expect(flow).toContain('clearState: false');
-  expect(flow).toContain('text: "^Submitted locally$"');
+  expect(yaml.loadAll(flow)[1]).toContainEqual({
+    extendedWaitUntil: {
+      visible: {id: 'proof-status', text: '^Submitted locally$'},
+      timeout: 30000,
+    },
+  });
   expect(smoke).not.toMatch(
     /-e\s+(?:MAESTRO_)?DEVICE_KEY|set -x|printenv|logcat -d/,
   );
@@ -358,7 +363,7 @@ test('iOS key injection uses isolated slow characters without revealing the valu
   expect(android.commands).toEqual([{inputText: '${MAESTRO_DEVICE_KEY}'}]);
 });
 
-test('both details presentations wait for the first model field before scrolling', () => {
+test('both details presentations expose exact identity before scrolling to model metadata', () => {
   const commands = yaml.loadAll(
     fs.readFileSync('.maestro/live-device.yaml', 'utf8'),
   )[1];
@@ -368,15 +373,25 @@ test('both details presentations wait for the first model field before scrolling
   expect(details).toHaveLength(2);
   for (const index of details) {
     expect(commands[index + 1]).toEqual({
-      extendedWaitUntil: {visible: {id: 'model-id'}, timeout: 15000},
+      extendedWaitUntil: {
+        visible: {
+          id: 'assigned-device-id',
+          text: '${MAESTRO_EXPECTED_DEVICE_ID_PATTERN}',
+        },
+        timeout: 15000,
+      },
     });
     expect(commands[index + 2]).toEqual({
-      assertVisible: {id: 'model-id', text: '${MAESTRO_MODEL_ID_PATTERN}'},
+      scrollUntilVisible: {
+        element: {id: 'assigned-hub'},
+        direction: 'DOWN',
+        timeout: 15000,
+      },
     });
   }
 });
 
-test('assigned identity waits retain exact selectors and the shared connection deadline', () => {
+test('identity waits retain exact selectors with bounded sheet presentation', () => {
   const commands = yaml.loadAll(
     fs.readFileSync('.maestro/live-device.yaml', 'utf8'),
   )[1];
@@ -397,7 +412,7 @@ test('assigned identity waits retain exact selectors and the shared connection d
       Array(2).fill({
         extendedWaitUntil: {
           visible: {id, text},
-          timeout: 180000,
+          timeout: 15000,
         },
       }),
     );
@@ -601,7 +616,9 @@ test('cleanup and launcher stay private, owned and do not silence simulator clea
   expect(cleanup.run).toContain('::warning::');
   expect(smoke).toContain('maestro="$PWD/build/ci-tools/maestro/bin/maestro"');
   expect(smoke).toContain('HOME="$private/home" TMPDIR="$private/scratch"');
-  expect(smoke).toContain('env -u MAESTRO_DEVICE_KEY -u PAAD_LIVE_CONFIG \\\n    bash scripts/ci/show-ios-simulator.sh "$device" > "$private/simulator-ui.log" 2>&1');
+  expect(smoke).toContain(
+    'env -u MAESTRO_DEVICE_KEY -u PAAD_LIVE_CONFIG \\\n    bash scripts/ci/show-ios-simulator.sh "$device" > "$private/simulator-ui.log" 2>&1',
+  );
   expect(smoke).toContain('stat.dev}:${stat.ino}');
   expect(smoke.indexOf('node scripts/ci/live-diagnostics.js')).toBeLessThan(
     smoke.indexOf('shell am force-stop'),

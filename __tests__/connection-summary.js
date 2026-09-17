@@ -4,6 +4,7 @@ import ConnectionSummary from '../src/components/connectionSummary';
 import * as hooks from '../src/hooks';
 import {Alert, Share} from 'react-native';
 import {PHONE_MODEL_ID} from '../src/connection/types';
+jest.mock('@rneui/themed', () => ({Icon: 'Icon'}));
 
 jest.mock('../src/hooks', () => ({
   useConnectIoTCentralClient: jest.fn(),
@@ -26,9 +27,10 @@ const press = label =>
     .findAll(
       node =>
         node.props.accessibilityRole === 'button' &&
-        node
-          .findAllByType('Text')
-          .some(child => child.props.children === label),
+        (node.props.accessibilityLabel === label ||
+          node
+            .findAllByType('Text')
+            .some(child => child.props.children === label)),
     )[0]
     .props.onPress();
 beforeEach(() => {
@@ -107,14 +109,18 @@ afterEach(() => {
   expect(jest.getTimerCount()).toBe(0);
   jest.useRealTimers();
 });
-it('shows exact assigned identity and detects disconnect without starting a transport', async () => {
+it('keeps the status row compact and preserves all actions and exact identity in details', async () => {
   act(() => {
     view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
   });
-  expect(text()).toContain('Exact-Assigned-ID');
-  expect(text()).toContain('assigned.azure-devices.net');
+  expect(text()).not.toContain('Exact-Assigned-ID');
+  expect(text()).not.toContain('assigned.azure-devices.net');
   expect(text()).not.toContain('registration-id');
   expect(text()).toContain('Connected');
+  expect(text()).not.toContain('connection-disconnect');
+  act(() => press('Connection details'));
+  expect(text()).toContain('Exact-Assigned-ID');
+  expect(text()).toContain('assigned.azure-devices.net');
   act(() => press('Disconnect'));
   expect(clear).toHaveBeenCalledTimes(1);
   connected = false;
@@ -124,8 +130,11 @@ it('shows exact assigned identity and detects disconnect without starting a tran
     await press('Reconnect');
   });
   expect(connect).toHaveBeenCalledWith({deviceId: 'registration-id'});
+  expect(text()).not.toContain('connection-details-sheet');
+  act(() => press('Connection details'));
   act(() => press('Connect manually'));
   expect(manual).toHaveBeenCalledTimes(1);
+  expect(text()).not.toContain('connection-details-sheet');
 });
 it('labels simulation as offline and exposes cancellation for the shared active request', async () => {
   hooks.useSimulation.mockReturnValue([true]);
