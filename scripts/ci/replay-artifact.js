@@ -109,6 +109,9 @@ try {
     artifactHelperSha256: digest('scripts/ci/replay-artifact.js'),
     startupFlowSha256: digest('.maestro/startup.yaml'),
     launcherRecoveryFlowSha256: digest('.maestro/dismiss-quickstep-anr.yaml'),
+    ...(platform === 'ios' ? {
+      simulatorUIHelperSha256: digest('scripts/ci/show-ios-simulator.sh'),
+    } : {}),
     evidenceScope: 'Credential-free synthetic startup only; no Connect or cloud proof',
   };
   if (mode === 'verify') console.log(JSON.stringify(identity, null, 2));

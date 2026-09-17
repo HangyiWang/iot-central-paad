@@ -132,6 +132,8 @@ printf '%s\n' "$device" > "$diagnostics/simulator-uuid.txt"
 run_bounded 15000 xcrun simctl boot "$device" > "$diagnostics/logs/boot.log" 2>&1
 run_bounded 180000 xcrun simctl bootstatus "$device" -b >> "$diagnostics/logs/boot.log" 2>&1
 run_bounded 60000 xcrun simctl install "$device" "$app" > "$diagnostics/logs/install.log" 2>&1
+bash scripts/ci/show-ios-simulator.sh "$device" \
+  > "$diagnostics/logs/simulator-ui.log" 2>&1
 
 flow_attempted=1
 HOME="$state/home" TMPDIR="$state/scratch" \

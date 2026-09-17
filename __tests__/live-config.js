@@ -601,6 +601,7 @@ test('cleanup and launcher stay private, owned and do not silence simulator clea
   expect(cleanup.run).toContain('::warning::');
   expect(smoke).toContain('maestro="$PWD/build/ci-tools/maestro/bin/maestro"');
   expect(smoke).toContain('HOME="$private/home" TMPDIR="$private/scratch"');
+  expect(smoke).toContain('env -u MAESTRO_DEVICE_KEY -u PAAD_LIVE_CONFIG \\\n    bash scripts/ci/show-ios-simulator.sh "$device" > "$private/simulator-ui.log" 2>&1');
   expect(smoke).toContain('stat.dev}:${stat.ino}');
   expect(smoke.indexOf('node scripts/ci/live-diagnostics.js')).toBeLessThan(
     smoke.indexOf('shell am force-stop'),

@@ -36,6 +36,7 @@ function withFixture(testBody, {download = false} = {}) {
     }
     fs.writeFileSync(file('scripts/ci/replay-ios.sh'), script);
     fs.writeFileSync(file('scripts/ci/replay-artifact.js'), helper);
+    fs.copyFileSync('scripts/ci/show-ios-simulator.sh', file('scripts/ci/show-ios-simulator.sh'));
     for (const name of ['startup.yaml', 'dismiss-quickstep-anr.yaml']) {
       fs.copyFileSync(`.maestro/${name}`, file(`.maestro/${name}`));
     }
@@ -46,6 +47,12 @@ function withFixture(testBody, {download = false} = {}) {
     ].join('\n');
     fs.writeFileSync(file(`source/${binary}`), archive);
     fs.writeFileSync(file('source/identity.txt'), identity);
+    fs.writeFileSync(file('bin/open'), `#!/usr/bin/env node
+const fs = require('node:fs');
+if ('MAESTRO_DEVICE_KEY' in process.env || 'PAAD_LIVE_CONFIG' in process.env) process.exit(99);
+fs.writeFileSync('simulator-ui-call.json', JSON.stringify(process.argv.slice(2)));
+if (process.env.TEST_FAIL === 'open') process.exit(8);
+`, {mode: 0o700});
     if (!download) {
       fs.mkdirSync(file('build/ci-artifacts'));
       for (const name of [binary, 'identity.txt']) {
@@ -185,7 +192,7 @@ test('iOS replay has owner/manual guards, narrowly scoped registration, pinned t
   });
   expect(steps.some(step => step.run === 'bash scripts/ci/install-maestro.sh')).toBe(true);
   expect(steps.find(step => step.run === 'bash scripts/ci/replay-ios.sh')['timeout-minutes']).toBeLessThanOrEqual(15);
-  expect([...script.matchAll(/run_bounded (\d+)/g)].reduce((sum, match) => sum + Number(match[1]), 0))
+  expect([...script.matchAll(/run_bounded (\d+)/g)].reduce((sum, match) => sum + Number(match[1]), 10000))
     .toBeLessThan(900000);
   expect(script).toContain('run_bounded 450000 "$maestro"');
   expect(script).toContain('run_bounded 60000 xcrun simctl create');
@@ -286,6 +293,7 @@ test('downloads the exact iOS artifact and verifies its immutable ZIP and replay
       replayHarnessSha: harnessSha, replayScriptSha256: digest(script), artifactHelperSha256: digest(helper),
       startupFlowSha256: digest(fs.readFileSync('.maestro/startup.yaml')),
       launcherRecoveryFlowSha256: digest(fs.readFileSync('.maestro/dismiss-quickstep-anr.yaml')),
+      simulatorUIHelperSha256: digest(fs.readFileSync('scripts/ci/show-ios-simulator.sh')),
     });
     expect(fs.readFileSync(file('build/ci-artifacts/identity.txt'), 'utf8')).toBe(identity);
     expect(calls()).toEqual([]);
@@ -392,6 +400,9 @@ test.each([
     expect(fs.readFileSync(file('build/ci-artifacts/identity.txt'), 'utf8')).toBe(identity);
     const invocation = JSON.parse(fs.readFileSync(file('maestro-call.json'), 'utf8'));
     expect(invocation.binary).toBe(file('build/ci-tools/maestro/bin/maestro'));
+    expect(JSON.parse(fs.readFileSync(file('simulator-ui-call.json'), 'utf8'))).toEqual([
+      '-a', `${developer}/Applications/Simulator.app`, '--args', '-CurrentDeviceUDID', device,
+    ]);
     expect(invocation.args).toEqual([
       '--device', device, 'test', '--no-ansi',
       '--format', 'junit', '--output', file(`${root}/results/result.xml`),
@@ -431,6 +442,16 @@ test.each(['boot', 'bootstatus', 'install'])('tracks ownership and deletes the n
     expect(status).toMatchObject({commandExitCode: 8, flowAttempted: false, simulator: device, simulatorDeleted: true});
     expect(fs.readFileSync(file('build/ci-artifacts/replay-ios/simulator-uuid.txt'), 'utf8')).toBe(`${device}\n`);
     expect(fs.existsSync(file('maestro-call.json'))).toBe(false);
+  });
+});
+
+test('Simulator UI launch failure fails replay before Maestro and still cleans its owned device', () => {
+  withFixture(({invoke, calls, file}) => {
+    expect(invoke({TEST_FAIL: 'open'}).status).toBe(1);
+    expect(calls().slice(-2)).toEqual([['simctl', 'shutdown', device], ['simctl', 'delete', device]]);
+    expect(fs.existsSync(file('maestro-call.json'))).toBe(false);
+    expect(JSON.parse(fs.readFileSync(file('build/ci-artifacts/replay-ios/status.json'), 'utf8')))
+      .toMatchObject({commandExitCode: 1, flowAttempted: false, simulatorDeleted: true});
   });
 });
 

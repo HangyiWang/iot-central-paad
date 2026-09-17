@@ -144,6 +144,8 @@ else
   xcrun simctl bootstatus "$device" -b >> "$private/boot.log" 2>&1
   xcrun simctl install "$device" \
     build/ios-derived/Build/Products/Release-iphonesimulator/IoTPnP.app > "$private/install.log" 2>&1
+  env -u MAESTRO_DEVICE_KEY -u PAAD_LIVE_CONFIG \
+    bash scripts/ci/show-ios-simulator.sh "$device" > "$private/simulator-ui.log" 2>&1
 fi
 
 export PAAD_LIVE_MAESTRO_DEVICE="$device"
