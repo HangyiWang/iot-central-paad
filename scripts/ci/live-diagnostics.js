@@ -3,6 +3,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const {sanitizeNativeResult} = require('./ios-xcuitest-result');
 
 // cli-2.10.0 TestOutputWriter / TreeNode schema. Never copy source objects.
 const COMMAND_KINDS = Object.freeze([
@@ -24,10 +25,12 @@ const ERROR_CODES = Object.freeze([
   'INVALID_CREDENTIALS', 'UNSAFE_ENDPOINT', 'CANCELLED', 'TIMEOUT',
   'AUTHENTICATION_FAILED', 'PROVISIONING_FAILED', 'INVALID_RESPONSE',
   'NETWORK_ERROR', 'CONNECT_FAILED', 'SECURE_TRANSPORT_REQUIRED',
+  'CONNECTION_LOST',
   'NOT_CONNECTED', 'OPERATION_FAILED', 'STORAGE_FAILED', 'BUSY',
 ]);
 const PROOF_STATUSES = Object.freeze(['Submitted locally']);
 const UI_PRESENCE_IDS = Object.freeze([
+  'app-header-title',
   'connection-status', 'assigned-device-id', 'assigned-hub', 'connection-details',
   'connection-details-sheet', 'connection-details-close', 'model-id',
   'app-busy-overlay', 'navigation-content', 'registration-manual',
@@ -36,6 +39,7 @@ const UI_PRESENCE_IDS = Object.freeze([
 ]);
 const UI_LABELS = new Map([
   ['IoT PnP', 'app-root'], ['IoT Plug and Play', 'app-heading'],
+  ['Phone as a device', 'app-heading'],
   ['Home Screen', 'launcher'], ['SpringBoard', 'launcher'],
   ['Manually connect', 'manual-heading'], ['Connect manually', 'manual-entry'],
   ['Checking connection details...', 'validating'],
@@ -194,9 +198,11 @@ function sanitizeDiagnostics(value) {
       if (PROOF_STATUSES.includes(value.ui.proofStatus)) ui.proofStatus = value.ui.proofStatus;
       if (SYSTEM_DIALOG_CODES.includes(value.ui.systemDialog)) ui.systemDialog = value.ui.systemDialog;
     }
-    return failedCommands.length || Object.keys(ui).length
+    const nativeUi = sanitizeNativeResult(value.nativeUi);
+    return failedCommands.length || Object.keys(ui).length || nativeUi
       ? {
         availability: 'available', failedCommands, ui,
+        ...(nativeUi ? {nativeUi} : {}),
         ...(typeof value.hierarchyCaptured === 'boolean' ? {hierarchyCaptured: value.hierarchyCaptured} : {}),
       } : unavailable();
   } catch {

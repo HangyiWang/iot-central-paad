@@ -442,6 +442,8 @@ test('workflow gates every live job, scopes secrets after binary publication and
   ).not.toContain('secrets.');
   expect(Object.keys(workflow.on.workflow_dispatch.inputs)).toEqual([
     'platform',
+    'ios_driver',
+    'ios_smoke_only',
     'confirm_live',
     'expected_sha',
     'config',
@@ -470,8 +472,24 @@ test('workflow gates every live job, scopes secrets after binary publication and
     expect(identityIndex).toBeGreaterThan(-1);
     expect(identityIndex).toBeLessThan(buildIndex);
     expect(job.steps.indexOf(secretStep)).toBeGreaterThan(buildIndex);
+    const nativeUploads = job.steps.filter(step =>
+      step.uses?.startsWith('actions/upload-artifact@') &&
+      ['build/ios-ui-smoke-summary.json', 'build/ios-ui-smoke.log'].includes(step.with.path),
+    );
+    expect(nativeUploads).toHaveLength(platform === 'ios' ? 2 : 0);
+    if (platform === 'ios') {
+      for (const upload of nativeUploads) {
+        expect(upload.with['retention-days']).toBe(3);
+        expect(job.steps.indexOf(upload)).toBeLessThan(job.steps.indexOf(secretStep));
+      }
+      expect(nativeUploads[1].if).toContain('inputs.ios_smoke_only');
+      expect(secretStep.if).toContain('!inputs.ios_smoke_only');
+      const synthetic = job.steps.find(step => step.run === 'node scripts/ci/run-ios-xcuitest.js smoke');
+      expect(synthetic.env.PAAD_NATIVE_SMOKE_DIAGNOSTICS).toBe('${{ inputs.ios_smoke_only }}');
+      expect(JSON.stringify(synthetic)).not.toContain('secrets.');
+    }
     const uploads = job.steps.filter(step =>
-      step.uses?.startsWith('actions/upload-artifact@'),
+      step.uses?.startsWith('actions/upload-artifact@') && !nativeUploads.includes(step),
     );
     expect(uploads).toHaveLength(2);
     expect(job.steps.indexOf(uploads[0])).toBeGreaterThan(buildIndex);
@@ -675,6 +693,7 @@ test.each([
         'smoke-live-device.sh',
         'live-config.js',
         'live-diagnostics.js',
+        'ios-xcuitest-result.js',
         'capture-failed-ios-ui.js',
       ]) {
         fs.copyFileSync(

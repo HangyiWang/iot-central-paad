@@ -45,6 +45,16 @@ Foundation run `35193089860`, source
 lanes with the Opus-informed activity-log and utility-page refinements.
 Follow-up log controls use actual 48 dp/pt minimum touch regions rather than
 relying on hit slop outside a parent's bounds.
+Foundation run `35247956689`, source
+`3bf1f3a11731dd52f3697d12265ce69a0447f2b2`, passed JavaScript and both native
+lanes. It distinguishes a lost established session (`CONNECTION_LOST`) from an
+initial connection failure; it does not infer a network cause or add automatic
+reconnection. The newer property-card presentation preserves protocol IDs while
+removing the synthetic editable value and clarifying empty states.
+The foundation property/notice adaptation
+`31467af09a22ce83062b6f75a02e9c8853c1975d` subsequently passed all three lanes
+in run `35252459704`, retaining the legacy form while placing errors in the
+owning screen rather than below the tab bar.
 The synthetic startup flow follows the real flow's endpoint-before-key input
 order and rechecks the endpoint afterward. Credential-free run `35227323436`
 otherwise left the endpoint at its default while the secure field changed

@@ -145,6 +145,49 @@ WebSocket silence. Both received the subsequent frame. This did not reproduce
 the proposed 15-second idle-disconnect explanation, so the production transport
 was not changed on that hypothesis. The probe is not PAAD/TLS/Azure acceptance.
 
+Run `35242626049` on source
+`b3902cbe550f9d9d8e68dac916a6d965b98ed8b4` passed the Connected assertion but
+failed the following Details tap. Independent reads matched assignment, phone
+model and one automatic ADR record; the nonce was still absent. The safe UI
+capture exposed only the fixed app-root label, which does not establish a crash
+or a transport cause. Its temporary input was removed.
+
+The owner subsequently approved a focused native XCUITest lane for iOS. It is
+opt-in (`ios_driver=xcuitest`) within the existing owner/exact-SHA live workflow.
+The runner is built and exercised with synthetic input before the dedicated
+device-key step; synthetic smoke never presses Connect. The native live path
+retains exact identity/model/nonce and actual terminate/relaunch assertions.
+Ordinary Maestro smoke remains in place. For credentialed runs, only fixed-category native milestones
+and the existing nonsecret proof summary may leave private test state; raw
+Xcode test output, result bundles and device inputs are deleted. Implementation
+of this lane does not itself close the remaining iOS acceptance gate.
+Set `ios_smoke_only=true` with `platform=ios` and `ios_driver=xcuitest` to
+exercise the new runner without ever requesting a device secret or sending
+device traffic. This credential-free-only mode additionally retains the final
+1 MiB of synthetic runner output for three days so actual Xcode/driver startup
+failures can be diagnosed. It never receives a device key; this exception does
+not apply to a credentialed run or its preflight. The ordinary exact-source/owner
+authorization still applies.
+
+The property/connection-notice UI candidate `2ae9a1f2901e287002d6420be1ab514786b33d31`
+passed JavaScript and both credential-free native lanes in run `35252178223`.
+The corresponding foundation adaptation
+`31467af09a22ce83062b6f75a02e9c8853c1975d` passed all three lanes in run
+`35252459704`. These are native startup/input-flow results, not the outstanding
+iOS live nonce and connected cold-restoration proof.
+
+The `2ae9a1f` Android APK was installed over the retained CI app without clearing
+credentials. It restored the same assigned device and Hub, and a fresh
+app-submitted nonce independently matched the Hub twin, phone model and existing
+automatic ADR record. The private interaction helper also exercised log
+expansion/filtering, utility pages and Details. An initial helper failure was
+an offscreen target with zero bounds; requiring visible bounds and scrolling
+resolved the helper failure without an app or transport change.
+APK SHA256:
+`e539f4223b4a1faeea0726992fde4ec5b128fee1ebf973a41b542217f56bbea0`.
+This is retained-identity upgrade/restoration evidence, not a new registry
+creation case or a separate process-force-stop assertion for this binary.
+
 ## What the experiment proved, and what it did not
 
 The 2026-09-13 isolated cloud experiment used `azure-iot-device` Python SDK

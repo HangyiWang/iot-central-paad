@@ -7,6 +7,11 @@ if [[ "$platform" != android && "$platform" != ios ]]; then
   echo 'Live smoke requires one supported platform.' >&2
   exit 1
 fi
+driver="${PAAD_IOS_UI_DRIVER:-maestro}"
+if [[ "$driver" != maestro && ( "$platform" != ios || "$driver" != xcuitest ) ]]; then
+  echo 'Unsupported live UI driver.' >&2
+  exit 1
+fi
 # Recheck authorization before even reading a key; dispatch data is never shell code.
 if [[ "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ||
       "${PAAD_LIVE_CONFIRM:-}" != true ||
@@ -49,8 +54,12 @@ cleanup() {
   cleanup_failed=0
   diagnostics='{"availability":"unavailable"}'
   if [[ "$flow_attempted" = 1 ]]; then
-    # Only this allowlisted value leaves the private tree, after Maestro exits.
-    diagnostics=$(node scripts/ci/live-diagnostics.js) || code=1
+    # Only an allowlisted value leaves the private tree, after the UI driver exits.
+    if [[ "$driver" = xcuitest ]]; then
+      diagnostics=$(node scripts/ci/run-ios-xcuitest.js diagnostics) || code=1
+    else
+      diagnostics=$(node scripts/ci/live-diagnostics.js) || code=1
+    fi
   fi
   if [[ "$platform" = android && -n "$device" ]]; then
     adb -s "$device" shell am force-stop com.iot_pnp.ci >/dev/null 2>&1 || cleanup_failed=1
@@ -122,7 +131,7 @@ trap 'exit 143' TERM
 mkdir "$private/home" "$private/scratch" "$private/debug" "$private/results"
 test ! -e "$PWD/build/live-device-summary-$platform.json"
 maestro="$PWD/build/ci-tools/maestro/bin/maestro"
-test -x "$maestro"
+if [[ "$driver" = maestro ]]; then test -x "$maestro"; fi
 node scripts/ci/live-config.js env "$platform" > "$private/case.env"
 while IFS='=' read -r name value; do
   export "$name=$value"
@@ -154,6 +163,14 @@ export PAAD_LIVE_PRIVATE="$private"
 export PAAD_LIVE_MAESTRO_BIN="$maestro"
 export PAAD_LIVE_PLATFORM="$platform"
 flow_attempted=1
+if [[ "$driver" = xcuitest ]]; then
+  set +e
+  node scripts/ci/run-ios-xcuitest.js live > "$private/native-launch.log" 2>&1
+  status=$?
+  set -e
+  if [[ "$status" = 0 ]]; then flow_result=passed; fi
+  exit "$status"
+fi
 set +e
 # Java does not necessarily honor HOME; isolate its home and scratch explicitly.
 # cli-2.10.0 has no supported failure-screenshot opt-out. Its ephemeral images

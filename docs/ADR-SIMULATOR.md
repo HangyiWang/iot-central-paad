@@ -236,6 +236,18 @@ A UI success report still says independent Azure verification is pending.
 Pair it with the operator verifier's result. Downstream telemetry consumption,
 physical camera/BLE/sensor accuracy, production signing, secure-storage upgrade
 acceptance, certificates and in-app inventory authorization remain separate.
+
+The opt-in `ios_driver=xcuitest` lane builds a standalone native UI runner without
+rebuilding or re-signing the app. A synthetic-input smoke flow runs before device
+input and never presses Connect; the live flow retains exact assignment, nonce
+and connected cold-restoration assertions. Ordinary Maestro coverage is unchanged.
+To exercise only this credential-free lane, dispatch with `platform=ios`,
+`ios_driver=xcuitest` and `ios_smoke_only=true`, plus the existing owner/exact-SHA
+confirmation and nonsecret configuration. This mode skips the device-secret step
+entirely. Only this no-secret mode also retains a bounded synthetic runner log
+(final 1 MiB, three days). Credentialed runs export only fixed-category summaries;
+their raw native output and result bundles remain private and are deleted.
+
 Android map preview needs a restricted key configured at native build time;
 without one, coordinates remain available. Image upload also requires Hub-side
 storage configuration; this workflow does not create that infrastructure.
