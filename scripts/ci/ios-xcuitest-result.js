@@ -27,6 +27,29 @@ const TARGETS = Object.freeze([
   'registration-id', 'registry-status', 'proof-nonce', 'proof-send', 'proof-status',
   'app-busy-overlay', 'navigation-content', 'connection-error',
 ]);
+const INPUT_TARGETS = Object.freeze([
+  'connection-registrationId', 'connection-scopeId', 'connection-provisioningHost',
+]);
+const INPUT_PHASES = Object.freeze(['focused', 'cleared', 'typed', 'committed', 'settled']);
+const INPUT_ELEMENTS = Object.freeze(['missing', 'text-field', 'secure-text-field', 'text-view', 'other']);
+const INPUT_VALUES = Object.freeze([
+  'unavailable', 'non-string', 'empty', 'placeholder', 'exact',
+  'newline-suffix', 'whitespace-difference', 'mismatch',
+]);
+const INPUT_FLAGS = Object.freeze(['hasNewline', 'uiFocused', 'hittable', 'enabled', 'keyboardVisible']);
+
+function sanitizeInputDiagnostics(value) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > INPUT_PHASES.length ||
+      value.some((entry, index) => !entry || typeof entry !== 'object' || Array.isArray(entry) ||
+        !INPUT_TARGETS.includes(entry.target) || entry.target !== value[0].target ||
+        entry.phase !== INPUT_PHASES[index] || !INPUT_ELEMENTS.includes(entry.element) ||
+        !INPUT_VALUES.includes(entry.value) ||
+        INPUT_FLAGS.some(flag => typeof entry[flag] !== 'boolean'))) return undefined;
+  return value.map(entry => ({
+    target: entry.target, phase: entry.phase, element: entry.element, value: entry.value,
+    ...Object.fromEntries(INPUT_FLAGS.map(flag => [flag, entry[flag]])),
+  }));
+}
 
 function sanitizeNativeResult(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
@@ -39,6 +62,9 @@ function sanitizeNativeResult(value) {
       value.observedTargets.some(id => !TARGETS.includes(id)) ||
       (value.failureCategory !== undefined && !FAILURE_CATEGORIES.includes(value.failureCategory)) ||
       (value.execution !== undefined && !EXECUTIONS.includes(value.execution))) return undefined;
+  const inputDiagnostics = value.inputDiagnostics === undefined ? undefined
+    : sanitizeInputDiagnostics(value.inputDiagnostics);
+  if (value.inputDiagnostics !== undefined && (value.mode !== 'smoke' || !inputDiagnostics)) return undefined;
   return {
     schemaVersion: 1, runner: 'xcuitest', mode: value.mode, outcome: value.outcome,
     stage: value.stage, applicationState: value.applicationState,
@@ -46,6 +72,7 @@ function sanitizeNativeResult(value) {
     observedTargets: [...new Set(value.observedTargets)].sort(),
     connected: value.connected, nonceSubmitted: value.nonceSubmitted, coldRestored: value.coldRestored,
     ...(value.execution ? {execution: value.execution} : {}),
+    ...(inputDiagnostics ? {inputDiagnostics} : {}),
   };
 }
 
@@ -76,5 +103,6 @@ function nativeFlowPassed(result, mode) {
 
 module.exports = {
   PREFIX, MAX_LOG_BYTES, STAGES, APPLICATION_STATES, FAILURE_CATEGORIES, EXECUTIONS, TARGETS,
+  INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };

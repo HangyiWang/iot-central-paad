@@ -97,6 +97,33 @@ private enum AppLabel {
   static let submittedLocally = "Submitted locally"
 }
 
+private enum InputPhase: String {
+  case focused
+  case cleared
+  case typed
+  case committed
+  case settled
+}
+
+private enum InputElement: String {
+  case missing
+  case textField = "text-field"
+  case secureTextField = "secure-text-field"
+  case textView = "text-view"
+  case other
+}
+
+private enum InputValue: String {
+  case unavailable
+  case nonString = "non-string"
+  case empty
+  case placeholder
+  case exact
+  case newlineSuffix = "newline-suffix"
+  case whitespaceDifference = "whitespace-difference"
+  case mismatch
+}
+
 // MARK: - Test case configuration
 
 private struct CaseConfig {
@@ -155,6 +182,8 @@ final class PaadLiveUITests: XCTestCase {
   /// Category applied to an XCTest-reported runtime failure raised by the
   /// interaction currently in flight.
   private var pendingCategory: Failure?
+  /// Only the current synthetic, nonsecure field; at most five fixed checkpoints.
+  private var inputDiagnostics: [[String: Any]] = []
 
   override func setUp() {
     super.setUp()
@@ -272,8 +301,7 @@ final class PaadLiveUITests: XCTestCase {
     try openDetails()
     try requireIdentity(config)
 
-    let nonceField = try enterExactText(.proofNonce, text: config.nonce)
-    try requireExactValue(on: nonceField, text: config.nonce, failure: .valueMismatch)
+    try enterExactText(.proofNonce, text: config.nonce)
     advance(to: .nonce)
 
     try tap(.proofSend)
@@ -371,16 +399,13 @@ final class PaadLiveUITests: XCTestCase {
   private func enterCredentials(_ config: CaseConfig) throws {
     // Each field is verified through the element resolved by the entry helper,
     // so a screen costs one element lookup rather than two snapshots.
-    let registration = try enterExactText(.formRegistrationId, text: config.registrationId)
-    try requireExactValue(on: registration, text: config.registrationId, failure: .valueMismatch)
+    try enterExactText(.formRegistrationId, text: config.registrationId)
     advance(to: .registrationInput)
 
-    let scope = try enterExactText(.formScopeId, text: config.scopeId)
-    try requireExactValue(on: scope, text: config.scopeId, failure: .valueMismatch)
+    try enterExactText(.formScopeId, text: config.scopeId)
     advance(to: .scopeInput)
 
     let host = try enterExactText(.formProvisioningHost, text: config.provisioningHost)
-    try requireExactValue(on: host, text: config.provisioningHost, failure: .valueMismatch)
     advance(to: .hostInput)
 
     try enterSecret(.formDeviceKey, secret: config.deviceKey)
@@ -512,9 +537,11 @@ final class PaadLiveUITests: XCTestCase {
   private func requireExactValue(
     on field: XCUIElement, text: String, failure: Failure
   ) throws {
+    // A format predicate echoes its expected value in XCTest's progress log.
+    // Keep exact equality, but do not give the waiter a printable input value.
     try waitFor(
-      NSPredicate(format: "value == %@", text),
-      on: field, timeout: Timeout.short, failure: failure)
+      NSPredicate { _, _ in (field.value as? String) == text },
+      on: NSNull(), timeout: Timeout.short, failure: failure)
   }
 
   private func requireExactText(
@@ -564,16 +591,29 @@ final class PaadLiveUITests: XCTestCase {
 
   @discardableResult
   private func enterExactText(_ target: Target, text: String) throws -> XCUIElement {
+    inputDiagnostics = []
     let field = try focusField(target)
+    diagnoseInput(field, target: target, phase: .focused, expected: text)
     clearField(field)
+    diagnoseInput(field, target: target, phase: .cleared, expected: text)
     pendingCategory = .notHittable
     field.typeText(text)
     pendingCategory = nil
+    diagnoseInput(field, target: target, phase: .typed, expected: text)
     commitField(field)
+    diagnoseInput(field, target: target, phase: .committed, expected: text)
+    do {
+      try requireExactValue(on: field, text: text, failure: .valueMismatch)
+    } catch let failure as Failure {
+      diagnoseInput(field, target: target, phase: .settled, expected: text)
+      throw failure
+    }
+    diagnoseInput(field, target: target, phase: .settled, expected: text)
     return field
   }
 
   private func enterSecret(_ target: Target, secret: String) throws {
+    inputDiagnostics = []
     let field = try focusField(target)
     clearField(field)
     pendingCategory = .notHittable
@@ -663,6 +703,61 @@ final class PaadLiveUITests: XCTestCase {
 
   // MARK: Diagnostics
 
+  private func diagnoseInput(
+    _ field: XCUIElement, target: Target, phase: InputPhase, expected: String
+  ) {
+    // Never inspect live input or secure fields for diagnostic publication.
+    guard mode == "smoke",
+      [.formRegistrationId, .formScopeId, .formProvisioningHost].contains(target)
+    else {
+      return
+    }
+    let exists = field.exists
+    let kind: InputElement
+    if exists {
+      switch field.elementType {
+      case .textField: kind = .textField
+      case .secureTextField: kind = .secureTextField
+      case .textView: kind = .textView
+      default: kind = .other
+      }
+    } else {
+      kind = .missing
+    }
+    let raw = exists && kind != .secureTextField ? field.value : nil
+    let value: InputValue
+    if let text = raw as? String {
+      if text.isEmpty {
+        value = .empty
+      } else if text == field.placeholderValue {
+        value = .placeholder
+      } else if text == expected {
+        value = .exact
+      } else if text == expected + "\n" || text == expected + "\r\n" {
+        value = .newlineSuffix
+      } else if text.trimmingCharacters(in: .whitespacesAndNewlines) == expected {
+        value = .whitespaceDifference
+      } else {
+        value = .mismatch
+      }
+    } else {
+      value = raw == nil ? .unavailable : .nonString
+    }
+    inputDiagnostics.append([
+      "target": target.rawValue,
+      "phase": phase.rawValue,
+      "element": kind.rawValue,
+      "value": value.rawValue,
+      "hasNewline": (raw as? String)?.rangeOfCharacter(from: .newlines) != nil,
+      // UI focus is diagnostic only; it is not a keyboard-focus assertion.
+      "uiFocused": exists && field.hasFocus,
+      "hittable": exists && field.isHittable,
+      "enabled": exists && field.isEnabled,
+      "keyboardVisible": app.keyboards.firstMatch.exists,
+    ])
+    emit(outcome: .inProgress)
+  }
+
   private func advance(to stage: Stage, queryingState: Bool = true) {
     self.stage = stage
     if queryingState {
@@ -721,6 +816,9 @@ final class PaadLiveUITests: XCTestCase {
     ]
     if let category = failureCategory {
       record["failureCategory"] = category.rawValue
+    }
+    if !inputDiagnostics.isEmpty {
+      record["inputDiagnostics"] = inputDiagnostics
     }
     guard
       let data = try? JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]),

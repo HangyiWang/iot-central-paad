@@ -12,6 +12,7 @@ const {
   parseNativeLog,
   nativeFlowPassed,
   STAGES, APPLICATION_STATES, FAILURE_CATEGORIES, TARGETS,
+  INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
 } = require('../scripts/ci/ios-xcuitest-result');
 const {sanitizeDiagnostics} = require('../scripts/ci/live-diagnostics');
 const {validateEnvironment} = require('../scripts/ci/run-ios-xcuitest');
@@ -55,6 +56,17 @@ const nativeResult = (mode = 'live') => ({
   connected: mode === 'live',
   nonceSubmitted: mode === 'live',
   coldRestored: mode === 'live',
+});
+const inputDiagnostic = (phase = 'focused') => ({
+  target: 'connection-registrationId',
+  phase,
+  element: 'text-field',
+  value: 'empty',
+  hasNewline: false,
+  uiFocused: true,
+  hittable: true,
+  enabled: true,
+  keyboardVisible: true,
 });
 const environment = mode => ({
   PAAD_VARIANT: 'ci',
@@ -239,6 +251,57 @@ test('native fixed-result parser strips extra fields and reports the last milest
       sanitizeDiagnostics({availability: 'available', nativeUi: value}),
     ),
   ).not.toContain('RAW_CANARY');
+});
+
+test('synthetic input checkpoints preserve before/after Return evidence without raw values', () => {
+  const inputDiagnostics = INPUT_PHASES.map(phase => ({
+    ...inputDiagnostic(phase),
+    ...(phase === 'typed' ? {value: 'exact'} : {}),
+    ...(['committed', 'settled'].includes(phase)
+      ? {value: 'newline-suffix', hasNewline: true, keyboardVisible: false} : {}),
+  }));
+  const result = {
+    ...nativeResult('smoke'), outcome: 'failed', stage: 'manual-navigation',
+    failureCategory: 'value-mismatch', applicationState: 'running-foreground',
+    inputDiagnostics,
+  };
+  const dirty = {
+    ...result,
+    inputDiagnostics: inputDiagnostics.map(entry => ({
+      ...entry, rawValue: 'RAW_CANARY', placeholder: 'RAW_CANARY', expected: 'RAW_CANARY',
+    })),
+  };
+  expect(parseNativeLog(`${PREFIX}${JSON.stringify(dirty)}`, 'smoke')).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: dirty}).nativeUi).toEqual(result);
+  expect(nativeFlowPassed(result, 'smoke')).toBe(false);
+  expect(Buffer.byteLength(`${PREFIX}${JSON.stringify(result)}`)).toBeLessThan(4096);
+});
+
+test.each([
+  null,
+  {},
+  [],
+  Array(6).fill(inputDiagnostic()),
+  [null],
+  [{...inputDiagnostic(), target: 'RAW_CANARY'}],
+  [{...inputDiagnostic(), target: 'connection-deviceKey'}],
+  [{...inputDiagnostic(), phase: 'RAW_CANARY'}],
+  [{...inputDiagnostic(), phase: 'typed'}],
+  [{...inputDiagnostic(), element: 'RAW_CANARY'}],
+  [{...inputDiagnostic(), value: 'RAW_CANARY'}],
+  [inputDiagnostic(), {...inputDiagnostic('cleared'), target: 'connection-scopeId'}],
+  ...INPUT_FLAGS.map(flag => [{...inputDiagnostic(), [flag]: 'true'}]),
+])('native input diagnostics reject invalid, unbounded or mixed-target evidence (%#)', inputDiagnostics => {
+  expect(sanitizeNativeResult({...nativeResult('smoke'), inputDiagnostics})).toBeUndefined();
+});
+
+test('native input diagnostics are smoke-only and remain optional for existing results', () => {
+  expect(sanitizeNativeResult({
+    ...nativeResult(), inputDiagnostics: [inputDiagnostic()],
+  })).toBeUndefined();
+  for (const mode of ['smoke', 'live']) {
+    expect(sanitizeNativeResult(nativeResult(mode))).toEqual(nativeResult(mode));
+  }
 });
 
 test.each([
@@ -444,6 +507,35 @@ test('native smoke deletes owned private state and writes only the fixed synthet
   });
 });
 
+test('native smoke summary carries bounded input diagnosis without upgrading failed exact proof', () => {
+  const inputDiagnostics = INPUT_PHASES.map(phase => ({
+    ...inputDiagnostic(phase), value: 'mismatch', rawValue: 'RAW_CANARY',
+  }));
+  withRunner('smoke', passed => {
+    expect(passed).toBe(false);
+    const text = fs.readFileSync('build/ios-ui-smoke-summary.json', 'utf8');
+    expect(text).not.toContain('RAW_CANARY');
+    expect(JSON.parse(text)).toMatchObject({
+      uiResult: 'failed',
+      diagnostics: {nativeUi: {
+        stage: 'manual-navigation', failureCategory: 'value-mismatch',
+        inputDiagnostics: INPUT_PHASES.map(phase => ({
+          ...inputDiagnostic(phase), value: 'mismatch',
+        })),
+      }},
+    });
+    expect(fs.existsSync('build/ios-ui-smoke.log')).toBe(false);
+    expect(fs.existsSync('build/ios-ui-smoke-private')).toBe(false);
+  }, {
+    process: {status: 1},
+    result: {
+      ...nativeResult('smoke'), outcome: 'failed', stage: 'manual-navigation',
+      applicationState: 'running-foreground', failureCategory: 'value-mismatch',
+      inputDiagnostics,
+    },
+  });
+});
+
 test('explicit credential-free smoke retains a bounded log but still removes private test state', () => {
   withRunner('smoke', passed => {
     expect(passed).toBe(true);
@@ -482,11 +574,46 @@ test('Swift diagnostics use only the parser vocabularies and stable public contr
   };
   expect(values('Stage').sort()).toEqual([...STAGES].sort());
   expect(values('ApplicationState').sort()).toEqual([...APPLICATION_STATES].sort());
+  expect(values('InputPhase').sort()).toEqual([...INPUT_PHASES].sort());
+  expect(values('InputElement').sort()).toEqual([...INPUT_ELEMENTS].sort());
+  expect(values('InputValue').sort()).toEqual([...INPUT_VALUES].sort());
   for (const value of values('Failure')) expect(FAILURE_CATEGORIES).toContain(value);
   for (const value of values('Target')) expect(TARGETS).toContain(value);
   expect(swift).toContain('FileHandle.standardOutput.write(Data("PAAD_XCTEST_RESULT:');
   expect(swift).not.toMatch(/screenshot\(\)|debugDescription|XCTAttachment\(/);
   expect(swift).not.toContain('"IoT Plug and Play"');
+});
+
+test('input diagnosis brackets real keystrokes, leaves exact proof strict, and excludes live/secure input', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const entry = swift.split('private func enterExactText(')[1].split('private func enterSecret(')[0];
+  const events = [
+    'inputDiagnostics = []', 'focusField(target)', 'phase: .focused',
+    'clearField(field)', 'phase: .cleared', 'field.typeText(text)', 'phase: .typed',
+    'commitField(field)', 'phase: .committed', 'requireExactValue(on: field',
+    'phase: .settled', 'throw failure',
+  ].map(text => entry.indexOf(text));
+  expect(events.every(index => index >= 0)).toBe(true);
+  expect(events).toEqual([...events].sort((a, b) => a - b));
+  const exact = swift.split('private func requireExactValue(')[1].split('private func requireExactText(')[0];
+  expect(exact).toContain('(field.value as? String) == text');
+  expect(exact).toContain('on: NSNull(), timeout: Timeout.short, failure: failure');
+  expect(exact).not.toMatch(/trimmingCharacters|placeholderValue|NSPredicate\(format:/);
+  const commit = swift.split('private func commitField(')[1].split('private func enterExactText(')[0];
+  expect(commit).toContain('field.typeText("\\n")');
+  const diagnostic = swift.split('private func diagnoseInput(')[1].split('private func advance(')[0];
+  expect(diagnostic).toContain('guard mode == "smoke"');
+  expect(diagnostic).toContain('[.formRegistrationId, .formScopeId, .formProvisioningHost].contains(target)');
+  expect(INPUT_TARGETS).toEqual([
+    'connection-registrationId', 'connection-scopeId', 'connection-provisioningHost',
+  ]);
+  expect(diagnostic).toContain('kind != .secureTextField ? field.value : nil');
+  expect(diagnostic).toContain('"value": value.rawValue');
+  expect(diagnostic).not.toMatch(/print\(|debugDescription|value\(forKey:|String\(describing:/);
+  const secret = swift.split('private func enterSecret(')[1].split('private func requireMaskedEntry(')[0];
+  expect(secret).toContain('inputDiagnostics = []');
+  expect(secret).not.toContain('diagnoseInput(');
+  expect(secret).toContain('requireMaskedEntry(field, expectedLength: secret.count)');
 });
 
 test('native smoke never submits credentials and live cold restoration uses an actual process stop', () => {
