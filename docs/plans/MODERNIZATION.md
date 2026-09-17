@@ -56,6 +56,18 @@ lanes. It distinguishes a lost established session (`CONNECTION_LOST`) from an
 initial connection failure; it does not infer a network cause or add automatic
 reconnection. The newer property-card presentation preserves protocol IDs while
 removing the synthetic editable value and clarifying empty states.
+
+The rounded-header refinement `dc7313e1cc9cb95164973efee054e1d8d640726d`
+passed JavaScript and both native lanes in run `35274510385`. It replaces the
+two-size chip with uniform Quicksand Bold typography and an original phone mark.
+Native font registration and the unchanged font binary are generated from the
+pinned package; the full OFL notice is distributed and readable in Settings.
+The equivalent ADR source `467617f3a39ae9be4f927092fe3f23fef7074d7b`
+passed all three lanes in run `35274389173`. Its in-place Windows emulator update
+restored the same Connected identity and retained the user-imported Azure context.
+These are startup, presentation and local persistence results, not a new cloud
+nonce or physical-device acceptance claim.
+
 The foundation property/notice adaptation
 `31467af09a22ce83062b6f75a02e9c8853c1975d` subsequently passed all three lanes
 in run `35252459704`, retaining the legacy form while placing errors in the
