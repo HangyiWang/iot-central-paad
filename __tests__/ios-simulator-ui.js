@@ -46,6 +46,7 @@ test('opens only the explicit simulator with pinned Xcode and bounded, non-detac
   expect(source).toContain("timeout: 60000, killSignal: 'SIGKILL'");
   expect(source).not.toMatch(/simctl|osascript|detached|killall|pkill/);
   const smoke = fs.readFileSync('scripts/ci/smoke-ios.sh', 'utf8');
+  expect(smoke).toContain('export MAESTRO_DRIVER_STARTUP_TIMEOUT=240000');
   expect(smoke.indexOf('show-ios-simulator.sh')).toBeGreaterThan(smoke.indexOf('simctl install'));
   expect(smoke.indexOf('show-ios-simulator.sh')).toBeLessThan(smoke.indexOf('maestro --version'));
 });

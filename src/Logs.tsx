@@ -256,7 +256,8 @@ const styles = StyleSheet.create({
   count: {fontSize: 13, lineHeight: 20},
   filters: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
   filter: {
-    minHeight: 44,
+    minWidth: 48,
+    minHeight: 48,
     justifyContent: 'center',
     paddingHorizontal: 14,
     paddingVertical: 9,
@@ -265,14 +266,14 @@ const styles = StyleSheet.create({
   },
   actionLabel: {fontSize: 13, lineHeight: 19, fontWeight: '600'},
   textAction: {
-    minHeight: 44,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
   disclosure: {
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: 48,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },

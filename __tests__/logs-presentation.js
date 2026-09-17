@@ -52,6 +52,16 @@ test('renders a chronological virtualized feed with stable keys and selectable i
   expect(list().data).toBe(events);
   expect(list().keyExtractor(events[0])).toBe('20');
   expect(list().keyExtractor(events[1])).toBe('21');
+  for (const id of ['logs-filter-all', 'logs-filter-issues']) {
+    expect(
+      StyleSheet.flatten(view.root.findAllByProps({testID: id})[0].props.style),
+    ).toMatchObject({minWidth: 48, minHeight: 48});
+  }
+  expect(
+    StyleSheet.flatten(
+      view.root.findAllByProps({testID: 'logs-latest'})[0].props.style,
+    ).minHeight,
+  ).toBe(48);
   act(() => press('logs-filter-issues'));
   expect(list().data.map(item => item.id)).toEqual([21, 22]);
   expect(
@@ -81,7 +91,7 @@ test('an event shows a severity badge and expands the exact selectable payload',
     StyleSheet.flatten(
       view.root.findAllByProps({testID: 'log-toggle-42'})[0].props.style,
     ),
-  ).toMatchObject({minWidth: 44, minHeight: 44});
+  ).toMatchObject({minWidth: 48, minHeight: 48});
   expect(view.root.findAllByProps({testID: 'log-payload-42'})).toHaveLength(0);
   act(() => press('log-toggle-42'));
   const payload = view.root.findAllByProps({testID: 'log-payload-42'})[0];

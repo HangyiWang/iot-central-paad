@@ -35,6 +35,16 @@ Xcode Simulator app before Maestro requests XCTest screenshots. GUI launch is
 bounded to sixty seconds and rejects live device inputs. This addresses a
 reported headless-runner stability condition without bypassing UI assertions;
 it is not itself evidence of a successful native or cloud run.
+The iOS driver startup allowance is four minutes inside the existing overall
+job/command bounds. In credential-free run `35193094005`, XCTest's HTTP server
+became ready after the pinned driver's default two-minute deadline; this is
+separate from app-level assertions and the earlier screenshot failures.
+
+Foundation run `35193089860`, source
+`2d587df91ee42447f0b09eac09c01e853e6bc490`, passed JavaScript and both native
+lanes with the Opus-informed activity-log and utility-page refinements.
+Follow-up log controls use actual 48 dp/pt minimum touch regions rather than
+relying on hit slop outside a parent's bounds.
 
 Run `35166673016` at `3f6e41cd0ad72af69a44bbb8aca1e437d101bd1e` passed the
 refreshed foundation iOS flow. Its Android flow closed Quickstep successfully,
