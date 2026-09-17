@@ -3,7 +3,7 @@
 // Licensed under the MIT License.
 
 import React, {useState, useEffect, useContext, useRef} from 'react';
-import {View, Platform, StyleSheet} from 'react-native';
+import {View, Platform, Pressable, StyleSheet} from 'react-native';
 import Settings from './Settings';
 import {
   NavigationContainer,
@@ -115,6 +115,10 @@ const Navigation = React.memo(() => {
             gestureEnabled: false,
             headerBackButtonDisplayMode: 'minimal' as const,
             headerShown: !registrationHasHeader,
+            headerStyle: {backgroundColor: colors.background},
+            headerShadowVisible: false,
+            headerTintColor: colors.text,
+            headerTitleStyle: styles.logoText,
           };
           if (
             route.name === Pages.ROOT ||
@@ -125,11 +129,13 @@ const Navigation = React.memo(() => {
               headerShown: !registrationHasHeader,
               headerTitle: () => (
                 <Text
+                  testID="app-header-title"
+                  accessibilityRole="header"
                   style={{
                     ...styles.logoText,
                     color: colors.text,
                   }}>
-                  {Strings.Title}
+                  {Strings.Header.Title}
                 </Text>
               ),
               headerTitleAlign: 'left',
@@ -264,11 +270,14 @@ export const Logo = React.memo(function Logo() {
     <View
       testID="app-header-logo"
       pointerEvents="none"
-      style={styles.logoContainer}>
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.logoContainer, {backgroundColor: colors.card}]}>
       {dark ? (
-        <LogoDark width={30} height={30} fill={colors.primary} />
+        <LogoDark width={22} height={22} fill={colors.primary} />
       ) : (
-        <LogoLight width={30} height={30} fill={colors.primary} />
+        <LogoLight width={22} height={22} fill={colors.primary} />
       )}
     </View>
   );
@@ -277,38 +286,57 @@ export const Logo = React.memo(function Logo() {
 export const Profile = React.memo((props: {navigate: any}) => {
   const {colors} = useTheme();
   return (
-    <View style={styles.marginHorizontal10}>
-      <Icon
-        style={styles.marginEnd20}
-        name={
-          Platform.select({
-            ios: 'settings-outline',
-            android: 'settings',
-          }) as string
-        }
-        type={Platform.select({ios: 'ionicon', android: 'material'})}
-        color={colors.text}
-        onPress={() => {
-          props.navigate(Pages.SETTINGS);
-        }}
-      />
-    </View>
+    <Pressable
+      testID="app-settings"
+      accessibilityRole="button"
+      accessibilityLabel={Strings.Settings.Title}
+      onPress={() => props.navigate(Pages.SETTINGS)}
+      style={({pressed}) => [
+        styles.settingsButton,
+        {backgroundColor: colors.card, opacity: pressed ? 0.7 : 1},
+      ]}>
+      <View
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants">
+        <Icon
+          name={
+            Platform.select({
+              ios: 'settings-outline',
+              android: 'settings',
+            }) as string
+          }
+          type={Platform.select({ios: 'ionicon', android: 'material'})}
+          color={colors.text}
+          size={22}
+        />
+      </View>
+    </Pressable>
   );
 });
 
 export const styles = StyleSheet.create({
   logoContainer: {
-    width: 30,
-    height: 30,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
     marginHorizontal: 10,
   },
   logoText: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    letterSpacing: 0.1,
+    fontWeight: '600',
+    fontSize: 18,
+    letterSpacing: -0.2,
+  },
+  settingsButton: {
+    minWidth: 48,
+    minHeight: 48,
+    borderRadius: 16,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   marginHorizontal10: {
     marginHorizontal: 10,
