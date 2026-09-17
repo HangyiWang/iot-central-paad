@@ -43,7 +43,7 @@ test('opens only the explicit simulator with pinned Xcode and bounded, non-detac
     ]);
   });
   const source = fs.readFileSync(script, 'utf8');
-  expect(source).toContain("timeout: 10000, killSignal: 'SIGKILL'");
+  expect(source).toContain("timeout: 60000, killSignal: 'SIGKILL'");
   expect(source).not.toMatch(/simctl|osascript|detached|killall|pkill/);
   const smoke = fs.readFileSync('scripts/ci/smoke-ios.sh', 'utf8');
   expect(smoke.indexOf('show-ios-simulator.sh')).toBeGreaterThan(smoke.indexOf('simctl install'));
@@ -80,7 +80,7 @@ test('surfaces GUI failure without printing raw child output', () => {
     const result = invoke([device], {TEST_OPEN_RESULT: '8'});
     expect(result.status).toBe(1);
     expect(result.stdout).toBe('');
-    expect(result.stderr).toBe('Owned Simulator UI could not be opened.\n');
+    expect(result.stderr).toBe('Owned Simulator UI could not be opened: nonzero-exit.\n');
     expect(fs.existsSync(call)).toBe(true);
   });
 });

@@ -14,9 +14,11 @@ node - "$1" "$DEVELOPER_DIR/Applications/Simulator.app" <<'NODE'
 const {spawnSync} = require('node:child_process');
 const result = spawnSync('open', [
   '-a', process.argv[3], '--args', '-CurrentDeviceUDID', process.argv[2],
-], {stdio: ['ignore', 'pipe', 'pipe'], timeout: 10000, killSignal: 'SIGKILL', maxBuffer: 65536});
+], {stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000, killSignal: 'SIGKILL', maxBuffer: 65536});
 if (result.error || result.signal || result.status !== 0) {
-  console.error('Owned Simulator UI could not be opened.');
+  const reason = result.error?.code === 'ETIMEDOUT' ? 'deadline-exceeded'
+    : result.error ? 'spawn-failed' : result.signal ? 'signal' : 'nonzero-exit';
+  console.error(`Owned Simulator UI could not be opened: ${reason}.`);
   process.exit(1);
 }
 console.log('Owned Simulator UI opened.');
