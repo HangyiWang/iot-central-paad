@@ -59,6 +59,17 @@ provide clear empty states and distinguish labels from values. Connection
 failures now appear in the connection summary or onboarding area, not below the
 tab bar; the existing legacy foundation form remains unchanged.
 
+The rounded-header refinement `dc7313e1cc9cb95164973efee054e1d8d640726d`
+passed JavaScript and both native lanes in run `35274510385`. It replaces the
+two-size chip with uniform Quicksand Bold typography and an original phone mark.
+Native font registration and the unchanged font binary are generated from the
+pinned package; the full OFL notice is distributed and readable in Settings.
+The equivalent ADR source `467617f3a39ae9be4f927092fe3f23fef7074d7b`
+passed all three lanes in run `35274389173`. Its in-place Windows emulator update
+restored the same Connected identity and retained the user-imported Azure context.
+These are startup, presentation and local persistence results, not a new cloud
+nonce or physical-device acceptance claim.
+
 Run `35166673016` at `3f6e41cd0ad72af69a44bbb8aca1e437d101bd1e` passed the
 refreshed foundation iOS flow. Its Android flow closed Quickstep successfully,
 then encountered a stacked System UI ANR. Recovery therefore allows at most
