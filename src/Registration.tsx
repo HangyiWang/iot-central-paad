@@ -40,6 +40,7 @@ import {
 import {IoTCContext, StorageContext} from 'contexts';
 import {CredentialForm} from './onboarding/manual';
 import {DeviceCredentials} from './connection';
+import RegistrationActions from './components/registrationActions';
 
 const screens = RegistrationScreens;
 type RegistrationRoutes = Record<
@@ -266,16 +267,9 @@ export function ManualConnect({onConnected}: {onConnected(): void}) {
         )}
         {error && <ConnectionNotice error={error} diagnostics />}
         {readonly && (
-          <Button
-            testID="registration-close"
-            title={Strings.Core.Close}
-            onPress={onConnected}
-          />
-        )}
-        {readonly && (
-          <Button
-            title={Strings.Registration.Manual.RegisterNew.Title}
-            onPress={() => {
+          <RegistrationActions
+            onClose={onConnected}
+            onRegisterNew={() => {
               setRegisteringNew(true);
               navigation.replace(screens.EMPTY);
             }}

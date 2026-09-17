@@ -382,6 +382,44 @@ test('one-shot restored real client lands Home even with batched connection upda
   expect(destinations).toHaveLength(2);
 });
 
+test('new-device footer opens blank entry without changing the saved connected device', async () => {
+  Keychain.getGenericPassword.mockResolvedValue({
+    username: 'IOTC_PAD_CLIENT',
+    password: JSON.stringify({credentials: {connectionString: direct}}),
+  });
+  await boot();
+  await act(async () => {
+    press('connection-details');
+  });
+  await act(async () => {
+    press('connection-manual');
+    await jest.advanceTimersByTimeAsync(500);
+  });
+  const saves = Keychain.setGenericPassword.mock.calls.length;
+  const resets = Keychain.resetGenericPassword.mock.calls.length;
+  await act(async () => {
+    press('registration-new');
+    await jest.advanceTimersByTimeAsync(500);
+  });
+  await act(async () => {
+    press('registration-manual');
+    await jest.advanceTimersByTimeAsync(500);
+  });
+  const registration = app.root
+    .findAllByType(TextInput)
+    .find(node => node.props.testID === 'connection-registrationId');
+  expect(registration.props.editable).toBe(true);
+  expect(registration.props.value).toBe('');
+  expect(
+    app.root.findAllByProps({testID: 'registration-actions'}),
+  ).toHaveLength(0);
+  expect(destinations).toHaveLength(1);
+  expect(sockets.size).toBe(1);
+  expect(httpFetch).not.toHaveBeenCalled();
+  expect(Keychain.setGenericPassword).toHaveBeenCalledTimes(saves);
+  expect(Keychain.resetGenericPassword).toHaveBeenCalledTimes(resets);
+});
+
 test('versioned QR uses the same real client, suppresses duplicate scans and releases camera on Home', async () => {
   await boot();
   await act(async () => {
