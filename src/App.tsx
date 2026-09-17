@@ -30,7 +30,6 @@ import LogoLight from './assets/IoT-Plug-And-Play_Dark.svg';
 import LogoDark from './assets/IoT-Plug-And-Play_Light.svg';
 import {Icon} from '@rneui/themed';
 import {createStackNavigator} from '@react-navigation/stack';
-import {Text} from './components/typography';
 import {Welcome} from './Welcome';
 import Home from './Home';
 import {
@@ -47,6 +46,8 @@ import Strings from 'strings';
 import {Option} from 'components/options';
 import Options from 'components/options';
 import {TorchCameraHost} from './tools/Torch';
+import BrandTitle from './components/brandTitle';
+import {palette} from './theme/palette';
 
 const Stack = createStackNavigator<NavigationPages>();
 
@@ -133,17 +134,7 @@ const Navigation = React.memo(() => {
               return {
                 ...defaultOptions,
                 headerShown: !registrationHasHeader,
-                headerTitle: () => (
-                  <Text
-                    testID="app-header-title"
-                    accessibilityRole="header"
-                    style={{
-                      ...styles.logoText,
-                      color: colors.text,
-                    }}>
-                    {Strings.Header.Title}
-                  </Text>
-                ),
+                headerTitle: () => <BrandTitle />,
                 headerTitleAlign: 'left',
                 headerLeft: () => <Logo />,
                 headerRight: () => (
@@ -281,7 +272,7 @@ export const Logo = React.memo(function Logo() {
       accessible={false}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[styles.logoContainer, {backgroundColor: colors.card}]}>
+      style={[styles.logoContainer, {backgroundColor: palette(dark).tints[0]}]}>
       {dark ? (
         <LogoDark width={22} height={22} fill={colors.primary} />
       ) : (

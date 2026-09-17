@@ -5,6 +5,10 @@ import React, {useCallback, useRef, useState} from 'react';
 import * as Keychain from 'react-native-keychain';
 import {DeviceCredentials, decodeCredentials} from '../connection';
 import {ThemeMode} from '../types';
+import {
+  AzureContextSnapshot,
+  parseAzureContext,
+} from '../onboarding/azureContext';
 
 const USERNAME = 'IOTC_PAD_CLIENT';
 
@@ -15,6 +19,8 @@ export type IStorageState = {
   deliveryInterval: number;
   credentials: DeviceCredentials | null;
   initialized: boolean;
+  azureContext: AzureContextSnapshot | null;
+  azureContextError: boolean;
 };
 
 const initialState: IStorageState = {
@@ -24,6 +30,8 @@ const initialState: IStorageState = {
   initialized: false,
   skipVersion: null,
   deliveryInterval: 5,
+  azureContext: null,
+  azureContextError: false,
 };
 
 export function restoreStoredState(value: unknown): IStorageState {
@@ -46,6 +54,17 @@ export function restoreStoredState(value: unknown): IStorageState {
   ) {
     throw new Error('Stored application settings are invalid.');
   }
+  let azureContext: AzureContextSnapshot | null = null;
+  let azureContextError = saved.azureContextError === true;
+  if (saved.azureContext != null) {
+    try {
+      azureContext = parseAzureContext(JSON.stringify(saved.azureContext));
+      azureContextError = false;
+    } catch {
+      // Optional context must not block credential restoration; the panel surfaces this error.
+      azureContextError = true;
+    }
+  }
   return {
     themeMode: themeMode as ThemeMode,
     simulated,
@@ -55,6 +74,8 @@ export function restoreStoredState(value: unknown): IStorageState {
       ? decodeCredentials(saved.credentials)
       : null,
     initialized: true,
+    azureContext,
+    azureContextError,
   };
 }
 
@@ -88,6 +109,20 @@ const StorageProvider: React.FC<{children: React.ReactNode}> = ({children}) => {
     (data: Partial<IStorageState>, store = true) =>
       enqueue(async () => {
         const next = {...current.current, ...data};
+        if (data.azureContext !== undefined) {
+          if (data.azureContext !== null && !next.credentials) {
+            throw new Error('Azure context requires saved device credentials.');
+          }
+          next.azureContext =
+            data.azureContext === null
+              ? null
+              : parseAzureContext(JSON.stringify(data.azureContext));
+          next.azureContextError = false;
+        }
+        if (data.credentials === null) {
+          next.azureContext = null;
+          next.azureContextError = false;
+        }
         if (store) {
           const written = await Keychain.setGenericPassword(
             USERNAME,

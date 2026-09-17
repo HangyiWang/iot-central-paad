@@ -27,6 +27,7 @@ import {palette} from '../theme/palette';
 import ConnectionNotice from './connectionNotice';
 import {Icon} from '@rneui/themed';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import AzureContextPanel from './azureContextPanel';
 
 export default function ConnectionSummary({
   onManualConnection,
@@ -408,6 +409,9 @@ export default function ConnectionSummary({
                 client={client}
                 connected={connected}
                 simulated={simulated}
+              />
+              <AzureContextPanel
+                identity={simulated ? null : client?.identity ?? null}
               />
               <Pressable
                 accessibilityRole="button"

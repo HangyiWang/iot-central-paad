@@ -5,6 +5,55 @@ const Strings = {
   Title: 'IoT Plug and Play',
   Header: {
     Title: 'Phone as a device',
+    Brand: 'Phone',
+    Descriptor: 'as a device',
+  },
+  AzureContext: {
+    Title: 'Azure environment',
+    Source: 'Operator-provided snapshot',
+    Explanation:
+      'Saved Azure context, not a live registry check. Refresh by importing a new operator export.',
+    Empty:
+      'Import Azure context to see this device’s namespace, subscription and resource group.',
+    Unavailable: 'Connect a real device before importing its Azure context.',
+    OtherDevice:
+      'The saved snapshot belongs to another device. Import a snapshot for this device.',
+    StoredInvalid:
+      'The saved Azure snapshot could not be read. Device credentials are unchanged; import it again.',
+    View: 'View Azure details',
+    Hide: 'Hide Azure details',
+    Import: 'Import snapshot',
+    Replace: 'Replace snapshot',
+    Input: 'Azure context JSON or Base64',
+    Placeholder: 'Paste exported JSON or Base64',
+    Hint: 'Use the operator’s Azure context export. Never paste device keys, connection strings or access tokens here.',
+    Invalid:
+      'This is not a supported Azure context snapshot. Check the export and try again.',
+    WrongDevice: 'This snapshot does not match the assigned device and Hub.',
+    SaveFailed: 'The Azure snapshot could not be saved. Try again.',
+    RemoveFailed: 'The saved snapshot could not be removed. Try again.',
+    OpenFailed: 'Azure Portal could not be opened.',
+    Remove: 'Remove snapshot',
+    Captured: 'Snapshot captured',
+    Namespace: 'ADR namespace',
+    Subscription: 'Subscription',
+    SubscriptionId: 'Subscription ID',
+    ResourceGroup: 'Resource group',
+    Region: 'Region',
+    Hub: 'IoT Hub',
+    Dps: 'Device Provisioning Service',
+    Registry: 'Registry record in snapshot',
+    RegistryMissing:
+      'No matching registry record was included in this snapshot.',
+    Portal: 'Open in Azure Portal',
+    ShowIds: 'Show resource IDs',
+    HideIds: 'Hide resource IDs',
+    Activities: 'Namespace activity',
+    ActivityExplanation:
+      'Up to 20 resource-management events from the export’s 24-hour window, including other devices in this namespace. This is not telemetry history.',
+    NoActivities: 'No management events were included in this export window.',
+    ShowActivities: 'Show activity snapshot',
+    HideActivities: 'Hide activity snapshot',
   },
   Core: {
     Back: 'Back',

@@ -99,7 +99,11 @@ describe('App startup', () => {
       });
 
       expect(app.root.findAllByType(Welcome)).toHaveLength(0);
-      expect(hasText(Strings.Header.Title)).toBe(true);
+      expect(
+        app.root
+          .findAllByProps({testID: 'app-header-title'})
+          .some(node => node.props.accessibilityLabel === Strings.Header.Title),
+      ).toBe(true);
       expect(hasText(Strings.Registration.Header.Welcome)).toBe(true);
       expect(hasText('Scan QR code')).toBe(true);
       expect(hasText(Strings.Registration.QRCode.Manually)).toBe(true);

@@ -230,6 +230,47 @@ for the exact DPS assignment, Hub twin model/nonce, and ADR external-device
 identity. It requests no keys and performs no cloud writes. Service hostnames
 may differ from device hostnames; supply the actual configured values.
 
+## Import operator-provided Azure context
+
+**Details > Azure environment** can show a saved namespace, subscription,
+resource group, region, Hub/DPS links, registry record and namespace activity.
+This is an explicitly labelled operator-provided snapshot, not an in-app ARM
+query or a live registry check. It is displayed only for its matching assigned
+device/Hub identity. Offline simulation does not display it.
+
+Using the project's Node 24.19 or newer and the existing authorized Azure CLI
+login, export a device-bound snapshot without requesting any keys:
+
+```bash
+node scripts/ci/export-azure-context.js \
+  --config /path/to/nonsecret-config.json --platform android \
+  --subscription <subscription-id> --resource-group <resource-group> \
+  --namespace <namespace-name> \
+  --dps-service-host <configured-DPS-service-host> \
+  --hub-service-host <configured-Hub-service-host> \
+  --out /path/to/new-azure-context.json
+```
+
+The exporter verifies actual namespace links and the DPS assignment, reads the
+matching registry record when present, and captures up to 20 namespace management
+events from the preceding 24 hours. It excludes caller identities, claims, IP
+addresses, authentication material and device telemetry. A denied read fails
+explicitly rather than producing an empty success. Version 1 requires the
+namespace, DPS and Hub to share the stated subscription and resource group.
+
+Choose **Import snapshot**, paste the exported JSON or its canonical Base64
+encoding, and confirm the import. No lab values are bundled into the app.
+The snapshot is saved with the existing local settings and survives restart;
+**Remove snapshot** removes only this context, while **Forget credentials** or
+**Clear Data** also removes it. Corrupt optional context surfaces an import error
+without blocking valid device credentials from restoring.
+
+Portal links open the external browser, where Azure authorization remains
+separate. **Namespace activity** includes other devices in the namespace and is
+neither a live feed nor telemetry history. Re-export and import to refresh its
+timestamp. An imported record does not change the app's live registry status
+from **Not checked**.
+
 ## Authorized automated live runs
 
 The separate `live-device.yml` workflow requires the repository owner,
