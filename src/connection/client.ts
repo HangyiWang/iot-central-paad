@@ -155,6 +155,7 @@ export function createDeviceClient(
         }
         checkAbort(signal);
         stage('connecting');
+        let established = false;
         transport = createLegacyHub(
           identity,
           password,
@@ -163,7 +164,12 @@ export function createDeviceClient(
           property => emit<IIoTCProperty>(propertyListeners, property),
           () => {
             password = '';
-            stage('error', new ConnectionError('CONNECT_FAILED'));
+            stage(
+              'error',
+              new ConnectionError(
+                established ? 'CONNECTION_LOST' : 'CONNECT_FAILED',
+              ),
+            );
           },
         );
         await transport.connect(
@@ -172,6 +178,7 @@ export function createDeviceClient(
           connectOptions.cleanSession ?? true,
         );
         checkAbort(signal);
+        established = true;
         stage('connected');
         return identity;
       } catch (error) {

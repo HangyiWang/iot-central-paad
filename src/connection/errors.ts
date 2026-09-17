@@ -8,6 +8,7 @@ export type ConnectionErrorCode =
   | 'INVALID_RESPONSE'
   | 'NETWORK_ERROR'
   | 'CONNECT_FAILED'
+  | 'CONNECTION_LOST'
   | 'SECURE_TRANSPORT_REQUIRED'
   | 'NOT_CONNECTED'
   | 'OPERATION_FAILED'
@@ -24,6 +25,7 @@ const messages: Record<ConnectionErrorCode, string> = {
   INVALID_RESPONSE: 'Azure returned an invalid protocol response.',
   NETWORK_ERROR: 'The secure network request failed.',
   CONNECT_FAILED: 'The device transport could not connect.',
+  CONNECTION_LOST: 'The cloud connection was interrupted.',
   SECURE_TRANSPORT_REQUIRED:
     'A WebSocket implementation that rejects redirects is required.',
   NOT_CONNECTED: 'The device is not connected.',
