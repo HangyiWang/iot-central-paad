@@ -156,6 +156,12 @@ retry. This distinguishes an interrupted action from an absent container marker
 without exporting UI text or changing the app. The cause of the preceding
 missing-sheet result is not yet established.
 
+Credential-free replay `35301528401` compiled and passed that harness (`8567687`)
+against the pre-secret `c152898` app, with owned simulator deletion. Its subsequent
+live-workflow attempt `35302135929` failed in synthetic welcome/manual navigation
+before the device-input step. The temporary input was removed; this is not an
+additional connected Details result.
+
 ### Connection capsule delivery (2026-09-17)
 
 The accepted capsule keeps status, a ringed cloud icon and a separated Details
@@ -184,6 +190,23 @@ Details uses a shared outlined/icon action treatment, contrasting fills on
 snapshot cards, explicit expand/external-link glyphs, and distinct primary and
 destructive actions. Static resource values and registry badges remain non-actions.
 The accepted app heading and connection capsule are unchanged.
+
+The compact-action feature source `df5bcb61053c70d8b6b43800f2d1fe9f40d2bd05`
+passed JavaScript and both native startup lanes in `35303108607`; foundation
+`30bb9acf822b716b7788a764af53bb04f501133d` passed all three in `35303073801`.
+The feature APK was installed in place on the retained Windows Android emulator.
+Its Registration controls measured 48 dp high, approximately 72/140 dp wide,
+and exactly 8 dp apart in one row. Close returned to the connected device; New
+device was not invoked. Public-only button crops confirmed visible action edges,
+icons and distinct destructive styling without exporting full live screenshots.
+
+The updated app submitted a fresh nonce, independently matched against DPS
+assignment, the phone model and the existing automatic ADR record. A genuine
+force-stop/relaunch restored the same connected identity without credential entry,
+and the saved Azure resource/activity context remained usable without reimport.
+This is retained-device evidence, not new registry creation or iOS live acceptance.
+APK SHA256:
+`8b62f4b5e266fd336270051b3182ebd805e7b5d776a9dd7fc6d14cd677de9893`.
 
 Feature source `31e7e8e7658abb7c152fa038bb8c98b4ecd7cf2c` passed JavaScript,
 Android and iOS lanes in `35285951515`. The corresponding foundation-only footer

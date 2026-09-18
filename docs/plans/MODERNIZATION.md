@@ -132,6 +132,9 @@ Narrow windows and large text stack the controls without fixed heights or
 truncated labels. The full registration accessibility label and both existing
 confirmation flows remain unchanged; this does not add the ADR Details sheet
 or replace the foundation's clear-credentials action with Close.
+Foundation source `30bb9acf822b716b7788a764af53bb04f501133d` passed
+JavaScript and both native startup lanes in `35303073801`. The separately
+adapted ADR UI passed all three in `35303108607` on `df5bcb6`.
 
 [Run 35052582168](https://github.com/HangyiWang/iot-central-paad/actions/runs/35052582168)
 built `f02ed75b061f675b5a3312a67c940de4b2a37cbc` using Expo 57.0.23,
