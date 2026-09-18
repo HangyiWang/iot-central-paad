@@ -205,6 +205,22 @@ APK SHA256:
 
 ### Registration and Details refinement (2026-09-17)
 
+The Azure-only follow-up, source `f724bde83a5b4cfb08ea81dc81ba5829991fdc86`,
+passed JavaScript and both native startup lanes in `35310328278`. Its APK was
+installed in place on the retained Windows Android emulator, preserving the
+accepted heading, capsule, compact Registration footer and other Details actions.
+Azure facts now use separate Scope/Resources groups, compact Portal links and
+one snapshot-management group with wrapping controls and consistent typography.
+Native saved-context paths retained the exact namespace, subscription, resource
+group, region and management activity without reimport. Bounded layout crops
+excluded inputs and redacted the resource values; no full live screenshot was
+written. A genuine process stop/relaunch restored Connected and the same assigned
+identity/model, and the saved context/activity remained available afterward.
+This layout delivery is not a new independently confirmed nonce, automatic
+registry-creation case or completed iOS live acceptance.
+APK SHA256:
+`4b63cc5647f306a16f6beb4d9b555c9766e6f13dac72321c05ab0c568403f36a`.
+
 The September 18 compact-action follow-up responds to further simulator feedback:
 Registration now pairs content-width Close and New device controls with an
 8 dp gap and 48 dp minimum touch regions. Narrow screens and large text stack
