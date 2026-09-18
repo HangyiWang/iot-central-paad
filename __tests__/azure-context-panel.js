@@ -14,6 +14,7 @@ import {palette} from '../src/theme/palette';
 
 jest.mock('../src/hooks', () => ({useTheme: jest.fn(() => ({dark: false}))}));
 jest.mock('../src/components/typography', () => ({Text: 'Text'}));
+jest.mock('@rneui/themed', () => ({Icon: 'Icon'}));
 
 const subscription = '11111111-2222-4333-8444-555555555555';
 const scope = `/subscriptions/${subscription}/resourceGroups/context-rg`;
@@ -265,7 +266,12 @@ test.each([false, true])(
       await storage.save({azureContext: snapshot});
     });
     const colors = palette(dark);
-    const style = node => StyleSheet.flatten(node.props.style);
+    const style = node =>
+      StyleSheet.flatten(
+        typeof node.props.style === 'function'
+          ? node.props.style({pressed: false})
+          : node.props.style,
+      );
     const textNode = content =>
       tree.root
         .findAllByType('Text')
@@ -335,7 +341,11 @@ test.each([false, true])(
       'azure-context-activities',
     ]) {
       expect(style(control(id)).minHeight).toBe(48);
-      expect(style(control(id)).backgroundColor).toBeUndefined();
+      expect(style(control(id))).toMatchObject({
+        backgroundColor: colors.tints[0],
+        borderWidth: 1,
+        borderColor: colors.controlBorder,
+      });
     }
     expect(style(control('azure-context-import-toggle'))).toMatchObject({
       minHeight: 48,
@@ -384,7 +394,13 @@ test('keeps importing controls visibly disabled while saving and reports failure
   )) {
     expect(node.props.disabled).toBe(true);
     expect(node.props.accessibilityState.disabled).toBe(true);
-    expect(StyleSheet.flatten(node.props.style).opacity).toBe(0.5);
+    expect(
+      StyleSheet.flatten(
+        typeof node.props.style === 'function'
+          ? node.props.style({pressed: false})
+          : node.props.style,
+      ).opacity,
+    ).toBe(0.5);
   }
   await act(async () => {
     finish(false);

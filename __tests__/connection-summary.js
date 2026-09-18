@@ -453,7 +453,12 @@ it.each([
       view.root
         .findAllByType('Text')
         .find(node => node.props.children === content);
-    const style = node => StyleSheet.flatten(node.props.style);
+    const style = node =>
+      StyleSheet.flatten(
+        typeof node.props.style === 'function'
+          ? node.props.style({pressed: false})
+          : node.props.style,
+      );
     const control = id => view.root.findAllByProps({testID: id})[0];
     const titleStyle = {
       fontSize: 17,
@@ -525,12 +530,14 @@ it.each([
       expect(style(control(id))).toMatchObject({
         minHeight: 48,
         borderRadius: 14,
-        paddingHorizontal: 16,
+        paddingHorizontal: 14,
+        borderWidth: 1,
+        borderColor: colors.controlBorder,
         backgroundColor: colors.inset,
       });
     }
     expect(style(textNode(Strings.Connection.Summary.Disconnect)).color).toBe(
-      colors.text,
+      colors.danger,
     );
     expect(style(control('connection-forget'))).toMatchObject({
       backgroundColor: colors.dangerSurface,
@@ -588,7 +595,9 @@ it('styles share failures and disabled forgetting without changing their actions
   const forget = view.root.findAllByProps({testID: 'connection-forget'})[0];
   expect(forget.props.disabled).toBe(true);
   expect(forget.props.accessibilityState.disabled).toBe(true);
-  expect(StyleSheet.flatten(forget.props.style).opacity).toBe(0.5);
+  expect(StyleSheet.flatten(forget.props.style({pressed: false})).opacity).toBe(
+    0.5,
+  );
   await act(async () => {
     finish();
     await pending;

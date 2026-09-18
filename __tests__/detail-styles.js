@@ -9,6 +9,7 @@ import Strings from '../src/strings';
 
 jest.mock('../src/hooks', () => ({useTheme: jest.fn()}));
 jest.mock('../src/components/typography', () => ({Text: 'Text'}));
+jest.mock('@rneui/themed', () => ({Icon: 'Icon'}));
 
 test.each([
   ['sheetTitle', 24, 31, '600', -0.5],
@@ -32,7 +33,12 @@ test.each([
 );
 
 let view;
-const style = node => StyleSheet.flatten(node.props.style);
+const style = node =>
+  StyleSheet.flatten(
+    typeof node.props.style === 'function'
+      ? node.props.style({pressed: false})
+      : node.props.style,
+  );
 const control = id => view.root.findAllByProps({testID: id})[0];
 const textNode = content =>
   view.root.findAllByType('Text').find(node => node.props.children === content);

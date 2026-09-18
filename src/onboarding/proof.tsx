@@ -1,17 +1,12 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {
-  Keyboard,
-  Platform,
-  Pressable,
-  TextInput,
-  View,
-} from 'react-native';
+import {Keyboard, Platform, TextInput, View} from 'react-native';
 import {DeviceClient} from '../connection';
 import {Text} from '../components/typography';
 import {useTheme} from '../hooks';
 import Strings from '../strings';
 import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
+import DetailsAction from '../components/detailsAction';
 
 export const validProofNonce = (nonce: string): boolean =>
   /^[A-Za-z0-9_-]{16,128}$/.test(nonce);
@@ -128,21 +123,15 @@ export function ProofActivity({
           setStatus('');
         }}
       />
-      <Pressable
-        testID="proof-send"
-        accessibilityRole="button"
-        accessibilityLabel={text.ProofSend}
-        accessibilityState={{disabled: unavailable || pending}}
+      <DetailsAction
+        id="proof-send"
+        label={text.ProofSend}
+        icon="send"
+        variant="primary"
+        block
+        busy={pending}
         disabled={unavailable || pending}
-        style={[
-          detailStyles.action,
-          detailStyles.primaryAction,
-          detailStyles.centered,
-          {
-            backgroundColor:
-              unavailable || pending ? colors.inset : colors.primary,
-          },
-        ]}
+        style={detailStyles.primaryAction}
         onPress={async () => {
           if (lock.current || unavailable || !client) {
             return;
@@ -181,16 +170,8 @@ export function ProofActivity({
               setPending(false);
             }
           }
-        }}>
-        <Text
-          style={[
-            detailStyles.actionLabel,
-            detailStyles.centeredLabel,
-            {color: unavailable || pending ? colors.muted : colors.onPrimary},
-          ]}>
-          {text.ProofSend}
-        </Text>
-      </Pressable>
+        }}
+      />
       <Text
         testID="proof-status"
         style={[

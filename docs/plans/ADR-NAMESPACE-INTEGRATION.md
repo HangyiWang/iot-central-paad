@@ -176,6 +176,15 @@ APK SHA256:
 
 ### Registration and Details refinement (2026-09-17)
 
+The September 18 compact-action follow-up responds to further simulator feedback:
+Registration now pairs content-width Close and New device controls with an
+8 dp gap and 48 dp minimum touch regions. Narrow screens and large text stack
+them without truncation; the full new-registration accessibility label remains.
+Details uses a shared outlined/icon action treatment, contrasting fills on
+snapshot cards, explicit expand/external-link glyphs, and distinct primary and
+destructive actions. Static resource values and registry badges remain non-actions.
+The accepted app heading and connection capsule are unchanged.
+
 Feature source `31e7e8e7658abb7c152fa038bb8c98b4ecd7cf2c` passed JavaScript,
 Android and iOS lanes in `35285951515`. The corresponding foundation-only footer
 adaptation, `113ac715d29215077c005632d7497c704ddff687`, passed all three in

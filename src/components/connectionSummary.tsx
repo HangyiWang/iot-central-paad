@@ -30,6 +30,7 @@ import ConnectionNotice from './connectionNotice';
 import {Icon} from '@rneui/themed';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import AzureContextPanel from './azureContextPanel';
+import DetailsAction from './detailsAction';
 
 export default function ConnectionSummary({
   onManualConnection,
@@ -287,16 +288,12 @@ export default function ConnectionSummary({
                 style={[styles.sheetTitle, {color: appearance.text}]}>
                 {text.Details}
               </Text>
-              <Pressable
-                testID="connection-details-close"
-                accessibilityRole="button"
-                accessibilityLabel={Strings.Core.Close}
+              <DetailsAction
+                id="connection-details-close"
+                label={Strings.Core.Close}
+                icon="close"
                 onPress={() => setDetails(false)}
-                style={[styles.close, {backgroundColor: appearance.inset}]}>
-                <Text style={[styles.actionText, {color: appearance.primary}]}>
-                  {Strings.Core.Close}
-                </Text>
-              </Pressable>
+              />
             </View>
             <ScrollView
               style={styles.scroll}
@@ -346,50 +343,34 @@ export default function ConnectionSummary({
                   },
                 ]}>
                 {client && (
-                  <Pressable
-                    testID="connection-disconnect"
-                    accessibilityRole="button"
+                  <DetailsAction
+                    id="connection-disconnect"
+                    label={text.Disconnect}
+                    icon="link-variant-off"
+                    variant="danger"
                     onPress={clear}
-                    style={styles.action}>
-                    <Text style={[styles.actionText, {color: appearance.text}]}>
-                      {text.Disconnect}
-                    </Text>
-                  </Pressable>
+                  />
                 )}
                 {credentials && !connected && (
-                  <Pressable
-                    testID="connection-reconnect"
-                    accessibilityRole="button"
+                  <DetailsAction
+                    id="connection-reconnect"
+                    label={text.Reconnect}
+                    icon="refresh"
                     onPress={() => {
                       setDetails(false);
                       void connect(credentials);
                     }}
-                    style={[
-                      styles.action,
-                      {backgroundColor: appearance.inset},
-                    ]}>
-                    <Text
-                      style={[styles.actionText, {color: appearance.primary}]}>
-                      {text.Reconnect}
-                    </Text>
-                  </Pressable>
+                  />
                 )}
-                <Pressable
-                  testID="connection-manual"
-                  accessibilityRole="button"
+                <DetailsAction
+                  id="connection-manual"
+                  label={text.Manual}
+                  icon="lan-connect"
                   onPress={() => {
                     setDetails(false);
                     onManualConnection();
                   }}
-                  style={[
-                    styles.action,
-                    {backgroundColor: appearance.inset},
-                  ]}>
-                  <Text
-                    style={[styles.actionText, {color: appearance.primary}]}>
-                    {text.Manual}
-                  </Text>
-                </Pressable>
+                />
               </View>
               <View
                 style={[
@@ -430,13 +411,9 @@ export default function ConnectionSummary({
               <AzureContextPanel
                 identity={simulated ? null : client?.identity ?? null}
               />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={text.Share}
-                style={[
-                  styles.secondaryAction,
-                  {backgroundColor: appearance.inset},
-                ]}
+              <DetailsAction
+                label={text.Share}
+                icon="share-variant"
                 onPress={async () => {
                   setShareFailed(false);
                   try {
@@ -458,11 +435,8 @@ export default function ConnectionSummary({
                       setShareFailed(true);
                     }
                   }
-                }}>
-                <Text style={[styles.actionText, {color: appearance.primary}]}>
-                  {text.Share}
-                </Text>
-              </Pressable>
+                }}
+              />
               {shareFailed && (
                 <Text
                   accessibilityLiveRegion="polite"
@@ -471,17 +445,13 @@ export default function ConnectionSummary({
                 </Text>
               )}
               {credentials && (
-                <Pressable
-                  testID="connection-forget"
-                  accessibilityRole="button"
-                  accessibilityLabel={text.Forget}
-                  accessibilityState={{disabled: forgetting || loading}}
+                <DetailsAction
+                  id="connection-forget"
+                  label={text.Forget}
+                  icon="delete-outline"
+                  variant="danger"
                   disabled={forgetting || loading}
-                  style={[
-                    styles.secondaryAction,
-                    {backgroundColor: appearance.dangerSurface},
-                    (forgetting || loading) && detailStyles.disabled,
-                  ]}
+                  busy={forgetting}
                   onPress={() =>
                     Alert.alert(text.ForgetTitle, text.ForgetMessage, [
                       {text: Strings.Core.Cancel, style: 'cancel'},
@@ -510,11 +480,8 @@ export default function ConnectionSummary({
                         },
                       },
                     ])
-                  }>
-                  <Text style={[styles.actionText, {color: appearance.danger}]}>
-                    {text.Forget}
-                  </Text>
-                </Pressable>
+                  }
+                />
               )}
             </ScrollView>
           </KeyboardAvoidingView>
@@ -707,9 +674,7 @@ const styles = StyleSheet.create({
   label: detailStyles.label,
   supporting: {fontSize: 12, lineHeight: 17},
   notice: {paddingTop: 8},
-  action: detailStyles.action,
   divided: detailStyles.divided,
-  actionText: detailStyles.actionLabel,
   rowAction: {fontSize: 13, lineHeight: 19, fontWeight: '600', flexShrink: 1},
   sheet: {flex: 1},
   handle: {
@@ -734,7 +699,6 @@ const styles = StyleSheet.create({
     ...detailStyles.sheetTitle,
     flexShrink: 1,
   },
-  close: detailStyles.action,
   scroll: {flex: 1},
   details: {paddingHorizontal: 20, paddingBottom: 48, gap: 16},
   detailValue: detailStyles.row,
@@ -745,9 +709,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-  },
-  secondaryAction: {
-    ...detailStyles.action,
-    ...detailStyles.centered,
   },
 });

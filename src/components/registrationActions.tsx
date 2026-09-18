@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import React from 'react';
-import {StyleSheet, View} from 'react-native';
+import {StyleSheet, useWindowDimensions, View} from 'react-native';
 import Button from './button';
 import {useTheme} from '../hooks';
 import {palette} from '../theme/palette';
@@ -17,30 +17,42 @@ export default function RegistrationActions({
 }) {
   const {dark} = useTheme();
   const colors = palette(dark);
+  const {width, fontScale} = useWindowDimensions();
+  const stacked = width < 360 || fontScale > 1.3;
   return (
     <View
       testID="registration-actions"
-      style={[styles.footer, {borderTopColor: colors.border}]}>
+      style={[
+        styles.footer,
+        stacked && styles.stacked,
+        {borderTopColor: colors.border},
+      ]}>
       <Button
         testID="registration-close"
         title={Strings.Core.Close}
-        type="solid"
-        buttonStyle={[styles.button, {backgroundColor: colors.primary}]}
-        titleStyle={styles.title}
+        type="outline"
+        containerStyle={[styles.control, stacked && styles.stackedControl]}
+        buttonStyle={[
+          styles.button,
+          {backgroundColor: colors.surface, borderColor: colors.controlBorder},
+        ]}
+        titleStyle={[styles.title, {color: colors.text}]}
         onPress={onClose}
       />
       <Button
         testID="registration-new"
-        title={Strings.Registration.Manual.RegisterNew.Title}
-        type="outline"
-        buttonStyle={[
-          styles.button,
-          styles.outline,
-          {
-            borderColor: colors.controlBorder,
-            backgroundColor: colors.tints[2],
-          },
-        ]}
+        title={Strings.Registration.Manual.RegisterNew.ShortTitle}
+        accessibilityLabel={Strings.Registration.Manual.RegisterNew.Title}
+        icon={{
+          name: 'plus',
+          type: 'material-community',
+          size: 18,
+          color: colors.onPrimary,
+        }}
+        iconContainerStyle={styles.icon}
+        type="solid"
+        containerStyle={[styles.control, stacked && styles.stackedControl]}
+        buttonStyle={[styles.button, {backgroundColor: colors.primary}]}
         titleStyle={styles.title}
         onPress={onRegisterNew}
       />
@@ -50,12 +62,23 @@ export default function RegistrationActions({
 
 const styles = StyleSheet.create({
   footer: {
-    marginTop: 28,
-    paddingTop: 20,
-    gap: 12,
+    marginTop: 20,
+    paddingTop: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  button: {minHeight: 52, paddingVertical: 14},
-  outline: {borderWidth: 1},
-  title: {fontSize: 15, lineHeight: 20, fontWeight: '600'},
+  stacked: {flexDirection: 'column', alignItems: 'center'},
+  control: {width: 'auto', maxWidth: '100%', flexShrink: 1, borderRadius: 14},
+  stackedControl: {width: '100%', maxWidth: 320},
+  button: {
+    minHeight: 48,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+  },
+  title: {fontSize: 15, lineHeight: 20, fontWeight: '600', textAlign: 'center'},
+  icon: {marginRight: 6},
 });

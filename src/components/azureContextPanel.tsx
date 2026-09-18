@@ -1,12 +1,5 @@
 import React, {useContext, useEffect, useRef, useState} from 'react';
-import {
-  Keyboard,
-  Linking,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import {Keyboard, Linking, StyleSheet, TextInput, View} from 'react-native';
 import {StorageContext} from '../contexts/storage';
 import {DeviceIdentity} from '../connection/types';
 import {azurePortalUrl, matchesAzureContext} from '../onboarding/azureContext';
@@ -16,6 +9,7 @@ import Strings from 'strings';
 import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
 import {Text} from './typography';
+import DetailsAction from './detailsAction';
 
 export default function AzureContextPanel({
   identity,
@@ -105,28 +99,20 @@ export default function AzureContextPanel({
     onPress: () => void,
     id?: string,
     selected?: boolean,
-    tinted = false,
+    variant: 'primary' | 'secondary' | 'danger' = 'secondary',
+    icon?: string,
   ) => (
-    <Pressable
+    <DetailsAction
       key={label}
-      testID={id}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{
-        disabled: busy,
-        ...(selected === undefined ? {} : {expanded: selected}),
-      }}
+      id={id}
+      label={label}
+      icon={icon}
+      variant={variant}
+      expanded={selected}
+      onInset
       disabled={busy}
       onPress={onPress}
-      style={[
-        detailStyles.action,
-        tinted && {backgroundColor: colors.surface},
-        busy && detailStyles.disabled,
-      ]}>
-      <Text style={[detailStyles.actionLabel, {color: colors.primary}]}>
-        {label}
-      </Text>
-    </Pressable>
+    />
   );
   const value = (label: string, content: string, id?: string) => (
     <View key={label} style={styles.value}>
@@ -161,19 +147,16 @@ export default function AzureContextPanel({
           {resourceId}
         </Text>
       )}
-      <Pressable
-        accessibilityRole="link"
+      <DetailsAction
+        label={text.Portal}
         accessibilityLabel={`${label}: ${text.Portal}`}
-        accessibilityState={{disabled: busy}}
+        external
+        onInset
         disabled={busy}
         onPress={() => {
           void open(resourceId);
         }}
-        style={[detailStyles.action, busy && detailStyles.disabled]}>
-        <Text style={[detailStyles.actionLabel, {color: colors.primary}]}>
-          {text.Portal}
-        </Text>
-      </Pressable>
+      />
     </View>
   );
   return (
@@ -297,6 +280,8 @@ export default function AzureContextPanel({
                     () => setShowIds(!showIds),
                     'azure-context-ids',
                     showIds,
+                    'secondary',
+                    showIds ? 'eye-off-outline' : 'eye-outline',
                   )}
                   <Text
                     accessibilityRole="header"
@@ -312,6 +297,8 @@ export default function AzureContextPanel({
                     () => setShowActivities(!showActivities),
                     'azure-context-activities',
                     showActivities,
+                    'secondary',
+                    'pulse',
                   )}
                   {showActivities &&
                     (snapshot.activities.length ? (
@@ -405,7 +392,8 @@ export default function AzureContextPanel({
             },
             'azure-context-import-toggle',
             importing,
-            true,
+            'secondary',
+            snapshot ? 'pencil-outline' : 'tray-arrow-down',
           )}
           {importing && (
             <>
@@ -443,13 +431,21 @@ export default function AzureContextPanel({
                 },
                 'azure-context-import',
                 undefined,
-                true,
+                'primary',
+                'tray-arrow-down',
               )}
-              {button(Strings.Core.Cancel, () => {
-                setImporting(false);
-                setInput('');
-                setError('');
-              })}
+              {button(
+                Strings.Core.Cancel,
+                () => {
+                  setImporting(false);
+                  setInput('');
+                  setError('');
+                },
+                'azure-context-import-cancel',
+                undefined,
+                'secondary',
+                'close',
+              )}
             </>
           )}
           {(azureContext || azureContextError) &&
@@ -459,6 +455,9 @@ export default function AzureContextPanel({
                 void remove();
               },
               'azure-context-remove',
+              undefined,
+              'danger',
+              'delete-outline',
             )}
         </>
       )}
