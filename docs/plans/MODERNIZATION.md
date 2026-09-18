@@ -30,6 +30,14 @@ navigation/cold-restart scenarios. Builds use isolated `.ci` application IDs,
 not production signing or credentials. Results must identify the exact built
 commit and toolchain; a written workflow is not evidence of a successful run.
 
+On September 18, the ADR footer run `35379275362` stopped before native builds
+because Expo's online compatibility check required newly published SDK 57 patches.
+The shared foundation pins now select Expo `57.0.24`, build-properties `57.0.21`,
+and constants, image-picker and location `57.0.19`; React and React Native are
+unchanged. The online check remains enabled. Native rebuilding and an explicit,
+reviewed CocoaPods lock refresh are pending; earlier native results below apply
+to their recorded sources, not these new dependency pins.
+
 The iOS harness presents only its explicitly owned simulator with the pinned
 Xcode Simulator app before Maestro requests XCTest screenshots. GUI launch is
 bounded to sixty seconds and rejects live device inputs. This addresses a
