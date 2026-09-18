@@ -328,6 +328,16 @@ four-action budget and requires actual sheet disappearance. Fixed
 This does not enable another Details tap or relax identity, nonce, preflight or
 cold-restoration assertions. A new native run must establish the result.
 
+Run `35385899894` compiled the new handler on `e8d4d66`, but stopped in the
+credential-free input preflight at `host-input` with `keyboard-unavailable`.
+The live-device step was skipped; the password-sheet handling was not exercised.
+Its temporary input was removed at 20:02:20 UTC and both slots were confirmed
+empty. Credential-free replay `35389585963` then passed unchanged exact input,
+masking and cold startup using that run's pre-secret `e8d4d66` binary and the
+docs-only `7a0f664` harness source. The earlier input failure did not reproduce,
+so no application input behavior or preflight assertion was changed on a guess.
+This replay is not a cloud proof.
+
 ### Details utility footer refinement (2026-09-18)
 
 At the owner's request, Opus 5 high refined only Share nonsecret diagnostics and
@@ -355,6 +365,9 @@ cloud nonce. APK SHA256:
 `c6dca3e0f8b69793a65d81505bd04da3c867ad456f6c7aff91cc7745ad6b4045`.
 The iOS lane of that run failed at the explicit Pod lock refresh, before an app
 build; its repair and reviewed lock are recorded in the modernization plan.
+The foundation's subsequent deployment-mode run `35385478270` passed JavaScript
+and both native lanes on `070841a21c0d2cd2cc709eea31eab07f644c0ee3`. Its iOS
+identity confirms `deployment` mode and the exact committed Pod lock hash.
 
 After approving that footer, the owner requested the same coherent treatment for
 connection and snapshot actions. The follow-up reuses its row component in
