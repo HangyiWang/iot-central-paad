@@ -21,7 +21,7 @@ printf 'CocoaPods lock mode: %s\n' "$mode" | tee -a build/ci-artifacts/identity.
   if [[ "$mode" = deployment ]]; then
     bundle exec pod install --deployment
   else
-    bundle exec pod install
+    bundle exec pod update --no-repo-update
   fi
 ) 2>&1 | tee build/ci-artifacts/pod-install.log
 cp ios/Podfile.lock build/ci-artifacts/Podfile.lock
