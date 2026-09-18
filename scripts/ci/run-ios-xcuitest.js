@@ -142,7 +142,7 @@ function executeNative(mode, env = process.env) {
       command('xcrun', ['simctl', 'bootstatus', env.IOS_SIMULATOR_UDID, '-b'], 600000);
       fs.writeSync(descriptor, 'Native bootstrap: app install\n');
       bootstrapStage = 'app-install';
-      command('xcrun', ['simctl', 'install', env.IOS_SIMULATOR_UDID, path.resolve(APP)], 60000);
+      command('xcrun', ['simctl', 'install', env.IOS_SIMULATOR_UDID, path.resolve(APP)], 180000);
       fs.writeSync(descriptor, 'Native bootstrap: simulator presentation\n');
       bootstrapStage = 'simulator-presentation';
       command('bash', ['scripts/ci/show-ios-simulator.sh', env.IOS_SIMULATOR_UDID], 65000);

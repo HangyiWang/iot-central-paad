@@ -134,6 +134,12 @@ attributes directly, outside a nested predicate waiter, with the same bounded
 deadline and permission checks. Fixed operation markers distinguish permission,
 query, state, resolution and gesture failures without exporting error text.
 
+The next attempt, `35297432418` on `a993529`, stopped in credential-free app
+installation at its 60-second deadline, before XCTest or device-input execution.
+Native smoke now allows three minutes for that install operation and still
+requires a successful command result. Its temporary input was removed; this
+attempt supplies no additional post-connection evidence.
+
 ### Connection capsule delivery (2026-09-17)
 
 The accepted capsule keeps status, a ringed cloud icon and a separated Details
