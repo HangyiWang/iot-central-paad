@@ -66,7 +66,7 @@ const NATIVE_ISSUES = Object.freeze([
   'timeout', 'connection-lost', 'other',
 ]);
 const NATIVE_OPERATIONS = Object.freeze([
-  'sheet-absence', 'permission-check', 'match-count', 'state-check', 'resolution', 'resolve-element', 'tap', 'presentation',
+  'activate', 'sheet-absence', 'permission-check', 'match-count', 'state-check', 'resolution', 'resolve-element', 'tap', 'presentation',
 ]);
 const DETAILS_TAP_ATTEMPTS = Object.freeze(['initial', 'permission-retry']);
 const ELEMENT_PRESENCES = Object.freeze(['unavailable', 'missing', 'present']);
@@ -79,11 +79,26 @@ function sanitizeControlComparisons(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > 2 ||
       value.some((entry, index) => !entry || typeof entry !== 'object' || Array.isArray(entry) ||
         (index === 0 ? entry.capture !== 'initial' : !['ready', 'timed-out'].includes(entry.capture)) ||
+        ['applicationState', 'systemApplicationState'].some(key =>
+          entry[key] !== undefined && !APPLICATION_STATES.includes(entry[key])) ||
+        (entry.systemDenial !== undefined && !INTERACTION_ELEMENTS.includes(entry.systemDenial)) ||
         CONTROL_COMPARATORS.some(key => !INTERACTION_ELEMENTS.includes(entry[key])))) return undefined;
   return value.map(entry => ({
     capture: entry.capture,
     ...Object.fromEntries(CONTROL_COMPARATORS.map(key => [key, entry[key]])),
+    ...(entry.applicationState ? {applicationState: entry.applicationState} : {}),
+    ...(entry.systemApplicationState ? {systemApplicationState: entry.systemApplicationState} : {}),
+    ...(entry.systemDenial ? {systemDenial: entry.systemDenial} : {}),
   }));
+}
+
+function sanitizeDetailsForeground(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      !APPLICATION_STATES.includes(value.before) || !APPLICATION_STATES.includes(value.after) ||
+      typeof value.activationRequested !== 'boolean' ||
+      (value.activationRequested &&
+        !['running-background', 'running-background-suspended'].includes(value.before))) return undefined;
+  return {before: value.before, after: value.after, activationRequested: value.activationRequested};
 }
 
 function sanitizeDetailsReadiness(value) {
@@ -207,6 +222,9 @@ function sanitizeNativeResult(value) {
   const detailsControlComparisons = value.detailsControlComparisons === undefined ? undefined
     : sanitizeControlComparisons(value.detailsControlComparisons);
   if (value.detailsControlComparisons !== undefined && !detailsControlComparisons) return undefined;
+  const detailsForeground = value.detailsForeground === undefined ? undefined
+    : sanitizeDetailsForeground(value.detailsForeground);
+  if (value.detailsForeground !== undefined && !detailsForeground) return undefined;
   return {
     schemaVersion: 1, runner: 'xcuitest', mode: value.mode, outcome: value.outcome,
     stage: value.stage, applicationState: value.applicationState,
@@ -220,6 +238,7 @@ function sanitizeNativeResult(value) {
     ...(interactionDiagnostics ? {interactionDiagnostics} : {}),
     ...(detailsTapDiagnostics ? {detailsTapDiagnostics} : {}),
     ...(detailsControlComparisons ? {detailsControlComparisons} : {}),
+    ...(detailsForeground ? {detailsForeground} : {}),
   };
 }
 

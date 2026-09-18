@@ -198,6 +198,7 @@ private enum ResolutionCapture: String {
 }
 
 private enum NativeOperation: String {
+  case activate
   case sheetAbsence = "sheet-absence"
   case permissionCheck = "permission-check"
   case matchCount = "match-count"
@@ -320,6 +321,7 @@ final class PaadLiveUITests: XCTestCase {
   private var detailsTapDiagnostics: [[String: Any]] = []
   private var detailsReadiness: [String: Any]?
   private var detailsControlComparisons: [[String: String]] = []
+  private var detailsForeground: [String: Any]?
   private var permissionAttempts = 0
   private var permissionDismissals = 0
   private var permissionDismissed = false
@@ -548,9 +550,42 @@ final class PaadLiveUITests: XCTestCase {
     advance(to: .keyInput)
   }
 
+  private func prepareDetailsForeground() throws {
+    detailsForeground = [
+      "before": ApplicationState.unknown.rawValue,
+      "after": ApplicationState.unknown.rawValue,
+      "activationRequested": false,
+    ]
+    pendingCategory = .launchFailed
+    nativeOperation = .stateCheck
+    refreshApplicationState()
+    detailsForeground?["before"] = applicationState.rawValue
+    switch applicationState {
+    case .runningForeground:
+      break
+    case .runningBackground, .runningBackgroundSuspended:
+      detailsForeground?["activationRequested"] = true
+      nativeOperation = .activate
+      app.activate()
+      guard app.wait(for: .runningForeground, timeout: Timeout.launch) else {
+        throw Failure.launchFailed
+      }
+    default:
+      // Never hide a stopped or unqueryable application by relaunching it here.
+      throw Failure.launchFailed
+    }
+    nativeOperation = .stateCheck
+    refreshApplicationState()
+    detailsForeground?["after"] = applicationState.rawValue
+    guard applicationState == .runningForeground else { throw Failure.launchFailed }
+    pendingCategory = nil
+  }
+
   private func openDetails() throws {
     detailsTapDiagnostics = []
     detailsReadiness = nil
+    detailsControlComparisons = []
+    try prepareDetailsForeground()
     nativeOperation = .sheetAbsence
     try waitFor(
       NSPredicate(format: "exists == false"),
@@ -1119,8 +1154,17 @@ final class PaadLiveUITests: XCTestCase {
       "settings": InteractionElement.unavailable.rawValue,
       "telemetry": InteractionElement.unavailable.rawValue,
       "navigation": InteractionElement.unavailable.rawValue,
+      "applicationState": ApplicationState.unknown.rawValue,
+      "systemApplicationState": ApplicationState.unknown.rawValue,
+      "systemDenial": InteractionElement.unavailable.rawValue,
     ])
     let index = detailsControlComparisons.count - 1
+    nativeOperation = .stateCheck
+    refreshApplicationState()
+    detailsControlComparisons[index]["applicationState"] = applicationState.rawValue
+    let springBoard = XCUIApplication(bundleIdentifier: Self.springBoardBundleIdentifier)
+    detailsControlComparisons[index]["systemApplicationState"] =
+      observedApplicationState(springBoard).rawValue
     // The fixed tab label locates an optional comparator, not a flow assertion.
     // Header Settings sits outside the stack screen; Telemetry sits inside it.
     let queries: [(String, XCUIElementQuery)] = [
@@ -1129,6 +1173,8 @@ final class PaadLiveUITests: XCTestCase {
       ("telemetry", app.buttons.matching(
         NSPredicate(format: "label == %@", "Telemetry, tab, 1 of 5"))),
       ("navigation", app.otherElements.matching(identifier: Target.navigationContent.rawValue)),
+      ("systemDenial", springBoard.buttons.matching(
+        NSPredicate(format: "label IN %@", argumentArray: [Self.permissionDenyLabels]))),
     ]
     for (name, query) in queries {
       nativeOperation = .matchCount
@@ -1367,19 +1413,23 @@ final class PaadLiveUITests: XCTestCase {
       applicationState = .unknown
       return
     }
-    switch app.state {
+    applicationState = observedApplicationState(app)
+  }
+
+  private func observedApplicationState(_ application: XCUIApplication) -> ApplicationState {
+    switch application.state {
     case .notRunning:
-      applicationState = .notRunning
+      return .notRunning
     case .runningBackgroundSuspended:
-      applicationState = .runningBackgroundSuspended
+      return .runningBackgroundSuspended
     case .runningBackground:
-      applicationState = .runningBackground
+      return .runningBackground
     case .runningForeground:
-      applicationState = .runningForeground
+      return .runningForeground
     case .unknown:
-      applicationState = .unknown
+      return .unknown
     @unknown default:
-      applicationState = .unknown
+      return .unknown
     }
   }
 
@@ -1415,6 +1465,9 @@ final class PaadLiveUITests: XCTestCase {
     }
     if !detailsControlComparisons.isEmpty {
       record["detailsControlComparisons"] = detailsControlComparisons
+    }
+    if let detailsForeground = detailsForeground {
+      record["detailsForeground"] = detailsForeground
     }
     if !inputDiagnostics.isEmpty {
       record["inputDiagnostics"] = inputDiagnostics

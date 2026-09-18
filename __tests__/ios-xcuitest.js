@@ -102,6 +102,11 @@ const tapDiagnostic = (attempt = 'initial') => ({
 const controlComparison = (capture = 'initial') => ({
   capture, details: 'not-hittable', settings: 'hittable',
   telemetry: 'not-hittable', navigation: 'not-hittable',
+  applicationState: 'running-foreground', systemApplicationState: 'running-background',
+  systemDenial: 'missing',
+});
+const foregroundDiagnostic = () => ({
+  before: 'running-background', after: 'running-foreground', activationRequested: true,
 });
 const resolutionDiagnostic = () => ({
   capture: 'initial',
@@ -577,6 +582,10 @@ test.each([
     [{...controlComparison(), [key]: true}],
     [{...controlComparison(), [key]: {label: 'RAW_CANARY'}}],
   ]),
+  ...['applicationState', 'systemApplicationState', 'systemDenial'].flatMap(key => [
+    [{...controlComparison(), [key]: 'RAW_CANARY'}],
+    [{...controlComparison(), [key]: null}],
+  ]),
 ])('rejects unbounded, unordered or arbitrary control comparisons (%#)', detailsControlComparisons => {
   expect(sanitizeNativeResult({...nativeResult(), detailsControlComparisons})).toBeUndefined();
 });
@@ -598,6 +607,51 @@ test('a control comparison cannot upgrade a failed actual flow', () => {
   expect(sanitizeNativeResult(result)).toEqual(result);
   expect(nativeFlowPassed(result, 'live')).toBe(false);
   expect(sanitizeNativeResult(nativeResult())).toEqual(nativeResult());
+});
+
+test('accepts previous control comparisons without fresh application or system state', () => {
+  const {applicationState, systemApplicationState, systemDenial, ...legacy} = controlComparison();
+  const result = {...nativeResult(), detailsControlComparisons: [legacy]};
+  expect(sanitizeNativeResult(result)).toEqual(result);
+});
+
+test.each(APPLICATION_STATES)('fresh control samples preserve fixed app state %s', state => {
+  const result = {...nativeResult(), detailsControlComparisons: [{
+    ...controlComparison(), applicationState: state, systemApplicationState: state,
+  }]};
+  expect(sanitizeNativeResult(result)).toEqual(result);
+});
+
+test.each(INTERACTION_ELEMENTS)('global denial-button observations preserve fixed state %s without action', systemDenial => {
+  const result = {...nativeResult(), detailsControlComparisons: [{...controlComparison(), systemDenial}]};
+  expect(sanitizeNativeResult(result)).toEqual(result);
+});
+
+test('foreground preparation publishes only lifecycle categories and an activation flag', () => {
+  const result = {...nativeResult(), detailsForeground: foregroundDiagnostic()};
+  const dirty = {...result, detailsForeground: {
+    ...foregroundDiagnostic(), label: 'RAW_CANARY', value: 'RAW_CANARY', processId: 123,
+  }};
+  expect(parseNativeLog(`${PREFIX}${JSON.stringify(dirty)}`, 'live')).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: dirty}).nativeUi).toEqual(result);
+});
+
+test.each([
+  null, [], {}, {...foregroundDiagnostic(), before: 'RAW_CANARY'},
+  {...foregroundDiagnostic(), after: 'RAW_CANARY'},
+  {...foregroundDiagnostic(), activationRequested: 'true'},
+  ...['unknown', 'not-running', 'running-foreground'].map(before => ({
+    ...foregroundDiagnostic(), before,
+  })),
+])('rejects malformed foreground evidence or activation of a stopped/foreground app (%#)', detailsForeground => {
+  expect(sanitizeNativeResult({...nativeResult(), detailsForeground})).toBeUndefined();
+});
+
+test.each(APPLICATION_STATES)('retains partial or unchanged foreground observation %s', before => {
+  const result = {...nativeResult(), detailsForeground: {
+    before, after: 'unknown', activationRequested: false,
+  }};
+  expect(sanitizeNativeResult(result)).toEqual(result);
 });
 
 test.each(RESOLUTION_CHECKPOINTS)('preserves interrupted resolution at %s through the final summary', checkpoint => {
@@ -645,19 +699,69 @@ test('duplicate target evidence cannot substitute for a unique real Details acti
   expect(nativeFlowPassed(result, 'live')).toBe(false);
 });
 
-test('combined bounded diagnostics still fit the existing record limit', () => {
+test.each(['smoke', 'live'])('maximum mode-specific %s diagnostics fit the unchanged record limit', mode => {
+  const longest = values => values.reduce((a, b) => a.length >= b.length ? a : b);
+  const geometry = {
+    type: longest(NATIVE_ELEMENT_TYPES), state: longest(INTERACTION_ELEMENTS),
+    frame: longest(FRAME_VISIBILITIES),
+  };
+  const readiness = {
+    ...Object.fromEntries(['matches', 'capsuleMatches', 'capsuleButtonMatches']
+      .map(key => [key, longest(MATCH_COUNTS)])),
+    target: geometry, containment: longest(CAPSULE_CONTAINMENTS), size: longest(TOUCH_TARGET_SIZES),
+  };
   const result = {
-    ...nativeResult('smoke'), observedTargets: TARGETS,
-    detailsTapDiagnostics: DETAILS_TAP_ATTEMPTS.map(tapDiagnostic),
-    detailsControlComparisons: [controlComparison(), controlComparison('timed-out')],
-    inputDiagnostics: INPUT_PHASES.map(phase => inputDiagnostic(phase)),
-    interactionDiagnostics: {...interactionDiagnostic(), resolution: {
-      ...resolutionDiagnostic(), candidates: Array(MAX_RESOLUTION_CANDIDATES).fill(geometryDiagnostic()),
-    }},
+    ...nativeResult(mode), observedTargets: TARGETS, outcome: 'failed',
+    stage: longest(STAGES), applicationState: longest(APPLICATION_STATES),
+    failureCategory: longest(FAILURE_CATEGORIES), nativeIssue: longest(NATIVE_ISSUES),
+    nativeOperation: longest(NATIVE_OPERATIONS),
+    ...(mode === 'smoke' ? {
+      inputDiagnostics: INPUT_PHASES.map(phase => ({
+        ...inputDiagnostic(phase), target: longest(INPUT_TARGETS),
+        element: longest(INPUT_ELEMENTS), value: longest(INPUT_VALUES),
+        ...Object.fromEntries(INPUT_FLAGS.map(key => [key, false])),
+      })),
+    } : {
+      detailsTapDiagnostics: DETAILS_TAP_ATTEMPTS.map((attempt, index) => ({
+        ...tapDiagnostic(attempt), targetState: longest(INTERACTION_ELEMENTS),
+        postTapState: longest(INTERACTION_ELEMENTS), laterTargetState: longest(INTERACTION_ELEMENTS),
+        completed: index === 0, permissionHandled: index === 0,
+        presentation: longest(DETAILS_PRESENTATIONS), readiness,
+        ...Object.fromEntries(['sheet', 'close', 'identity'].map(key => [key, longest(ELEMENT_PRESENCES)])),
+      })),
+      detailsControlComparisons: ['initial', 'timed-out'].map(capture => ({
+        ...controlComparison(capture),
+        ...Object.fromEntries(CONTROL_COMPARATORS.map(key => [key, longest(INTERACTION_ELEMENTS)])),
+        applicationState: longest(APPLICATION_STATES),
+        systemApplicationState: longest(APPLICATION_STATES), systemDenial: longest(INTERACTION_ELEMENTS),
+      })),
+      detailsForeground: {
+        before: 'running-background-suspended', after: longest(APPLICATION_STATES), activationRequested: true,
+      },
+    }),
+    interactionDiagnostics: {
+      ...interactionDiagnostic(), target: longest(INTERACTION_TARGETS),
+      phase: longest(INTERACTION_PHASES), element: longest(INTERACTION_ELEMENTS),
+      applicationAlert: longest(PERMISSION_ALERTS), systemAlert: longest(PERMISSION_ALERTS),
+      resolution: {
+      ...resolutionDiagnostic(), capture: longest(RESOLUTION_CAPTURES), checkpoint: longest(RESOLUTION_CHECKPOINTS),
+      ...Object.fromEntries(RESOLUTION_COUNTS.map(key => [key, longest(MATCH_COUNTS)])),
+      selected: geometry, untypedFirst: geometry, capsule: geometry, status: geometry,
+      candidates: Array(MAX_RESOLUTION_CANDIDATES).fill(geometry),
+      },
+    },
   };
   const line = `${PREFIX}${JSON.stringify(result)}`;
   expect(Buffer.byteLength(line)).toBeLessThan(4096);
-  expect(parseNativeLog(line, 'smoke')).toEqual(sanitizeNativeResult(result));
+  expect(parseNativeLog(line, mode)).toEqual(sanitizeNativeResult(result));
+});
+
+test('native producer keeps synthetic input tracing separate from live Details observations', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const smoke = swift.split('private func runSmoke(')[1].split('private func runLive(')[0];
+  const input = swift.split('private func diagnoseInput(')[1].split('private func advance(')[0];
+  expect(smoke).not.toMatch(/openDetails|compareDetailsControls|prepareDetailsForeground/);
+  expect(input).toContain('guard mode == "smoke"');
 });
 
 test.each([
@@ -1031,6 +1135,7 @@ test('Details requires unique hittable in-frame readiness and a real tap-to-shee
   const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
   const open = swift.split('private func openDetails()')[1].split('private func tapDetails(')[0];
   const events = [
+    'try prepareDetailsForeground()',
     'NSPredicate(format: "exists == false")',
     'on: element(.connectionDetailsSheet)',
     '.connectionDetails, phase: .waitingForReadiness, failure: .notHittable',
@@ -1148,12 +1253,40 @@ test('control comparisons are bounded read-only observations, not readiness or n
   expect(comparison).toContain('Target.appSettings.rawValue');
   expect(comparison).toContain('Target.navigationContent.rawValue');
   expect(comparison).toContain('"Telemetry, tab, 1 of 5"');
+  expect(comparison).toContain('refreshApplicationState()');
+  expect(comparison).toContain('observedApplicationState(springBoard).rawValue');
+  expect(comparison).toContain('NSPredicate(format: "label IN %@", argumentArray: [Self.permissionDenyLabels])');
   for (const key of CONTROL_COMPARATORS) {
     expect(comparison).toContain(`"${key}"`);
   }
   expect(comparison).not.toMatch(/\.label\b|\.value\b|debugDescription|screenshot|coordinate|\.tap\(|swipe|activate\(|emit\(|waitFor/);
   expect(swift.split('private func emit(outcome:')[1])
     .toContain('record["detailsControlComparisons"] = detailsControlComparisons');
+});
+
+test('foreground preparation activates only an observed background process, never a stopped app', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const preparation = swift.split('private func prepareDetailsForeground()')[1]
+    .split('private func openDetails()')[0];
+  const events = [
+    'refreshApplicationState()', 'detailsForeground?["before"]',
+    'switch applicationState', 'case .runningForeground:', 'break',
+    'case .runningBackground, .runningBackgroundSuspended:',
+    'detailsForeground?["activationRequested"] = true', 'app.activate()',
+    'app.wait(for: .runningForeground, timeout: Timeout.launch)',
+    'default:',
+    'detailsForeground?["after"]',
+    'guard applicationState == .runningForeground',
+  ].map(text => preparation.indexOf(text));
+  expect(events.every(index => index >= 0)).toBe(true);
+  expect(events).toEqual([...events].sort((a, b) => a - b));
+  expect(preparation.match(/app\.activate\(\)/g)).toHaveLength(1);
+  const stopped = preparation.split('default:')[1].split('nativeOperation = .stateCheck')[0];
+  expect(stopped).toContain('throw Failure.launchFailed');
+  expect(stopped).not.toContain('app.activate()');
+  expect(preparation).not.toMatch(/\.tap\(|swipe|coordinate|\.launch\(|\bwhile\b|\bfor\s+|\bcatch\b/);
+  const emitter = swift.split('private func emit(outcome:')[1];
+  expect(emitter).toContain('record["detailsForeground"] = detailsForeground');
 });
 
 test('resolution evidence survives polling and query aborts without text or coordinate taps', () => {
@@ -1262,7 +1395,7 @@ test('native smoke never submits credentials and live cold restoration uses an a
   expect(swift).toContain('app.terminate()');
   expect(swift).toContain('app.wait(for: .notRunning');
   expect(swift).toContain('guard app.state == .notRunning else');
-  expect(swift.match(/app\.activate\(\)/g)).toHaveLength(2);
+  expect(swift.match(/app\.activate\(\)/g)).toHaveLength(3);
   expect(swift).not.toContain('app.launch()');
   expect(swift.match(/app.launchEnvironment = \[:\]/g)).toHaveLength(3);
   expect(swift).not.toMatch(/app\.launchEnvironment\s*=\s*(?:ProcessInfo|config)/);

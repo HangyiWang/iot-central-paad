@@ -242,6 +242,22 @@ subtree and Telemetry is inside it, which can help localize the affected region.
 Static-text or container hittability alone does not prove a real touch failure;
 the actual cause is not established and app behavior is not changed on a guess.
 
+Run `35362218755` on `f129b0e` passed preflight and connected. Both the initial
+and timeout samples reported Details, Settings, Telemetry and navigation as
+non-hittable, so the symptom is not isolated to the capsule. No tap, nonce or
+cold-restoration proof followed. Its owned input was removed at 15:49:40 UTC,
+and both repository slots were confirmed empty.
+
+The reported application state had been cached before these observations.
+The driver now records fresh app/system states and fixed presence/hittability
+categories for allowlisted system denial buttons, without dismissing controls
+outside its existing alert handler. Before Details it explicitly requires a
+foreground app: only an observed running-background state permits one activation;
+a stopped or unknown app fails instead of being relaunched. Before/after state
+and whether activation was requested are retained. This does not establish that
+backgrounding caused the prior failure, change the app, add a Details retry or
+weaken the identity/proof/restoration assertions.
+
 ### Connection capsule delivery (2026-09-17)
 
 The accepted capsule keeps status, a ringed cloud icon and a separated Details
