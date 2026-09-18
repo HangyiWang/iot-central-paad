@@ -71,6 +71,22 @@ const NATIVE_OPERATIONS = Object.freeze([
 const DETAILS_TAP_ATTEMPTS = Object.freeze(['initial', 'permission-retry']);
 const ELEMENT_PRESENCES = Object.freeze(['unavailable', 'missing', 'present']);
 const DETAILS_PRESENTATIONS = Object.freeze(['unavailable', 'closed', 'opening', 'shown', 'unknown']);
+const CAPSULE_CONTAINMENTS = Object.freeze(['unavailable', 'invalid', 'empty', 'outside', 'partial', 'inside']);
+const TOUCH_TARGET_SIZES = Object.freeze(['unavailable', 'below-minimum', 'meets-minimum']);
+
+function sanitizeDetailsReadiness(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      ['matches', 'capsuleMatches', 'capsuleButtonMatches'].some(key => !MATCH_COUNTS.includes(value[key])) ||
+      !CAPSULE_CONTAINMENTS.includes(value.containment) ||
+      !TOUCH_TARGET_SIZES.includes(value.size)) return undefined;
+  const target = sanitizeGeometry(value.target);
+  if (!target) return undefined;
+  return {
+    matches: value.matches, capsuleMatches: value.capsuleMatches,
+    capsuleButtonMatches: value.capsuleButtonMatches, target,
+    containment: value.containment, size: value.size,
+  };
+}
 
 function sanitizeDetailsTaps(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > DETAILS_TAP_ATTEMPTS.length ||
@@ -78,6 +94,9 @@ function sanitizeDetailsTaps(value) {
         entry.attempt !== DETAILS_TAP_ATTEMPTS[index] ||
         !INTERACTION_ELEMENTS.includes(entry.targetState) ||
         (entry.presentation !== undefined && !DETAILS_PRESENTATIONS.includes(entry.presentation)) ||
+        ['postTapState', 'laterTargetState'].some(key =>
+          entry[key] !== undefined && !INTERACTION_ELEMENTS.includes(entry[key])) ||
+        (entry.readiness !== undefined && !sanitizeDetailsReadiness(entry.readiness)) ||
         typeof entry.completed !== 'boolean' || typeof entry.permissionHandled !== 'boolean' ||
         ['sheet', 'close', 'identity'].some(key => !ELEMENT_PRESENCES.includes(entry[key]))) ||
       (value.length === 2 && (!value[0].completed || !value[0].permissionHandled))) return undefined;
@@ -86,6 +105,9 @@ function sanitizeDetailsTaps(value) {
     completed: entry.completed, permissionHandled: entry.permissionHandled,
     sheet: entry.sheet, close: entry.close, identity: entry.identity,
     ...(entry.presentation ? {presentation: entry.presentation} : {}),
+    ...(entry.postTapState ? {postTapState: entry.postTapState} : {}),
+    ...(entry.laterTargetState ? {laterTargetState: entry.laterTargetState} : {}),
+    ...(entry.readiness ? {readiness: sanitizeDetailsReadiness(entry.readiness)} : {}),
   }));
 }
 
@@ -217,5 +239,6 @@ module.exports = {
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
   RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
   DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES, DETAILS_PRESENTATIONS,
+  CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };

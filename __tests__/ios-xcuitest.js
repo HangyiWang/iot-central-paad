@@ -17,6 +17,7 @@ const {
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
   RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
   DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES, DETAILS_PRESENTATIONS,
+  CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES,
 } = require('../scripts/ci/ios-xcuitest-result');
 const {sanitizeDiagnostics} = require('../scripts/ci/live-diagnostics');
 const {validateEnvironment} = require('../scripts/ci/run-ios-xcuitest');
@@ -86,10 +87,17 @@ const interactionDiagnostic = () => ({
 const geometryDiagnostic = () => ({
   type: 'button', state: 'not-hittable', frame: 'inside-app',
 });
+const readinessDiagnostic = () => ({
+  matches: 'one', capsuleMatches: 'one', capsuleButtonMatches: 'one',
+  target: geometryDiagnostic(), containment: 'inside', size: 'meets-minimum',
+});
 const tapDiagnostic = (attempt = 'initial') => ({
   attempt, targetState: 'not-hittable', completed: true, permissionHandled: true,
   sheet: 'missing', close: 'missing', identity: 'missing',
   presentation: 'unavailable',
+  postTapState: 'not-hittable',
+  laterTargetState: 'not-hittable',
+  readiness: readinessDiagnostic(),
 });
 const resolutionDiagnostic = () => ({
   capture: 'initial',
@@ -492,6 +500,56 @@ test.each(DETAILS_PRESENTATIONS)('publishes only the fixed Details presentation 
   expect(sanitizeNativeResult({
     ...result, detailsTapDiagnostics: [{...tapDiagnostic(), presentation: 'RAW_CANARY'}],
   })).toBeUndefined();
+});
+
+test('retains pre-tap readiness and later native states without exporting geometry or text', () => {
+  const result = {...nativeResult(), detailsTapDiagnostics: [tapDiagnostic()]};
+  const dirty = {...result, detailsTapDiagnostics: [{
+    ...tapDiagnostic(), readiness: {
+      ...readinessDiagnostic(), raw: 'RAW_CANARY', x: 123,
+      target: {...geometryDiagnostic(), label: 'RAW_CANARY', frameOrigin: {x: 123}},
+    },
+  }]};
+  expect(parseNativeLog(`${PREFIX}${JSON.stringify(dirty)}`, 'live')).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: dirty}).nativeUi).toEqual(result);
+});
+
+test.each([
+  ...['postTapState', 'laterTargetState'].flatMap(key => [
+    {[key]: 'RAW_CANARY'}, {[key]: null}, {[key]: true},
+  ]),
+  {readiness: null}, {readiness: []}, {readiness: {}},
+  ...['matches', 'capsuleMatches', 'capsuleButtonMatches'].flatMap(key => [
+    {readiness: {...readinessDiagnostic(), [key]: 'RAW_CANARY'}},
+    {readiness: {...readinessDiagnostic(), [key]: 1}},
+  ]),
+  {readiness: {...readinessDiagnostic(), target: {x: 123}}},
+  {readiness: {...readinessDiagnostic(), containment: 'RAW_CANARY'}},
+  {readiness: {...readinessDiagnostic(), size: 44}},
+])('rejects unbounded Details readiness or later-state data (%#)', change => {
+  expect(sanitizeNativeResult({
+    ...nativeResult(), detailsTapDiagnostics: [{...tapDiagnostic(), ...change}],
+  })).toBeUndefined();
+});
+
+test.each(CAPSULE_CONTAINMENTS)('retains categorical capsule containment %s', containment => {
+  const result = {...nativeResult(), detailsTapDiagnostics: [{
+    ...tapDiagnostic(), readiness: {...readinessDiagnostic(), containment},
+  }]};
+  expect(sanitizeNativeResult(result)).toEqual(result);
+});
+
+test.each(TOUCH_TARGET_SIZES)('retains categorical touch target size %s', size => {
+  const result = {...nativeResult(), detailsTapDiagnostics: [{
+    ...tapDiagnostic(), readiness: {...readinessDiagnostic(), size},
+  }]};
+  expect(sanitizeNativeResult(result)).toEqual(result);
+});
+
+test('accepts prior tap reports without the optional readiness and later-state evidence', () => {
+  const {readiness, postTapState, laterTargetState, ...legacy} = tapDiagnostic();
+  const result = {...nativeResult(), detailsTapDiagnostics: [legacy]};
+  expect(sanitizeNativeResult(result)).toEqual(result);
 });
 
 test.each(RESOLUTION_CHECKPOINTS)('preserves interrupted resolution at %s through the final summary', checkpoint => {
@@ -910,6 +968,8 @@ test('Swift diagnostics use only the parser vocabularies and stable public contr
   expect(values('DetailsTapAttempt').sort()).toEqual([...DETAILS_TAP_ATTEMPTS].sort());
   expect(values('ElementPresence').sort()).toEqual([...ELEMENT_PRESENCES].sort());
   expect(values('DetailsPresentation').sort()).toEqual([...DETAILS_PRESENTATIONS].sort());
+  expect(values('CapsuleContainment').sort()).toEqual([...CAPSULE_CONTAINMENTS].sort());
+  expect(values('TouchTargetSize').sort()).toEqual([...TOUCH_TARGET_SIZES].sort());
   expect(values('ResolutionCapture').sort()).toEqual([...RESOLUTION_CAPTURES].sort());
   for (const value of values('Failure')) expect(FAILURE_CATEGORIES).toContain(value);
   for (const value of values('Target')) expect(TARGETS).toContain(value);
@@ -987,6 +1047,24 @@ test('Details retries only a handled in-tap interruption with a still-absent she
   expect(wait).toContain('&& (!requireHittable || field.isHittable)');
   const emitter = swift.split('private func emit(outcome:')[1];
   expect(emitter).toContain('record["detailsTapDiagnostics"] = detailsTapDiagnostics');
+});
+
+test('retains readiness before the real tap and samples later state without changing actions', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const tap = swift.split('private func tapDetails(')[1].split('private func diagnoseDetailsPresentation(')[0];
+  expect(tap).toContain('detailsTapDiagnostics[index]["readiness"] = detailsReadiness');
+  expect(tap.indexOf('["readiness"]')).toBeLessThan(tap.indexOf('control.tap()'));
+  expect(tap.indexOf('["postTapState"] = interactionState(control)')).toBeGreaterThan(tap.indexOf('control.tap()'));
+  expect(tap.match(/control\.tap\(\)/g)).toHaveLength(1);
+  const presentation = swift.split('private func diagnoseDetailsPresentation(')[1].split('private func detailsPresentation(')[0];
+  expect(presentation).toContain('["laterTargetState"] = interactionState(query.firstMatch)');
+  const readiness = swift.split('private func retainDetailsReadiness(')[1].split('private func diagnoseResolution(')[0];
+  expect(readiness).toContain('frame.width >= 44 && frame.height >= 44');
+  expect(readiness).toContain('frameVisibility(frame, in: capsule.frame)');
+  expect(readiness).not.toMatch(/\.label\b|\.value\b|print\(|\.tap\(|coordinate|screenshot/);
+  const diagnosis = swift.split('private func diagnoseResolution(')[1].split('private func permissionAlertState(')[0];
+  expect(diagnosis).toContain('if target == .connectionDetails && capture == .ready');
+  expect(diagnosis).toContain('retainDetailsReadiness(field, capsule: capsule)');
 });
 
 test('presentation classification reads only the fixed Details button and never exports its native value', () => {

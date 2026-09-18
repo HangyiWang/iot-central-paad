@@ -172,9 +172,10 @@ The Details control now reports ordinary busy/expanded accessibility states for
 requested versus native-confirmed presentation (`Modal.onShow`), clearing them
 when closed. This changes no visual styling or navigation and adds no test-only
 entry point. The native harness classifies only that fixed button's state into
-allowlisted categories; it never exports the raw accessibility value. This
-distinguishes an undelivered tap from a pending native presentation before any
-app-side recovery is considered.
+allowlisted categories; it never exports the raw accessibility value. These
+describe the state at observation time. A later closed state does not exclude
+a previously invoked handler followed by a component remount or rapid dismissal;
+it is not proof of the cause.
 
 Retained-device run `35308619148` on `1722f0e` passed preflight and connected.
 The Details tap completed from a non-hittable target, with no permission handled
@@ -184,6 +185,15 @@ does not support adding a speculative native Modal remount. The exact gesture
 failure remains to be diagnosed. Nonce submission and connected cold restoration
 are still unproven. Its owned temporary input was removed, and both dedicated
 device-input slots were confirmed empty.
+
+The next native diagnostic retains the pre-tap button's uniqueness, membership
+and frame containment in the capsule, and whether its dimensions meet the iOS
+44-point touch-target baseline. It also records target state after `tap()`
+returns and during subsequent sheet diagnosis. These are fixed categories,
+not coordinates or exported accessibility text, and remain within the existing
+record bounds. Actual gestures, readiness/proof assertions and the narrowly
+permission-gated retry rule are unchanged. Opening a sheet from `onPressIn`
+would change user interaction semantics and is deliberately not used.
 
 ### Connection capsule delivery (2026-09-17)
 

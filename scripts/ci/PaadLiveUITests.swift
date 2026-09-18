@@ -225,6 +225,21 @@ private enum DetailsPresentation: String {
   case unknown
 }
 
+private enum CapsuleContainment: String {
+  case unavailable
+  case invalid
+  case empty
+  case outside
+  case partial
+  case inside
+}
+
+private enum TouchTargetSize: String {
+  case unavailable
+  case belowMinimum = "below-minimum"
+  case meetsMinimum = "meets-minimum"
+}
+
 // MARK: - Test case configuration
 
 private struct CaseConfig {
@@ -301,6 +316,7 @@ final class PaadLiveUITests: XCTestCase {
   private var nativeIssue: NativeIssue?
   private var nativeOperation: NativeOperation?
   private var detailsTapDiagnostics: [[String: Any]] = []
+  private var detailsReadiness: [String: Any]?
   private var permissionAttempts = 0
   private var permissionDismissals = 0
   private var permissionDismissed = false
@@ -531,6 +547,7 @@ final class PaadLiveUITests: XCTestCase {
 
   private func openDetails() throws {
     detailsTapDiagnostics = []
+    detailsReadiness = nil
     nativeOperation = .sheetAbsence
     try waitFor(
       NSPredicate(format: "exists == false"),
@@ -569,8 +586,13 @@ final class PaadLiveUITests: XCTestCase {
       "close": ElementPresence.unavailable.rawValue,
       "identity": ElementPresence.unavailable.rawValue,
       "presentation": DetailsPresentation.unavailable.rawValue,
+      "postTapState": InteractionElement.unavailable.rawValue,
+      "laterTargetState": InteractionElement.unavailable.rawValue,
     ])
     let index = detailsTapDiagnostics.count - 1
+    if let detailsReadiness = detailsReadiness {
+      detailsTapDiagnostics[index]["readiness"] = detailsReadiness
+    }
     pendingCategory = .notHittable
     interactionDiagnostics?["phase"] = InteractionPhase.tapping.rawValue
     nativeOperation = .tap
@@ -580,6 +602,8 @@ final class PaadLiveUITests: XCTestCase {
     let interrupted = permissionDismissals > dismissalsBeforeTap
     detailsTapDiagnostics[index]["completed"] = true
     detailsTapDiagnostics[index]["permissionHandled"] = interrupted
+    nativeOperation = .stateCheck
+    detailsTapDiagnostics[index]["postTapState"] = interactionState(control).rawValue
     return interrupted
   }
 
@@ -598,6 +622,12 @@ final class PaadLiveUITests: XCTestCase {
         (element(target).exists ? ElementPresence.present : .missing).rawValue
     }
     detailsTapDiagnostics[index]["presentation"] = detailsPresentation().rawValue
+    let query = app.buttons.matching(identifier: Target.connectionDetails.rawValue)
+    if query.count <= 1 {
+      detailsTapDiagnostics[index]["laterTargetState"] = interactionState(query.firstMatch).rawValue
+    } else {
+      detailsTapDiagnostics[index]["laterTargetState"] = InteractionElement.unavailable.rawValue
+    }
     return sheet
   }
 
@@ -1052,12 +1082,51 @@ final class PaadLiveUITests: XCTestCase {
     case .staticText: type = .staticText
     default: type = .other
     }
-    let state: InteractionElement = !field.isEnabled
-      ? .disabled : field.isHittable ? .hittable : .notHittable
+    let state = interactionState(field)
     return [
       "type": type.rawValue,
       "state": state.rawValue,
       "frame": frameVisibility(field.frame, in: viewport).rawValue,
+    ]
+  }
+
+  private func interactionState(_ field: XCUIElement) -> InteractionElement {
+    guard field.exists else { return .missing }
+    guard field.isEnabled else { return .disabled }
+    return field.isHittable ? .hittable : .notHittable
+  }
+
+  private func retainDetailsReadiness(_ field: XCUIElement, capsule: XCUIElement) {
+    guard let resolutionDiagnostics = resolutionDiagnostics else { return }
+    var containment = CapsuleContainment.unavailable
+    var size = TouchTargetSize.unavailable
+    if field.exists {
+      let frame = field.frame
+      if frame.width.isFinite && frame.height.isFinite && !frame.isNull {
+        size = frame.width >= 44 && frame.height >= 44 ? .meetsMinimum : .belowMinimum
+      }
+      if capsule.exists {
+        switch frameVisibility(frame, in: capsule.frame) {
+        case .insideApp: containment = .inside
+        case .partlyInsideApp: containment = .partial
+        case .outsideApp: containment = .outside
+        case .empty: containment = .empty
+        case .invalid: containment = .invalid
+        case .unavailable: containment = .unavailable
+        }
+      }
+    }
+    detailsReadiness = [
+      "matches": resolutionDiagnostics["queryMatches"] ?? MatchCount.unavailable.rawValue,
+      "capsuleMatches": resolutionDiagnostics["capsuleMatches"] ?? MatchCount.unavailable.rawValue,
+      "capsuleButtonMatches": resolutionDiagnostics["capsuleButtonMatches"] ?? MatchCount.unavailable.rawValue,
+      "target": resolutionDiagnostics["selected"] ?? [
+        "type": NativeElementType.unavailable.rawValue,
+        "state": InteractionElement.unavailable.rawValue,
+        "frame": FrameVisibility.unavailable.rawValue,
+      ],
+      "containment": containment.rawValue,
+      "size": size.rawValue,
     ]
   }
 
@@ -1121,6 +1190,9 @@ final class PaadLiveUITests: XCTestCase {
     resolutionDiagnostics?["checkpoint"] = "status-geometry"
     resolutionDiagnostics?["status"] = elementGeometry(element(.connectionStatus), viewport: viewport)
     resolutionDiagnostics?["checkpoint"] = "complete"
+    if target == .connectionDetails && capture == .ready {
+      retainDetailsReadiness(field, capsule: capsule)
+    }
     if target == .connectionDetailsSheet && !detailsTapDiagnostics.isEmpty {
       diagnoseDetailsPresentation()
       nativeOperation = .resolution
@@ -1149,15 +1221,8 @@ final class PaadLiveUITests: XCTestCase {
   private func updateInteraction(
     _ target: Target, field: XCUIElement, phase: InteractionPhase
   ) -> Bool {
-    let exists = field.exists
-    let state: InteractionElement
-    if !exists {
-      state = .missing
-    } else if !field.isEnabled {
-      state = .disabled
-    } else {
-      state = field.isHittable ? .hittable : .notHittable
-    }
+    let state = interactionState(field)
+    let exists = state != .missing
     let springBoard = XCUIApplication(bundleIdentifier: Self.springBoardBundleIdentifier)
     let systemAlert = permissionAlertState(springBoard.alerts.firstMatch)
     let applicationAlert = permissionAlertState(app.alerts.firstMatch)
