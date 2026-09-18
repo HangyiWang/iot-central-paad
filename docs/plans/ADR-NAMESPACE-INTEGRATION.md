@@ -249,14 +249,34 @@ cold-restoration proof followed. Its owned input was removed at 15:49:40 UTC,
 and both repository slots were confirmed empty.
 
 The reported application state had been cached before these observations.
-The driver now records fresh app/system states and fixed presence/hittability
-categories for allowlisted system denial buttons, without dismissing controls
+`c7235f2` added fresh app/system states and fixed presence/hittability categories
+for allowlisted system denial buttons, initially without dismissing controls
 outside its existing alert handler. Before Details it explicitly requires a
 foreground app: only an observed running-background state permits one activation;
 a stopped or unknown app fails instead of being relaunched. Before/after state
 and whether activation was requested are retained. This does not establish that
 backgrounding caused the prior failure, change the app, add a Details retry or
 weaken the identity/proof/restoration assertions.
+
+Run `35366489937` on `c7235f2` passed preflight and connected but still found
+all four app comparators non-hittable. Fresh state stayed foregrounded and no
+activation was requested. The initial system-denial comparator was hittable;
+the final one was missing. This establishes a tappable allowlisted system
+control during the observation, not backgrounding or conclusively a particular
+alert class: these native queries are sequential. No Details tap, nonce or
+cold-restoration proof followed. Its owned input was removed at 16:36:53 UTC,
+and both repository slots were confirmed empty.
+
+The permission handler now also permits one uniquely matched, enabled, hittable
+SpringBoard control with the same three exact denial labels, only while the
+test app is foregrounded. It shares the existing four-attempt budget and never
+selects a generic first button. Fixed action-source categories identify attempted
+denials. The readiness deadline now starts after initial diagnostic collection;
+only a completed denial action renews its settling window, within that same
+global budget. Poll counts are categorized so zero-poll failures are no longer
+indistinguishable from actual readiness polling. App UI and cloud assertions
+are unchanged; the next native result must establish whether this resolves the
+observed permission/readiness issue.
 
 ### Connection capsule delivery (2026-09-17)
 

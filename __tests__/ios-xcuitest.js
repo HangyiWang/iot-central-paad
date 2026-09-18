@@ -18,6 +18,7 @@ const {
   RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
   DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES, DETAILS_PRESENTATIONS,
   CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES, CONTROL_COMPARATORS,
+  PERMISSION_SOURCES, MAX_PERMISSION_ACTIONS,
 } = require('../scripts/ci/ios-xcuitest-result');
 const {sanitizeDiagnostics} = require('../scripts/ci/live-diagnostics');
 const {validateEnvironment} = require('../scripts/ci/run-ios-xcuitest');
@@ -104,6 +105,7 @@ const controlComparison = (capture = 'initial') => ({
   telemetry: 'not-hittable', navigation: 'not-hittable',
   applicationState: 'running-foreground', systemApplicationState: 'running-background',
   systemDenial: 'missing',
+  polls: capture === 'initial' ? 'zero' : 'one',
 });
 const foregroundDiagnostic = () => ({
   before: 'running-background', after: 'running-foreground', activationRequested: true,
@@ -582,7 +584,7 @@ test.each([
     [{...controlComparison(), [key]: true}],
     [{...controlComparison(), [key]: {label: 'RAW_CANARY'}}],
   ]),
-  ...['applicationState', 'systemApplicationState', 'systemDenial'].flatMap(key => [
+  ...['applicationState', 'systemApplicationState', 'systemDenial', 'polls'].flatMap(key => [
     [{...controlComparison(), [key]: 'RAW_CANARY'}],
     [{...controlComparison(), [key]: null}],
   ]),
@@ -610,7 +612,7 @@ test('a control comparison cannot upgrade a failed actual flow', () => {
 });
 
 test('accepts previous control comparisons without fresh application or system state', () => {
-  const {applicationState, systemApplicationState, systemDenial, ...legacy} = controlComparison();
+  const {applicationState, systemApplicationState, systemDenial, polls, ...legacy} = controlComparison();
   const result = {...nativeResult(), detailsControlComparisons: [legacy]};
   expect(sanitizeNativeResult(result)).toEqual(result);
 });
@@ -625,6 +627,27 @@ test.each(APPLICATION_STATES)('fresh control samples preserve fixed app state %s
 test.each(INTERACTION_ELEMENTS)('global denial-button observations preserve fixed state %s without action', systemDenial => {
   const result = {...nativeResult(), detailsControlComparisons: [{...controlComparison(), systemDenial}]};
   expect(sanitizeNativeResult(result)).toEqual(result);
+});
+
+test.each(MATCH_COUNTS)('readiness poll observations preserve only fixed count category %s', polls => {
+  const result = {...nativeResult(), detailsControlComparisons: [{...controlComparison(), polls}]};
+  expect(sanitizeNativeResult(result)).toEqual(result);
+});
+
+test('permission action evidence names only bounded alert or system-control attempts', () => {
+  const result = {...nativeResult(), permissionActions: [...PERMISSION_SOURCES]};
+  expect(parseNativeLog(`${PREFIX}${JSON.stringify(result)}`, 'live')).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: result}).nativeUi).toEqual(result);
+  expect(sanitizeNativeResult({
+    ...nativeResult(), permissionActions: Array(MAX_PERMISSION_ACTIONS).fill('system-control'),
+  })).toBeDefined();
+});
+
+test.each([
+  null, [], {}, ['RAW_CANARY'], [{label: 'RAW_CANARY'}],
+  Array(MAX_PERMISSION_ACTIONS + 1).fill('alert'),
+])('rejects arbitrary or unbounded permission-action evidence (%#)', permissionActions => {
+  expect(sanitizeNativeResult({...nativeResult(), permissionActions})).toBeUndefined();
 });
 
 test('foreground preparation publishes only lifecycle categories and an activation flag', () => {
@@ -715,6 +738,7 @@ test.each(['smoke', 'live'])('maximum mode-specific %s diagnostics fit the uncha
     stage: longest(STAGES), applicationState: longest(APPLICATION_STATES),
     failureCategory: longest(FAILURE_CATEGORIES), nativeIssue: longest(NATIVE_ISSUES),
     nativeOperation: longest(NATIVE_OPERATIONS),
+    permissionActions: Array(MAX_PERMISSION_ACTIONS).fill(longest(PERMISSION_SOURCES)),
     ...(mode === 'smoke' ? {
       inputDiagnostics: INPUT_PHASES.map(phase => ({
         ...inputDiagnostic(phase), target: longest(INPUT_TARGETS),
@@ -734,6 +758,7 @@ test.each(['smoke', 'live'])('maximum mode-specific %s diagnostics fit the uncha
         ...Object.fromEntries(CONTROL_COMPARATORS.map(key => [key, longest(INTERACTION_ELEMENTS)])),
         applicationState: longest(APPLICATION_STATES),
         systemApplicationState: longest(APPLICATION_STATES), systemDenial: longest(INTERACTION_ELEMENTS),
+        polls: longest(MATCH_COUNTS),
       })),
       detailsForeground: {
         before: 'running-background-suspended', after: longest(APPLICATION_STATES), activationRequested: true,
@@ -1155,6 +1180,11 @@ test('Details requires unique hittable in-frame readiness and a real tap-to-shee
   expect(wait).toContain('throw Failure.ambiguousElement');
   expect(wait).toContain('dismissKnownPermissionAlert()');
   expect(wait).toContain('ProcessInfo.processInfo.systemUptime + Timeout.standard');
+  expect(wait.indexOf('var deadline =')).toBeGreaterThan(wait.indexOf('capture: .initial'));
+  expect(wait.indexOf('dismissKnownPermissionAlert()')).toBeLessThan(wait.indexOf('updateInteraction('));
+  expect(wait).toContain('if permissionDismissals > handledPermissions');
+  expect(wait).toContain('handledPermissions = permissionDismissals');
+  expect(wait).toContain('detailsReadinessPolls += 1');
   expect(wait).toContain('while ProcessInfo.processInfo.systemUptime < deadline');
   expect(wait).toContain('Thread.sleep(forTimeInterval: min(Timeout.interactionPoll, remaining))');
   expect(wait).toContain('throw failure');
@@ -1256,6 +1286,7 @@ test('control comparisons are bounded read-only observations, not readiness or n
   expect(comparison).toContain('refreshApplicationState()');
   expect(comparison).toContain('observedApplicationState(springBoard).rawValue');
   expect(comparison).toContain('NSPredicate(format: "label IN %@", argumentArray: [Self.permissionDenyLabels])');
+  expect(comparison).toContain('"polls": matchCount(detailsReadinessPolls).rawValue');
   for (const key of CONTROL_COMPARATORS) {
     expect(comparison).toContain(`"${key}"`);
   }
@@ -1333,15 +1364,23 @@ test('explicit and interruption permission handling share a bounded allowlisted 
   expect(dismissal).toContain('permissionAttempts < Permission.maximumAttempts, alert.exists');
   expect(dismissal).toContain('for label in Self.permissionDenyLabels');
   expect(dismissal).toContain('button.exists && button.isHittable');
+  expect(dismissal).toContain('app.state == .runningForeground');
+  expect(dismissal).toContain('let denials = springBoard.buttons.matching(');
+  expect(dismissal).toContain('NSPredicate(format: "label IN %@", argumentArray: [Self.permissionDenyLabels])');
+  expect(dismissal).toContain('guard denials.count == 1 else { return }');
+  expect(dismissal).toContain('performPermissionDenial(denials.element, source: .systemControl)');
+  expect(dismissal).toContain('return performPermissionDenial(button, source: .alert)');
+  expect(dismissal).toContain('button.exists && button.isEnabled && button.isHittable');
   const events = [
     'permissionAttempts += 1',
+    'permissionActions.append(source.rawValue)',
     'InteractionPhase.dismissingPermission.rawValue', 'emit(outcome: .inProgress)',
     'button.tap()', 'permissionDismissals += 1', 'permissionDismissed = true',
     'pendingCategory = previousCategory',
   ].map(text => dismissal.indexOf(text));
   expect(events.every(index => index >= 0)).toBe(true);
   expect(events).toEqual([...events].sort((a, b) => a - b));
-  expect(swift).toContain('static let maximumAttempts = 4');
+  expect(swift).toContain(`static let maximumAttempts = ${MAX_PERMISSION_ACTIONS}`);
   expect(dismissal).not.toMatch(/buttons\.firstMatch|coordinate|\.label\b|\.value\b|while /);
   const classify = swift.split('private func permissionAlertState(')[1]
     .split('private func updateInteraction(')[0];

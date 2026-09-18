@@ -74,6 +74,8 @@ const DETAILS_PRESENTATIONS = Object.freeze(['unavailable', 'closed', 'opening',
 const CAPSULE_CONTAINMENTS = Object.freeze(['unavailable', 'invalid', 'empty', 'outside', 'partial', 'inside']);
 const TOUCH_TARGET_SIZES = Object.freeze(['unavailable', 'below-minimum', 'meets-minimum']);
 const CONTROL_COMPARATORS = Object.freeze(['details', 'settings', 'telemetry', 'navigation']);
+const PERMISSION_SOURCES = Object.freeze(['alert', 'system-control']);
+const MAX_PERMISSION_ACTIONS = 4;
 
 function sanitizeControlComparisons(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > 2 ||
@@ -82,6 +84,7 @@ function sanitizeControlComparisons(value) {
         ['applicationState', 'systemApplicationState'].some(key =>
           entry[key] !== undefined && !APPLICATION_STATES.includes(entry[key])) ||
         (entry.systemDenial !== undefined && !INTERACTION_ELEMENTS.includes(entry.systemDenial)) ||
+        (entry.polls !== undefined && !MATCH_COUNTS.includes(entry.polls)) ||
         CONTROL_COMPARATORS.some(key => !INTERACTION_ELEMENTS.includes(entry[key])))) return undefined;
   return value.map(entry => ({
     capture: entry.capture,
@@ -89,6 +92,7 @@ function sanitizeControlComparisons(value) {
     ...(entry.applicationState ? {applicationState: entry.applicationState} : {}),
     ...(entry.systemApplicationState ? {systemApplicationState: entry.systemApplicationState} : {}),
     ...(entry.systemDenial ? {systemDenial: entry.systemDenial} : {}),
+    ...(entry.polls ? {polls: entry.polls} : {}),
   }));
 }
 
@@ -225,6 +229,10 @@ function sanitizeNativeResult(value) {
   const detailsForeground = value.detailsForeground === undefined ? undefined
     : sanitizeDetailsForeground(value.detailsForeground);
   if (value.detailsForeground !== undefined && !detailsForeground) return undefined;
+  if (value.permissionActions !== undefined &&
+      (!Array.isArray(value.permissionActions) || value.permissionActions.length === 0 ||
+        value.permissionActions.length > MAX_PERMISSION_ACTIONS ||
+        value.permissionActions.some(source => !PERMISSION_SOURCES.includes(source)))) return undefined;
   return {
     schemaVersion: 1, runner: 'xcuitest', mode: value.mode, outcome: value.outcome,
     stage: value.stage, applicationState: value.applicationState,
@@ -239,6 +247,7 @@ function sanitizeNativeResult(value) {
     ...(detailsTapDiagnostics ? {detailsTapDiagnostics} : {}),
     ...(detailsControlComparisons ? {detailsControlComparisons} : {}),
     ...(detailsForeground ? {detailsForeground} : {}),
+    ...(value.permissionActions ? {permissionActions: [...value.permissionActions]} : {}),
   };
 }
 
@@ -275,5 +284,6 @@ module.exports = {
   RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
   DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES, DETAILS_PRESENTATIONS,
   CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES, CONTROL_COMPARATORS,
+  PERMISSION_SOURCES, MAX_PERMISSION_ACTIONS,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };

@@ -154,6 +154,11 @@ private enum PermissionAlert: String {
   case denialHittable = "denial-hittable"
 }
 
+private enum PermissionSource: String {
+  case alert
+  case systemControl = "system-control"
+}
+
 private enum MatchCount: String {
   case unavailable
   case zero
@@ -322,6 +327,8 @@ final class PaadLiveUITests: XCTestCase {
   private var detailsReadiness: [String: Any]?
   private var detailsControlComparisons: [[String: String]] = []
   private var detailsForeground: [String: Any]?
+  private var detailsReadinessPolls = 0
+  private var permissionActions: [String] = []
   private var permissionAttempts = 0
   private var permissionDismissals = 0
   private var permissionDismissed = false
@@ -693,6 +700,7 @@ final class PaadLiveUITests: XCTestCase {
   ) throws -> XCUIElement {
     if target == .connectionDetails {
       detailsControlComparisons = []
+      detailsReadinessPolls = 0
     }
     // Details is a fixed header, not scroll content. Give navigation, the busy
     // overlay and asynchronous sensor permission dialogs time to settle.
@@ -702,8 +710,9 @@ final class PaadLiveUITests: XCTestCase {
       ? app.buttons.matching(identifier: target.rawValue)
       : app.descendants(matching: .any).matching(identifier: target.rawValue)
     let field = query.firstMatch
-    let deadline = ProcessInfo.processInfo.systemUptime + Timeout.standard
     pendingCategory = failure
+    nativeOperation = .permissionCheck
+    dismissKnownPermissionAlert()
     nativeOperation = .stateCheck
     updateInteraction(target, field: field, phase: phase)
     emit(outcome: .inProgress)
@@ -712,7 +721,14 @@ final class PaadLiveUITests: XCTestCase {
     }
     nativeOperation = .resolution
     diagnoseResolution(target, field: field, query: query, capture: .initial)
+    // Diagnostic snapshots can take native waits of their own. They must not
+    // exhaust the actionable-readiness window before its first poll.
+    var deadline = ProcessInfo.processInfo.systemUptime + Timeout.standard
+    var handledPermissions = permissionDismissals
     while ProcessInfo.processInfo.systemUptime < deadline {
+      if target == .connectionDetails {
+        detailsReadinessPolls += 1
+      }
       // Native queries can perform their own waits. Keep them outside an XCTest
       // predicate callback, and explicitly handle only known permission denials.
       nativeOperation = .permissionCheck
@@ -731,6 +747,12 @@ final class PaadLiveUITests: XCTestCase {
         // Unlike firstMatch, element also fails if ambiguity appears at tap time.
         nativeOperation = .resolveElement
         return query.element
+      }
+      if permissionDismissals > handledPermissions {
+        // Only a completed denial action replenishes the settling window;
+        // the shared four-attempt budget bounds this across the whole flow.
+        handledPermissions = permissionDismissals
+        deadline = ProcessInfo.processInfo.systemUptime + Timeout.standard
       }
       let remaining = deadline - ProcessInfo.processInfo.systemUptime
       if remaining > 0 {
@@ -990,6 +1012,13 @@ final class PaadLiveUITests: XCTestCase {
         return
       }
     }
+    // Recheck exact denial controls on SpringBoard if no alert was handled.
+    guard permissionAttempts < Permission.maximumAttempts,
+      app.state == .runningForeground else { return }
+    let denials = springBoard.buttons.matching(
+      NSPredicate(format: "label IN %@", argumentArray: [Self.permissionDenyLabels]))
+    guard denials.count == 1 else { return }
+    _ = performPermissionDenial(denials.element, source: .systemControl)
   }
 
   private func denyPermissionAlert(_ alert: XCUIElement) -> Bool {
@@ -999,29 +1028,36 @@ final class PaadLiveUITests: XCTestCase {
     for label in Self.permissionDenyLabels {
       let button = alert.buttons[label]
       if button.exists && button.isHittable {
-        let previousPhase = interactionDiagnostics?["phase"]
-        let previousCategory = pendingCategory
-        pendingCategory = .notHittable
-        // Consume the budget before the action, including monitor re-entry.
-        permissionAttempts += 1
-        if interactionDiagnostics != nil {
-          interactionDiagnostics?["phase"] = InteractionPhase.dismissingPermission.rawValue
-          interactionDiagnostics?["permissionLimitReached"] =
-            permissionAttempts == Permission.maximumAttempts
-          emit(outcome: .inProgress)
-        }
-        button.tap()
-        permissionDismissals += 1
-        permissionDismissed = true
-        pendingCategory = previousCategory
-        interactionDiagnostics?["phase"] = previousPhase
-        interactionDiagnostics?["permissionDismissed"] = true
-        interactionDiagnostics?["permissionLimitReached"] =
-          permissionAttempts == Permission.maximumAttempts
-        return true
+        return performPermissionDenial(button, source: .alert)
       }
     }
     return false
+  }
+
+  private func performPermissionDenial(_ button: XCUIElement, source: PermissionSource) -> Bool {
+    guard permissionAttempts < Permission.maximumAttempts,
+      button.exists && button.isEnabled && button.isHittable else { return false }
+    let previousPhase = interactionDiagnostics?["phase"]
+    let previousCategory = pendingCategory
+    pendingCategory = .notHittable
+    // Consume the shared budget before the action, including monitor re-entry.
+    permissionAttempts += 1
+    permissionActions.append(source.rawValue)
+    if interactionDiagnostics != nil {
+      interactionDiagnostics?["phase"] = InteractionPhase.dismissingPermission.rawValue
+      interactionDiagnostics?["permissionLimitReached"] =
+        permissionAttempts == Permission.maximumAttempts
+      emit(outcome: .inProgress)
+    }
+    button.tap()
+    permissionDismissals += 1
+    permissionDismissed = true
+    pendingCategory = previousCategory
+    interactionDiagnostics?["phase"] = previousPhase
+    interactionDiagnostics?["permissionDismissed"] = true
+    interactionDiagnostics?["permissionLimitReached"] =
+      permissionAttempts == Permission.maximumAttempts
+    return true
   }
 
   // MARK: Configuration
@@ -1157,6 +1193,7 @@ final class PaadLiveUITests: XCTestCase {
       "applicationState": ApplicationState.unknown.rawValue,
       "systemApplicationState": ApplicationState.unknown.rawValue,
       "systemDenial": InteractionElement.unavailable.rawValue,
+      "polls": matchCount(detailsReadinessPolls).rawValue,
     ])
     let index = detailsControlComparisons.count - 1
     nativeOperation = .stateCheck
@@ -1468,6 +1505,9 @@ final class PaadLiveUITests: XCTestCase {
     }
     if let detailsForeground = detailsForeground {
       record["detailsForeground"] = detailsForeground
+    }
+    if !permissionActions.isEmpty {
+      record["permissionActions"] = permissionActions
     }
     if !inputDiagnostics.isEmpty {
       record["inputDiagnostics"] = inputDiagnostics
