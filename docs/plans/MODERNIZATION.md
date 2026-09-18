@@ -38,6 +38,13 @@ unchanged. The online check remains enabled. Native rebuilding and an explicit,
 reviewed CocoaPods lock refresh are pending; earlier native results below apply
 to their recorded sources, not these new dependency pins.
 
+The first refresh attempt, ADR run `35380792854`, rejected the changed
+`ExpoLocation` podspec while still using `pod install`. Explicit refresh now uses
+`pod update --no-repo-update` to resolve the requested new lock for review;
+ordinary runs still require `pod install --deployment` and never update silently.
+The generated resolution must be reviewed and committed before normal deployment
+mode is considered restored.
+
 The iOS harness presents only its explicitly owned simulator with the pinned
 Xcode Simulator app before Maestro requests XCTest screenshots. GUI launch is
 bounded to sixty seconds and rejects live device inputs. This addresses a
