@@ -18,6 +18,7 @@ import {
   Platform,
   ScrollView,
   KeyboardAvoidingView,
+  useWindowDimensions,
 } from 'react-native';
 import {
   CommonActions,
@@ -226,6 +227,8 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
     const {bottom} = useSafeAreaInsets();
     const {dark} = useTheme();
     const colors = palette(dark);
+    const {width, fontScale} = useWindowDimensions();
+    const stackedActions = width < 360 || fontScale > 1.3;
     const {parentNavigatorKey, parentRoutes} = route.params;
     const style = useMemo<StyleDefinition>(
       () => ({
@@ -242,8 +245,11 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
         },
         footer: {
           alignItems: 'center',
-          gap: 12,
-          paddingTop: 20,
+          flexDirection: stackedActions ? 'column' : 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          gap: 8,
+          paddingTop: 16,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
           marginBottom: Platform.select({ios: bottom, android: 20}),
@@ -252,8 +258,25 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
         bodyGroup: {flex: 1},
         bodyGroupContainerStyle: {marginVertical: 10},
         manualBody: {flex: 2},
-        footerAction: {minHeight: 52, paddingVertical: 14},
-        footerTitle: {fontSize: 15, lineHeight: 20, fontWeight: '600'},
+        footerAction: {
+          minHeight: 48,
+          paddingVertical: 12,
+          paddingHorizontal: 16,
+          borderRadius: 14,
+        },
+        footerControl: {
+          width: stackedActions ? '100%' : 'auto',
+          maxWidth: stackedActions ? 320 : '100%',
+          flexShrink: 1,
+          borderRadius: 14,
+        },
+        footerIcon: {marginRight: 6},
+        footerTitle: {
+          fontSize: 15,
+          lineHeight: 20,
+          fontWeight: '600',
+          textAlign: 'center',
+        },
         registerNewButton: {backgroundColor: colors.primary},
         clearButton: {
           borderWidth: 1,
@@ -262,7 +285,7 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
         },
         clearBtn: {color: colors.danger},
       }),
-      [orientation, bottom, colors],
+      [orientation, bottom, colors, stackedActions],
     );
 
     const readonly = !registeringNew && !!client && client?.isConnected();
@@ -423,7 +446,18 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
             <>
               <Button
                 key="register-new-device"
-                title={Strings.Registration.Manual.RegisterNew.Title}
+                title={Strings.Registration.Manual.RegisterNew.ShortTitle}
+                accessibilityLabel={
+                  Strings.Registration.Manual.RegisterNew.Title
+                }
+                icon={{
+                  name: 'plus',
+                  type: 'material-community',
+                  size: 18,
+                  color: colors.onPrimary,
+                }}
+                iconContainerStyle={style.footerIcon}
+                containerStyle={style.footerControl}
                 type="solid"
                 buttonStyle={[style.footerAction, style.registerNewButton]}
                 titleStyle={style.footerTitle}
@@ -467,6 +501,7 @@ const ManualConnect = React.memo<{navigation: any; route: any}>(
               <Button
                 key="clear-device-credentials"
                 title={Strings.Registration.Manual.Clear.Title}
+                containerStyle={style.footerControl}
                 type="outline"
                 buttonStyle={[style.footerAction, style.clearButton]}
                 titleStyle={[style.footerTitle, style.clearBtn]}

@@ -119,6 +119,13 @@ implementation remain pending.
 
 ## Modern foundation progress (2026-09-16)
 
+The September 18 registration follow-up uses compact content-width New device
+and Clear registration actions, an 8 dp gap and 48 dp minimum touch regions.
+Narrow windows and large text stack the controls without fixed heights or
+truncated labels. The full registration accessibility label and both existing
+confirmation flows remain unchanged; this does not add the ADR Details sheet
+or replace the foundation's clear-credentials action with Close.
+
 [Run 35052582168](https://github.com/HangyiWang/iot-central-paad/actions/runs/35052582168)
 built `f02ed75b061f675b5a3312a67c940de4b2a37cbc` using Expo 57.0.23,
 React Native 0.86.3 and React 19.2.3. Its JavaScript gate and real Android

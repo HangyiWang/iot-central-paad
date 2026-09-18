@@ -155,6 +155,7 @@ const Strings = {
       Registered: 'Registered using:',
       RegisterNew: {
         Title: 'Register as a new device',
+        ShortTitle: 'New device',
         Alert: {
           Title: 'Register as new device?',
           Text: "Once you register as a new device, your old connection will be disconnected and you'll be able to connect as a new device. Current device credentials will not be cleared until the new device actually connects. Data previously sent will remain in the cloud until you delete it.",
