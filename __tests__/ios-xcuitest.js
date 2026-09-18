@@ -16,6 +16,7 @@ const {
   INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
   RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
+  DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES,
 } = require('../scripts/ci/ios-xcuitest-result');
 const {sanitizeDiagnostics} = require('../scripts/ci/live-diagnostics');
 const {validateEnvironment} = require('../scripts/ci/run-ios-xcuitest');
@@ -84,6 +85,10 @@ const interactionDiagnostic = () => ({
 });
 const geometryDiagnostic = () => ({
   type: 'button', state: 'not-hittable', frame: 'inside-app',
+});
+const tapDiagnostic = (attempt = 'initial') => ({
+  attempt, targetState: 'not-hittable', completed: true, permissionHandled: true,
+  sheet: 'missing', close: 'missing', identity: 'missing',
 });
 const resolutionDiagnostic = () => ({
   capture: 'initial',
@@ -448,6 +453,37 @@ test.each(NATIVE_OPERATIONS)('retains only the fixed native operation %s', nativ
   expect(sanitizeNativeResult({...result, nativeOperation: 'RAW_CANARY'})).toBeUndefined();
 });
 
+test('Details tap evidence records handled interruptions and marker presence without UI text', () => {
+  const detailsTapDiagnostics = DETAILS_TAP_ATTEMPTS.map(tapDiagnostic);
+  const result = {...nativeResult(), detailsTapDiagnostics};
+  const dirty = {...result, detailsTapDiagnostics: detailsTapDiagnostics.map(entry => ({
+    ...entry, label: 'RAW_CANARY', value: 'RAW_CANARY', alert: 'RAW_CANARY',
+  }))};
+  expect(parseNativeLog(`${PREFIX}${JSON.stringify(dirty)}`, 'live')).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: dirty}).nativeUi).toEqual(result);
+});
+
+test.each([
+  null, [], {}, [null], Array(3).fill(tapDiagnostic()),
+  [tapDiagnostic('permission-retry')],
+  [{...tapDiagnostic(), attempt: 'RAW_CANARY'}],
+  [{...tapDiagnostic(), targetState: 'RAW_CANARY'}],
+  [{...tapDiagnostic(), completed: 'true'}],
+  [{...tapDiagnostic(), permissionHandled: 'true'}],
+  ...['sheet', 'close', 'identity'].map(key => [{...tapDiagnostic(), [key]: 'RAW_CANARY'}]),
+  [{...tapDiagnostic(), permissionHandled: false}, tapDiagnostic('permission-retry')],
+  [{...tapDiagnostic(), completed: false}, tapDiagnostic('permission-retry')],
+])('Details tap evidence rejects unbounded or unobserved interruption recovery (%#)', detailsTapDiagnostics => {
+  expect(sanitizeNativeResult({...nativeResult(), detailsTapDiagnostics})).toBeUndefined();
+});
+
+test.each(ELEMENT_PRESENCES)('Details marker evidence accepts fixed presence %s', presence => {
+  const result = {...nativeResult(), detailsTapDiagnostics: [
+    {...tapDiagnostic(), sheet: presence, close: presence, identity: presence},
+  ]};
+  expect(sanitizeNativeResult(result)).toEqual(result);
+});
+
 test.each(RESOLUTION_CHECKPOINTS)('preserves interrupted resolution at %s through the final summary', checkpoint => {
   const unavailable = {type: 'unavailable', state: 'unavailable', frame: 'unavailable'};
   const resolution = {
@@ -496,6 +532,7 @@ test('duplicate target evidence cannot substitute for a unique real Details acti
 test('combined bounded diagnostics still fit the existing record limit', () => {
   const result = {
     ...nativeResult('smoke'), observedTargets: TARGETS,
+    detailsTapDiagnostics: DETAILS_TAP_ATTEMPTS.map(tapDiagnostic),
     inputDiagnostics: INPUT_PHASES.map(phase => inputDiagnostic(phase)),
     interactionDiagnostics: {...interactionDiagnostic(), resolution: {
       ...resolutionDiagnostic(), candidates: Array(MAX_RESOLUTION_CANDIDATES).fill(geometryDiagnostic()),
@@ -860,6 +897,8 @@ test('Swift diagnostics use only the parser vocabularies and stable public contr
   expect(values('FrameVisibility').sort()).toEqual([...FRAME_VISIBILITIES].sort());
   expect(values('NativeIssue').sort()).toEqual([...NATIVE_ISSUES].sort());
   expect(values('NativeOperation').sort()).toEqual([...NATIVE_OPERATIONS].sort());
+  expect(values('DetailsTapAttempt').sort()).toEqual([...DETAILS_TAP_ATTEMPTS].sort());
+  expect(values('ElementPresence').sort()).toEqual([...ELEMENT_PRESENCES].sort());
   expect(values('ResolutionCapture').sort()).toEqual([...RESOLUTION_CAPTURES].sort());
   for (const value of values('Failure')) expect(FAILURE_CATEGORIES).toContain(value);
   for (const value of values('Target')) expect(TARGETS).toContain(value);
@@ -870,15 +909,12 @@ test('Swift diagnostics use only the parser vocabularies and stable public contr
 
 test('Details requires unique enabled in-frame readiness and a real tap-to-sheet transition', () => {
   const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
-  const open = swift.split('private func openDetails()')[1].split('private func waitForDetailsTarget(')[0];
+  const open = swift.split('private func openDetails()')[1].split('private func tapDetails(')[0];
   const events = [
     'NSPredicate(format: "exists == false")',
     'on: element(.connectionDetailsSheet)',
     '.connectionDetails, phase: .waitingForReadiness, failure: .notHittable',
-    'pendingCategory = .notHittable',
-    'InteractionPhase.tapping.rawValue',
-    'emit(outcome: .inProgress)',
-    'control.tap()',
+    'tapDetails(control, attempt: .initial)',
     '.connectionDetailsSheet, phase: .waitingForSheet, failure: .missingElement',
     'InteractionPhase.sheetVisible.rawValue',
     'advance(to: .details)',
@@ -910,6 +946,36 @@ test('Details requires unique enabled in-frame readiness and a real tap-to-sheet
   expect(INTERACTION_TARGETS).toEqual(['connection-details', 'connection-details-sheet']);
   const record = swift.split('override func record(')[1].split('// MARK: Entry point')[0];
   expect(record).not.toMatch(/updateInteraction|app\.|permissionAlertState/);
+});
+
+test('Details retries only a handled in-tap interruption with a still-absent sheet and ready button', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const open = swift.split('private func openDetails()')[1].split('private func tapDetails(')[0];
+  expect(open).toContain('detailsTapDiagnostics = []');
+  expect(open).toContain('if interrupted && !element(.connectionDetailsSheet).waitForExistence(timeout: Timeout.short)');
+  expect(open).toContain('if !diagnoseDetailsPresentation()');
+  expect(open).toContain('requireHittable: true');
+  expect(open.match(/attempt: \.permissionRetry/g)).toHaveLength(1);
+  expect(open).not.toMatch(/\bfor\b|\bwhile\b|\bcatch\b/);
+  const tap = swift.split('private func tapDetails(')[1].split('private func diagnoseDetailsPresentation(')[0];
+  const events = [
+    'let dismissalsBeforeTap = permissionDismissals',
+    'detailsTapDiagnostics.append(', '"completed": false',
+    'InteractionPhase.tapping.rawValue', 'emit(outcome: .inProgress)', 'control.tap()',
+    'permissionDismissals > dismissalsBeforeTap', '["completed"] = true',
+    '["permissionHandled"] = interrupted', 'return interrupted',
+  ].map(text => tap.indexOf(text));
+  expect(events.every(index => index >= 0)).toBe(true);
+  expect(events).toEqual([...events].sort((a, b) => a - b));
+  const presentation = swift.split('private func diagnoseDetailsPresentation(')[1].split('private func waitForDetailsTarget(')[0];
+  expect(presentation).toContain('element(.connectionDetailsSheet).exists');
+  expect(presentation).toContain('("close", .connectionDetailsClose)');
+  expect(presentation).toContain('("identity", .assignedDeviceId)');
+  expect(tap + presentation).not.toMatch(/\.label\b|\.value\b|debugDescription|screenshot|coordinate|swipe/);
+  const wait = swift.split('private func waitForDetailsTarget(')[1].split('private func requireIdentity(')[0];
+  expect(wait).toContain('&& (!requireHittable || field.isHittable)');
+  const emitter = swift.split('private func emit(outcome:')[1];
+  expect(emitter).toContain('record["detailsTapDiagnostics"] = detailsTapDiagnostics');
 });
 
 test('resolution evidence survives polling and query aborts without text or coordinate taps', () => {
@@ -959,7 +1025,7 @@ test('explicit and interruption permission handling share a bounded allowlisted 
   const events = [
     'permissionAttempts += 1',
     'InteractionPhase.dismissingPermission.rawValue', 'emit(outcome: .inProgress)',
-    'button.tap()', 'permissionDismissed = true',
+    'button.tap()', 'permissionDismissals += 1', 'permissionDismissed = true',
     'pendingCategory = previousCategory',
   ].map(text => dismissal.indexOf(text));
   expect(events.every(index => index >= 0)).toBe(true);

@@ -344,7 +344,8 @@ actual termination and an observed not-running state before reactivation.
 Native preflight and native replay allow up to ten minutes for a fresh
 simulator's `bootstatus -b` operation to complete, including data migration.
 They do not treat the earlier Booted state as ready. Installing the bundled app
-on that fresh simulator has a separate three-minute allowance. Their steps are bounded to
+on that fresh simulator has a separate three-minute allowance. Their steps are
+bounded to
 25 minutes; XCTest and live proof deadlines are unchanged. A failed synthetic
 bootstrap reports only its fixed stage and subprocess outcome, even when raw
 diagnostic retention is disabled.

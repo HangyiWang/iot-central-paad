@@ -66,8 +66,25 @@ const NATIVE_ISSUES = Object.freeze([
   'timeout', 'connection-lost', 'other',
 ]);
 const NATIVE_OPERATIONS = Object.freeze([
-  'sheet-absence', 'permission-check', 'match-count', 'state-check', 'resolution', 'resolve-element', 'tap',
+  'sheet-absence', 'permission-check', 'match-count', 'state-check', 'resolution', 'resolve-element', 'tap', 'presentation',
 ]);
+const DETAILS_TAP_ATTEMPTS = Object.freeze(['initial', 'permission-retry']);
+const ELEMENT_PRESENCES = Object.freeze(['unavailable', 'missing', 'present']);
+
+function sanitizeDetailsTaps(value) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > DETAILS_TAP_ATTEMPTS.length ||
+      value.some((entry, index) => !entry || typeof entry !== 'object' || Array.isArray(entry) ||
+        entry.attempt !== DETAILS_TAP_ATTEMPTS[index] ||
+        !INTERACTION_ELEMENTS.includes(entry.targetState) ||
+        typeof entry.completed !== 'boolean' || typeof entry.permissionHandled !== 'boolean' ||
+        ['sheet', 'close', 'identity'].some(key => !ELEMENT_PRESENCES.includes(entry[key]))) ||
+      (value.length === 2 && (!value[0].completed || !value[0].permissionHandled))) return undefined;
+  return value.map(entry => ({
+    attempt: entry.attempt, targetState: entry.targetState,
+    completed: entry.completed, permissionHandled: entry.permissionHandled,
+    sheet: entry.sheet, close: entry.close, identity: entry.identity,
+  }));
+}
 
 function sanitizeInputDiagnostics(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > INPUT_PHASES.length ||
@@ -147,6 +164,9 @@ function sanitizeNativeResult(value) {
   const interactionDiagnostics = value.interactionDiagnostics === undefined ? undefined
     : sanitizeInteractionDiagnostics(value.interactionDiagnostics);
   if (value.interactionDiagnostics !== undefined && !interactionDiagnostics) return undefined;
+  const detailsTapDiagnostics = value.detailsTapDiagnostics === undefined ? undefined
+    : sanitizeDetailsTaps(value.detailsTapDiagnostics);
+  if (value.detailsTapDiagnostics !== undefined && !detailsTapDiagnostics) return undefined;
   return {
     schemaVersion: 1, runner: 'xcuitest', mode: value.mode, outcome: value.outcome,
     stage: value.stage, applicationState: value.applicationState,
@@ -158,6 +178,7 @@ function sanitizeNativeResult(value) {
     ...(value.execution ? {execution: value.execution} : {}),
     ...(inputDiagnostics ? {inputDiagnostics} : {}),
     ...(interactionDiagnostics ? {interactionDiagnostics} : {}),
+    ...(detailsTapDiagnostics ? {detailsTapDiagnostics} : {}),
   };
 }
 
@@ -192,5 +213,6 @@ module.exports = {
   INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
   RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
+  DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };

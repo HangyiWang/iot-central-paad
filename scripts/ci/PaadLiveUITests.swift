@@ -79,6 +79,7 @@ private enum Target: String, CaseIterable {
   case connectionStatus = "connection-status"
   case connectionDetails = "connection-details"
   case connectionDetailsSheet = "connection-details-sheet"
+  case connectionDetailsClose = "connection-details-close"
   case connectionStatusCapsule = "connection-status-capsule"
   case appBusyOverlay = "app-busy-overlay"
   case assignedDeviceId = "assigned-device-id"
@@ -202,6 +203,18 @@ private enum NativeOperation: String {
   case resolution
   case resolveElement = "resolve-element"
   case tap
+  case presentation
+}
+
+private enum DetailsTapAttempt: String {
+  case initial
+  case permissionRetry = "permission-retry"
+}
+
+private enum ElementPresence: String {
+  case unavailable
+  case missing
+  case present
 }
 
 // MARK: - Test case configuration
@@ -279,7 +292,9 @@ final class PaadLiveUITests: XCTestCase {
   private var resolutionTarget: Target?
   private var nativeIssue: NativeIssue?
   private var nativeOperation: NativeOperation?
+  private var detailsTapDiagnostics: [[String: Any]] = []
   private var permissionAttempts = 0
+  private var permissionDismissals = 0
   private var permissionDismissed = false
 
   override func setUp() {
@@ -507,6 +522,7 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   private func openDetails() throws {
+    detailsTapDiagnostics = []
     nativeOperation = .sheetAbsence
     try waitFor(
       NSPredicate(format: "exists == false"),
@@ -515,12 +531,17 @@ final class PaadLiveUITests: XCTestCase {
       failure: .unexpectedIssue)
     let control = try waitForDetailsTarget(
       .connectionDetails, phase: .waitingForReadiness, failure: .notHittable)
-    pendingCategory = .notHittable
-    interactionDiagnostics?["phase"] = InteractionPhase.tapping.rawValue
-    nativeOperation = .tap
-    emit(outcome: .inProgress)
-    control.tap()
-    pendingCategory = nil
+    let interrupted = tapDetails(control, attempt: .initial)
+    // A handled permission interruption can consume the original interaction.
+    // Retry once only when that happened and the sheet is still absent.
+    if interrupted && !element(.connectionDetailsSheet).waitForExistence(timeout: Timeout.short) {
+      if !diagnoseDetailsPresentation() {
+        let retryControl = try waitForDetailsTarget(
+          .connectionDetails, phase: .waitingForReadiness, failure: .notHittable,
+          requireHittable: true)
+        _ = tapDetails(retryControl, attempt: .permissionRetry)
+      }
+    }
     _ = try waitForDetailsTarget(
       .connectionDetailsSheet, phase: .waitingForSheet, failure: .missingElement)
     interactionDiagnostics?["phase"] = InteractionPhase.sheetVisible.rawValue
@@ -528,8 +549,51 @@ final class PaadLiveUITests: XCTestCase {
     advance(to: .details)
   }
 
+  @discardableResult
+  private func tapDetails(_ control: XCUIElement, attempt: DetailsTapAttempt) -> Bool {
+    let dismissalsBeforeTap = permissionDismissals
+    detailsTapDiagnostics.append([
+      "attempt": attempt.rawValue,
+      "targetState": interactionDiagnostics?["element"] ?? InteractionElement.unavailable.rawValue,
+      "completed": false,
+      "permissionHandled": false,
+      "sheet": ElementPresence.unavailable.rawValue,
+      "close": ElementPresence.unavailable.rawValue,
+      "identity": ElementPresence.unavailable.rawValue,
+    ])
+    let index = detailsTapDiagnostics.count - 1
+    pendingCategory = .notHittable
+    interactionDiagnostics?["phase"] = InteractionPhase.tapping.rawValue
+    nativeOperation = .tap
+    emit(outcome: .inProgress)
+    control.tap()
+    pendingCategory = nil
+    let interrupted = permissionDismissals > dismissalsBeforeTap
+    detailsTapDiagnostics[index]["completed"] = true
+    detailsTapDiagnostics[index]["permissionHandled"] = interrupted
+    return interrupted
+  }
+
+  @discardableResult
+  private func diagnoseDetailsPresentation() -> Bool {
+    nativeOperation = .presentation
+    let index = detailsTapDiagnostics.count - 1
+    let sheet = element(.connectionDetailsSheet).exists
+    detailsTapDiagnostics[index]["sheet"] =
+      (sheet ? ElementPresence.present : .missing).rawValue
+    let markers: [(String, Target)] = [
+      ("close", .connectionDetailsClose), ("identity", .assignedDeviceId),
+    ]
+    for (key, target) in markers {
+      detailsTapDiagnostics[index][key] =
+        (element(target).exists ? ElementPresence.present : .missing).rawValue
+    }
+    return sheet
+  }
+
   private func waitForDetailsTarget(
-    _ target: Target, phase: InteractionPhase, failure: Failure
+    _ target: Target, phase: InteractionPhase, failure: Failure,
+    requireHittable: Bool = false
   ) throws -> XCUIElement {
     // Details is a fixed header, not scroll content. Give navigation, the busy
     // overlay and asynchronous sensor permission dialogs time to settle.
@@ -554,7 +618,8 @@ final class PaadLiveUITests: XCTestCase {
       nativeOperation = .matchCount
       let unique = query.count == 1
       nativeOperation = .stateCheck
-      if updateInteraction(target, field: field, phase: phase) && unique {
+      if updateInteraction(target, field: field, phase: phase) && unique
+        && (!requireHittable || field.isHittable) {
         nativeOperation = .resolution
         diagnoseResolution(target, field: field, query: query, capture: .ready)
         pendingCategory = nil
@@ -839,6 +904,7 @@ final class PaadLiveUITests: XCTestCase {
           emit(outcome: .inProgress)
         }
         button.tap()
+        permissionDismissals += 1
         permissionDismissed = true
         pendingCategory = previousCategory
         interactionDiagnostics?["phase"] = previousPhase
@@ -1029,6 +1095,10 @@ final class PaadLiveUITests: XCTestCase {
     resolutionDiagnostics?["checkpoint"] = "status-geometry"
     resolutionDiagnostics?["status"] = elementGeometry(element(.connectionStatus), viewport: viewport)
     resolutionDiagnostics?["checkpoint"] = "complete"
+    if target == .connectionDetailsSheet && !detailsTapDiagnostics.isEmpty {
+      diagnoseDetailsPresentation()
+      nativeOperation = .resolution
+    }
     emit(outcome: .inProgress)
   }
 
@@ -1205,6 +1275,9 @@ final class PaadLiveUITests: XCTestCase {
     }
     if let nativeOperation = nativeOperation {
       record["nativeOperation"] = nativeOperation.rawValue
+    }
+    if !detailsTapDiagnostics.isEmpty {
+      record["detailsTapDiagnostics"] = detailsTapDiagnostics
     }
     if !inputDiagnostics.isEmpty {
       record["inputDiagnostics"] = inputDiagnostics

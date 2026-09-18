@@ -88,8 +88,8 @@ cold startup. It reused the pre-secret app `bc0410e` from run `35264683214`;
 it does not establish cloud acceptance or execution of the newer header binary.
 The preceding replay isolated an input mismatch before Return. Individual public
 XCTest key actions passed where burst typing did not; the app's input behavior and
-strict assertions were not changed. Live iOS nonce/connected restoration still
-requires a fresh individual enrollment and independent operator confirmation.
+strict assertions were not changed. Live iOS nonce/connected restoration and
+independent operator confirmation remained outstanding at this point.
 
 The later native live run `35277305904`, source
 `0d206068bcb1069ed5b60cf617cdcc16e95c0a47`, passed synthetic preflight and reached
@@ -139,6 +139,22 @@ installation at its 60-second deadline, before XCTest or device-input execution.
 Native smoke now allows three minutes for that install operation and still
 requires a successful command result. Its temporary input was removed; this
 attempt supplies no additional post-connection evidence.
+
+Credential-free replay `35298845776` passed with app source `a993529` and harness
+`c152898`, and deleted its owned simulator. The subsequent retained-device run
+`35299327617` on `c152898` passed preflight, connected, and reached the actual
+Details tap. The sheet marker remained absent afterward; capsule/status
+hittability alone does not prove that the sheet opened. Its temporary input was
+removed, and neither nonce submission nor connected cold restoration passed.
+
+The native harness now records bounded per-tap completion, whether a known
+permission was actually dismissed during that tap, and presence of the sheet,
+Close control and assigned-identity marker. Only an observed in-tap permission
+dismissal with the sheet still absent permits one retry; that retry additionally
+requires a hittable button. Ordinary missing-sheet failures still fail without
+retry. This distinguishes an interrupted action from an absent container marker
+without exporting UI text or changing the app. The cause of the preceding
+missing-sheet result is not yet established.
 
 ### Connection capsule delivery (2026-09-17)
 
