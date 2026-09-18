@@ -646,7 +646,7 @@ function withRunner(mode, body, overrides = {}) {
       }
       if (binary === 'xcrun' && args[1] === 'bootstatus') {
         expect(mode).toBe('smoke');
-        expect(options.timeout).toBe(300000);
+        expect(options.timeout).toBe(600000);
         expect(options.killSignal).toBe('SIGKILL');
         expect(args).toEqual(['simctl', 'bootstatus', environment(mode).IOS_SIMULATOR_UDID, '-b']);
         return {status: 0};
@@ -658,6 +658,8 @@ function withRunner(mode, body, overrides = {}) {
       const runner = require('../scripts/ci/run-ios-xcuitest');
       body(runner.executeNative(mode, {...environment(mode), ...overrides.env}), runner);
     });
+    expect(spawn.mock.calls.some(([binary, args]) =>
+      binary === 'xcrun' && args[1] === 'boot')).toBe(false);
     expect(error.mock.calls.flat().join(' ')).not.toContain('RAW_CANARY');
   } finally {
     process.chdir(original);
@@ -735,7 +737,6 @@ test('native zero exit without complete app proof remains a failure', () => {
 });
 
 test.each([
-  ['simulator-boot', 'xcrun', 'boot'],
   ['simulator-ready', 'xcrun', 'bootstatus'],
   ['app-install', 'xcrun', 'install'],
   ['simulator-presentation', 'bash', 'scripts/ci/show-ios-simulator.sh'],

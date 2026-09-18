@@ -2,7 +2,7 @@
 
 Status: SAS-first application integrated; Android end-to-end and cold restore confirmed;
 iOS nonce/cold-restore acceptance remains pending.
-Date: 2026-09-17. Branch: `feature/adr-onboarding`.
+Date: 2026-09-18. Branch: `feature/adr-onboarding`.
 Parent: `modernize/paad-foundation`.
 
 ## CI-first update (2026-09-16)
@@ -103,10 +103,19 @@ coordinates or swipe that fixed header. Credential-free replay `35283136275`
 passed exact input, masking and cold-start assertions and deleted its owned
 simulator. This replay used harness
 `9007ba1d6d036a86101075f00a899810be37c119` and the pre-secret `0d20606` app from
-`35277305904`. The smoke boot allowance is five minutes following an observed
-three-minute fresh-simulator data-migration timeout. Synthetic smoke never
+`35277305904`. That replay used a five-minute smoke boot allowance following an
+observed three-minute fresh-simulator data-migration timeout. Synthetic smoke never
 connects, so this result does not prove the connected Details readiness fix or
 the pending live nonce/cold-restoration gate.
+
+On September 18, credential-free replay `35291595509` exhausted that five-minute
+allowance while CoreLocation migration was still non-terminal; no app UI ran, and
+the owned simulator was deleted. Native smoke now uses `simctl bootstatus -b` as
+one bounded boot/readiness operation, allowing ten minutes for a fresh runtime.
+The native preflight/replay steps allow 25 minutes; the existing XCTest execution,
+post-connection readiness and live proof deadlines are unchanged. A Booted state
+alone is never accepted as readiness. Fixed bootstrap-stage/outcome reporting
+does not relax the restrictions on raw logs from credentialed jobs.
 
 ### Connection capsule delivery (2026-09-17)
 
@@ -146,7 +155,9 @@ The inspection did not invoke new registration. Saved Azure context/activity
 survived without reimport, and an exact newly submitted proof nonce independently
 matched assignment, model and the existing automatic ADR record. This is
 retained-device update/traffic evidence, not a new registry-creation case or a
-separate force-stop assertion for this binary.
+claim of new Azure resources. A subsequent scoped force-stop on September 18
+confirmed the process was gone, then a new process restored Connected and the
+exact identity/model without credential entry or clearing data.
 APK SHA256:
 `d6d48debef8d548abdf44d494c67eeac1e9f435223da2232718c6fc7aa80ab6c`.
 

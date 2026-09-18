@@ -218,7 +218,7 @@ test('iOS replay has owner/manual guards, narrowly scoped registration, pinned t
     with: {'ruby-version': '3.3.8', bundler: '2.5.23', 'bundler-cache': true},
   });
   expect(steps.find(step => step.run === 'node scripts/ci/replay-native-ios.js')).toMatchObject({
-    if: "inputs.ios_driver == 'xcuitest'", 'timeout-minutes': 15,
+    if: "inputs.ios_driver == 'xcuitest'", 'timeout-minutes': 25,
   });
   expect([...script.matchAll(/run_bounded (\d+)/g)].reduce((sum, match) => sum + Number(match[1]), 60000))
     .toBeLessThan(900000);

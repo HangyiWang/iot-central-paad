@@ -341,6 +341,13 @@ This is not current-source mobile/cloud acceptance. The native harness uses
 Apple's application activation API; a cold-restoration assertion still requires
 actual termination and an observed not-running state before reactivation.
 
+Native preflight and native replay allow up to ten minutes for a fresh
+simulator's `bootstatus -b` operation to complete, including data migration.
+They do not treat the earlier Booted state as ready. Their steps are bounded to
+25 minutes; XCTest and live proof deadlines are unchanged. A failed synthetic
+bootstrap reports only its fixed stage and subprocess outcome, even when raw
+diagnostic retention is disabled.
+
 Android map preview needs a restricted key configured at native build time;
 without one, coordinates remain available. Image upload also requires Hub-side
 storage configuration; this workflow does not create that infrastructure.

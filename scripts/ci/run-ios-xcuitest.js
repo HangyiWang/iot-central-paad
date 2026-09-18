@@ -92,7 +92,7 @@ function executeNative(mode, env = process.env) {
   const log = path.join(root, 'xcuitest.log');
   let descriptor;
   let success = false;
-  let smokeBooted = false;
+  let smokeBootAttempted = false;
   let diagnostics = unavailable('no-supported-data');
   let bootstrapStage = 'manifest-read';
   const cleanEnv = {...env};
@@ -135,13 +135,11 @@ function executeNative(mode, env = process.env) {
     command('plutil', ['-convert', 'binary1', '-o', privateManifest, '-'], 10000, JSON.stringify(configured));
     if (mode === 'smoke') {
       // This simulator was created by build-ios.sh, not discovered from other running devices.
-      fs.writeSync(descriptor, 'Native bootstrap: simulator boot\n');
-      bootstrapStage = 'simulator-boot';
-      command('xcrun', ['simctl', 'boot', env.IOS_SIMULATOR_UDID], 15000);
-      smokeBooted = true;
-      // A fresh iOS 26 runtime can still be migrating location data after three minutes.
+      fs.writeSync(descriptor, 'Native bootstrap: simulator boot and readiness\n');
+      smokeBootAttempted = true;
+      // -b initiates boot if needed and waits for migration, not just Booted state.
       bootstrapStage = 'simulator-ready';
-      command('xcrun', ['simctl', 'bootstatus', env.IOS_SIMULATOR_UDID, '-b'], 300000);
+      command('xcrun', ['simctl', 'bootstatus', env.IOS_SIMULATOR_UDID, '-b'], 600000);
       fs.writeSync(descriptor, 'Native bootstrap: app install\n');
       bootstrapStage = 'app-install';
       command('xcrun', ['simctl', 'install', env.IOS_SIMULATOR_UDID, path.resolve(APP)], 60000);
@@ -187,7 +185,7 @@ function executeNative(mode, env = process.env) {
   } finally {
     if (descriptor !== undefined) fs.closeSync(descriptor);
     if (mode === 'smoke') {
-      if (smokeBooted) {
+      if (smokeBootAttempted) {
         if (env.PAAD_NATIVE_SMOKE_DIAGNOSTICS === 'true') {
           try {
             const runtime = spawnSync('xcrun', [

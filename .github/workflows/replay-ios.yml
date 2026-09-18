@@ -112,7 +112,7 @@ jobs:
           bundler-cache: true
       - name: Replay native synthetic inputs without Connect or credentials
         if: inputs.ios_driver == 'xcuitest'
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: node scripts/ci/replay-native-ios.js
       - name: Remove only this replay's native simulator after external interruption
         if: always() && inputs.ios_driver == 'xcuitest' && env.IOS_SIMULATOR_UDID != '' && env.PAAD_NATIVE_REPLAY_SIMULATOR_DELETED != '1'

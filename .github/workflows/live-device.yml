@@ -218,7 +218,7 @@ jobs:
         run: bash scripts/ci/build-ios-uitests.sh
       - name: Exercise native synthetic inputs without Connect or device credentials
         if: inputs.ios_driver == 'xcuitest'
-        timeout-minutes: 15
+        timeout-minutes: 25
         env:
           PAAD_NATIVE_SMOKE_DIAGNOSTICS: ${{ inputs.ios_smoke_only }}
         run: node scripts/ci/run-ios-xcuitest.js smoke
