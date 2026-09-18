@@ -82,6 +82,8 @@ private enum Target: String, CaseIterable {
   case connectionDetailsClose = "connection-details-close"
   case connectionStatusCapsule = "connection-status-capsule"
   case appBusyOverlay = "app-busy-overlay"
+  case appSettings = "app-settings"
+  case navigationContent = "navigation-content"
   case assignedDeviceId = "assigned-device-id"
   case assignedHub = "assigned-hub"
   case modelId = "model-id"
@@ -317,6 +319,7 @@ final class PaadLiveUITests: XCTestCase {
   private var nativeOperation: NativeOperation?
   private var detailsTapDiagnostics: [[String: Any]] = []
   private var detailsReadiness: [String: Any]?
+  private var detailsControlComparisons: [[String: String]] = []
   private var permissionAttempts = 0
   private var permissionDismissals = 0
   private var permissionDismissed = false
@@ -653,6 +656,9 @@ final class PaadLiveUITests: XCTestCase {
   private func waitForDetailsTarget(
     _ target: Target, phase: InteractionPhase, failure: Failure
   ) throws -> XCUIElement {
+    if target == .connectionDetails {
+      detailsControlComparisons = []
+    }
     // Details is a fixed header, not scroll content. Give navigation, the busy
     // overlay and asynchronous sensor permission dialogs time to settle.
     // SummaryAction declares an accessible button. A type-erased first match
@@ -666,6 +672,9 @@ final class PaadLiveUITests: XCTestCase {
     nativeOperation = .stateCheck
     updateInteraction(target, field: field, phase: phase)
     emit(outcome: .inProgress)
+    if target == .connectionDetails {
+      compareDetailsControls(.initial)
+    }
     nativeOperation = .resolution
     diagnoseResolution(target, field: field, query: query, capture: .initial)
     while ProcessInfo.processInfo.systemUptime < deadline {
@@ -677,6 +686,9 @@ final class PaadLiveUITests: XCTestCase {
       let unique = query.count == 1
       nativeOperation = .stateCheck
       if updateInteraction(target, field: field, phase: phase) && unique {
+        if target == .connectionDetails {
+          compareDetailsControls(.ready)
+        }
         nativeOperation = .resolution
         diagnoseResolution(target, field: field, query: query, capture: .ready)
         pendingCategory = nil
@@ -689,6 +701,9 @@ final class PaadLiveUITests: XCTestCase {
       if remaining > 0 {
         Thread.sleep(forTimeInterval: min(Timeout.interactionPoll, remaining))
       }
+    }
+    if target == .connectionDetails {
+      compareDetailsControls(.timedOut)
     }
     nativeOperation = .resolution
     diagnoseResolution(target, field: field, query: query, capture: .timedOut)
@@ -1097,6 +1112,34 @@ final class PaadLiveUITests: XCTestCase {
     return field.isHittable ? .hittable : .notHittable
   }
 
+  private func compareDetailsControls(_ capture: ResolutionCapture) {
+    detailsControlComparisons.append([
+      "capture": capture.rawValue,
+      "details": InteractionElement.unavailable.rawValue,
+      "settings": InteractionElement.unavailable.rawValue,
+      "telemetry": InteractionElement.unavailable.rawValue,
+      "navigation": InteractionElement.unavailable.rawValue,
+    ])
+    let index = detailsControlComparisons.count - 1
+    // The fixed tab label locates an optional comparator, not a flow assertion.
+    // Header Settings sits outside the stack screen; Telemetry sits inside it.
+    let queries: [(String, XCUIElementQuery)] = [
+      ("details", app.buttons.matching(identifier: Target.connectionDetails.rawValue)),
+      ("settings", app.buttons.matching(identifier: Target.appSettings.rawValue)),
+      ("telemetry", app.buttons.matching(
+        NSPredicate(format: "label == %@", "Telemetry, tab, 1 of 5"))),
+      ("navigation", app.otherElements.matching(identifier: Target.navigationContent.rawValue)),
+    ]
+    for (name, query) in queries {
+      nativeOperation = .matchCount
+      let count = query.count
+      nativeOperation = .stateCheck
+      let state: InteractionElement = count == 0 ? .missing
+        : count == 1 ? interactionState(query.element) : .unavailable
+      detailsControlComparisons[index][name] = state.rawValue
+    }
+  }
+
   private func retainDetailsReadiness(_ field: XCUIElement, capsule: XCUIElement) {
     guard let resolutionDiagnostics = resolutionDiagnostics else { return }
     var containment = CapsuleContainment.unavailable
@@ -1369,6 +1412,9 @@ final class PaadLiveUITests: XCTestCase {
     }
     if !detailsTapDiagnostics.isEmpty {
       record["detailsTapDiagnostics"] = detailsTapDiagnostics
+    }
+    if !detailsControlComparisons.isEmpty {
+      record["detailsControlComparisons"] = detailsControlComparisons
     }
     if !inputDiagnostics.isEmpty {
       record["inputDiagnostics"] = inputDiagnostics

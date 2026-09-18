@@ -17,7 +17,7 @@ const {
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
   RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
   DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES, DETAILS_PRESENTATIONS,
-  CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES,
+  CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES, CONTROL_COMPARATORS,
 } = require('../scripts/ci/ios-xcuitest-result');
 const {sanitizeDiagnostics} = require('../scripts/ci/live-diagnostics');
 const {validateEnvironment} = require('../scripts/ci/run-ios-xcuitest');
@@ -98,6 +98,10 @@ const tapDiagnostic = (attempt = 'initial') => ({
   postTapState: 'not-hittable',
   laterTargetState: 'not-hittable',
   readiness: readinessDiagnostic(),
+});
+const controlComparison = (capture = 'initial') => ({
+  capture, details: 'not-hittable', settings: 'hittable',
+  telemetry: 'not-hittable', navigation: 'not-hittable',
 });
 const resolutionDiagnostic = () => ({
   capture: 'initial',
@@ -552,6 +556,50 @@ test('accepts prior tap reports without the optional readiness and later-state e
   expect(sanitizeNativeResult(result)).toEqual(result);
 });
 
+test.each(['ready', 'timed-out'])('retains initial and %s control comparisons without exporting text', capture => {
+  const detailsControlComparisons = [controlComparison(), controlComparison(capture)];
+  const result = {...nativeResult(), detailsControlComparisons};
+  const dirty = {...result, detailsControlComparisons: detailsControlComparisons.map(entry => ({
+    ...entry, label: 'RAW_CANARY', value: 'RAW_CANARY', frame: {x: 123},
+    arbitraryControl: 'RAW_CANARY',
+  }))};
+  expect(parseNativeLog(`${PREFIX}${JSON.stringify(dirty)}`, 'live')).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: dirty}).nativeUi).toEqual(result);
+});
+
+test.each([
+  null, [], {}, [null], [controlComparison('ready')],
+  Array(3).fill(controlComparison()), [controlComparison(), controlComparison()],
+  [controlComparison(), controlComparison('RAW_CANARY')],
+  ...CONTROL_COMPARATORS.flatMap(key => [
+    [{...controlComparison(), [key]: undefined}],
+    [{...controlComparison(), [key]: 'RAW_CANARY'}],
+    [{...controlComparison(), [key]: true}],
+    [{...controlComparison(), [key]: {label: 'RAW_CANARY'}}],
+  ]),
+])('rejects unbounded, unordered or arbitrary control comparisons (%#)', detailsControlComparisons => {
+  expect(sanitizeNativeResult({...nativeResult(), detailsControlComparisons})).toBeUndefined();
+});
+
+test.each(INTERACTION_ELEMENTS)('preserves fixed comparator state %s, including interrupted reads', state => {
+  const detailsControlComparisons = [{
+    capture: 'initial', ...Object.fromEntries(CONTROL_COMPARATORS.map(key => [key, state])),
+  }];
+  const result = {...nativeResult(), detailsControlComparisons};
+  expect(sanitizeNativeResult(result)).toEqual(result);
+});
+
+test('a control comparison cannot upgrade a failed actual flow', () => {
+  const result = {
+    ...nativeResult(), outcome: 'failed', stage: 'connecting', failureCategory: 'not-hittable',
+    nonceSubmitted: false, coldRestored: false,
+    detailsControlComparisons: [controlComparison(), controlComparison('timed-out')],
+  };
+  expect(sanitizeNativeResult(result)).toEqual(result);
+  expect(nativeFlowPassed(result, 'live')).toBe(false);
+  expect(sanitizeNativeResult(nativeResult())).toEqual(nativeResult());
+});
+
 test.each(RESOLUTION_CHECKPOINTS)('preserves interrupted resolution at %s through the final summary', checkpoint => {
   const unavailable = {type: 'unavailable', state: 'unavailable', frame: 'unavailable'};
   const resolution = {
@@ -601,6 +649,7 @@ test('combined bounded diagnostics still fit the existing record limit', () => {
   const result = {
     ...nativeResult('smoke'), observedTargets: TARGETS,
     detailsTapDiagnostics: DETAILS_TAP_ATTEMPTS.map(tapDiagnostic),
+    detailsControlComparisons: [controlComparison(), controlComparison('timed-out')],
     inputDiagnostics: INPUT_PHASES.map(phase => inputDiagnostic(phase)),
     interactionDiagnostics: {...interactionDiagnostic(), resolution: {
       ...resolutionDiagnostic(), candidates: Array(MAX_RESOLUTION_CANDIDATES).fill(geometryDiagnostic()),
@@ -1082,6 +1131,29 @@ test('presentation classification reads only the fixed Details button and never 
   expect(state).toContain('case "expanded": return .shown');
   expect(state).toContain('default: return .unknown');
   expect(state).not.toMatch(/print\(|emit\(|standardOutput|record\[|detailsTapDiagnostics|\.tap\(/);
+});
+
+test('control comparisons are bounded read-only observations, not readiness or navigation fallbacks', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const comparison = swift.split('private func compareDetailsControls(')[1]
+    .split('private func retainDetailsReadiness(')[0];
+  const wait = swift.split('private func waitForDetailsTarget(')[1]
+    .split('private func requireIdentity(')[0];
+  for (const capture of ['initial', 'ready', 'timedOut']) {
+    expect(wait).toContain(`if target == .connectionDetails {\n      ${capture === 'ready' ? '    ' : ''}compareDetailsControls(.${capture})`);
+  }
+  expect(wait).toContain('if target == .connectionDetails {\n      detailsControlComparisons = []');
+  expect(wait.indexOf('detailsControlComparisons = []')).toBeLessThan(wait.indexOf('updateInteraction('));
+  expect(comparison).toContain('count == 1 ? interactionState(query.element) : .unavailable');
+  expect(comparison).toContain('Target.appSettings.rawValue');
+  expect(comparison).toContain('Target.navigationContent.rawValue');
+  expect(comparison).toContain('"Telemetry, tab, 1 of 5"');
+  for (const key of CONTROL_COMPARATORS) {
+    expect(comparison).toContain(`"${key}"`);
+  }
+  expect(comparison).not.toMatch(/\.label\b|\.value\b|debugDescription|screenshot|coordinate|\.tap\(|swipe|activate\(|emit\(|waitFor/);
+  expect(swift.split('private func emit(outcome:')[1])
+    .toContain('record["detailsControlComparisons"] = detailsControlComparisons');
 });
 
 test('resolution evidence survives polling and query aborts without text or coordinate taps', () => {

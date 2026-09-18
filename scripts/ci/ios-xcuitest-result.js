@@ -25,7 +25,7 @@ const TARGETS = Object.freeze([
   'connection-submit', 'connection-status', 'connection-details', 'connection-details-sheet',
   'connection-details-close', 'assigned-device-id', 'assigned-hub', 'model-id',
   'registration-id', 'registry-status', 'proof-nonce', 'proof-send', 'proof-status',
-  'app-busy-overlay', 'navigation-content', 'connection-error', 'connection-status-capsule',
+  'app-busy-overlay', 'navigation-content', 'connection-error', 'connection-status-capsule', 'app-settings',
 ]);
 const INPUT_TARGETS = Object.freeze([
   'connection-registrationId', 'connection-scopeId', 'connection-provisioningHost',
@@ -73,6 +73,18 @@ const ELEMENT_PRESENCES = Object.freeze(['unavailable', 'missing', 'present']);
 const DETAILS_PRESENTATIONS = Object.freeze(['unavailable', 'closed', 'opening', 'shown', 'unknown']);
 const CAPSULE_CONTAINMENTS = Object.freeze(['unavailable', 'invalid', 'empty', 'outside', 'partial', 'inside']);
 const TOUCH_TARGET_SIZES = Object.freeze(['unavailable', 'below-minimum', 'meets-minimum']);
+const CONTROL_COMPARATORS = Object.freeze(['details', 'settings', 'telemetry', 'navigation']);
+
+function sanitizeControlComparisons(value) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 2 ||
+      value.some((entry, index) => !entry || typeof entry !== 'object' || Array.isArray(entry) ||
+        (index === 0 ? entry.capture !== 'initial' : !['ready', 'timed-out'].includes(entry.capture)) ||
+        CONTROL_COMPARATORS.some(key => !INTERACTION_ELEMENTS.includes(entry[key])))) return undefined;
+  return value.map(entry => ({
+    capture: entry.capture,
+    ...Object.fromEntries(CONTROL_COMPARATORS.map(key => [key, entry[key]])),
+  }));
+}
 
 function sanitizeDetailsReadiness(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
@@ -192,6 +204,9 @@ function sanitizeNativeResult(value) {
   const detailsTapDiagnostics = value.detailsTapDiagnostics === undefined ? undefined
     : sanitizeDetailsTaps(value.detailsTapDiagnostics);
   if (value.detailsTapDiagnostics !== undefined && !detailsTapDiagnostics) return undefined;
+  const detailsControlComparisons = value.detailsControlComparisons === undefined ? undefined
+    : sanitizeControlComparisons(value.detailsControlComparisons);
+  if (value.detailsControlComparisons !== undefined && !detailsControlComparisons) return undefined;
   return {
     schemaVersion: 1, runner: 'xcuitest', mode: value.mode, outcome: value.outcome,
     stage: value.stage, applicationState: value.applicationState,
@@ -204,6 +219,7 @@ function sanitizeNativeResult(value) {
     ...(inputDiagnostics ? {inputDiagnostics} : {}),
     ...(interactionDiagnostics ? {interactionDiagnostics} : {}),
     ...(detailsTapDiagnostics ? {detailsTapDiagnostics} : {}),
+    ...(detailsControlComparisons ? {detailsControlComparisons} : {}),
   };
 }
 
@@ -239,6 +255,6 @@ module.exports = {
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
   RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
   DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES, DETAILS_PRESENTATIONS,
-  CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES,
+  CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES, CONTROL_COMPARATORS,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };

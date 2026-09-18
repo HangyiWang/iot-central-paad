@@ -213,8 +213,34 @@ again after collecting readiness diagnostics. It does not use nested XCTest
 predicate polling for this readiness check. An in-frame but non-hittable target
 no longer triggers a speculative first tap. This strengthens the precondition
 without changing app behavior, introducing a second ordinary tap, or relaxing
-the sheet/identity/nonce/cold-restoration requirements. Its live outcome remains
-to be established.
+the sheet/identity/nonce/cold-restoration requirements. It is not itself a fix
+for the underlying interaction.
+
+Run `35350111973` compiled `c38d25d` and passed the credential-free native flow,
+but did not attempt live connection. The operator controller had removed its
+repository input immediately after the workflow was queued; the dependent iOS
+job subsequently reported `Dedicated device input secret is unavailable.`
+There is no live UI result or new cloud proof from that run. Both temporary
+input slots were confirmed empty. Queue-time removal is therefore not used for
+this workflow: the controller again retains timestamp-owned inputs until the
+exact run completes, then removes and confirms their absence. The retained
+retry below used the same app/harness source and completion-based cleanup.
+
+The retained retry `35355041556` on the same `c38d25d` source passed preflight
+and connected. Its Details readiness window ended with one in-frame but
+non-hittable button, so no Details tap was attempted. No visible app/system
+alert, keyboard or connection busy overlay explained that state; nonce and
+connected cold restoration remain unproven. The owned repository input was
+removed at 14:55:31 UTC after completion, and both slots were confirmed empty.
+
+The next native-only observation compares the unique Details button, Settings
+header button, Telemetry tab and navigation container at the beginning and end
+of that existing readiness window. It retains only fixed state categories
+(including unavailable for ambiguous matches); no text, coordinates or extra
+gestures are exported or introduced. Settings is outside the stack screen
+subtree and Telemetry is inside it, which can help localize the affected region.
+Static-text or container hittability alone does not prove a real touch failure;
+the actual cause is not established and app behavior is not changed on a guess.
 
 ### Connection capsule delivery (2026-09-17)
 
