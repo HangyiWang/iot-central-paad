@@ -136,6 +136,7 @@ private enum InteractionPhase: String {
 }
 
 private enum InteractionElement: String {
+  case unavailable
   case missing
   case disabled
   case notHittable = "not-hittable"
@@ -159,6 +160,7 @@ private enum MatchCount: String {
 }
 
 private enum NativeElementType: String {
+  case unavailable
   case missing
   case button
   case staticText = "static-text"
@@ -172,6 +174,23 @@ private enum FrameVisibility: String {
   case outsideApp = "outside-app"
   case partlyInsideApp = "partly-inside-app"
   case insideApp = "inside-app"
+}
+
+private enum NativeIssue: String {
+  case harnessFailure = "harness-failure"
+  case snapshot
+  case multipleMatches = "multiple-matches"
+  case noMatches = "no-matches"
+  case notHittable = "not-hittable"
+  case timeout
+  case connectionLost = "connection-lost"
+  case other
+}
+
+private enum ResolutionCapture: String {
+  case initial
+  case ready
+  case timedOut = "timed-out"
 }
 
 // MARK: - Test case configuration
@@ -245,6 +264,9 @@ final class PaadLiveUITests: XCTestCase {
   private var inputDiagnostics: [[String: Any]] = []
   /// Cached public UI state only; record/teardown never query a failed interaction.
   private var interactionDiagnostics: [String: Any]?
+  private var resolutionDiagnostics: [String: Any]?
+  private var resolutionTarget: Target?
+  private var nativeIssue: NativeIssue?
   private var permissionAttempts = 0
   private var permissionDismissed = false
 
@@ -272,6 +294,9 @@ final class PaadLiveUITests: XCTestCase {
 
   override func record(_ issue: XCTIssue) {
     recordedFailure = true
+    if nativeIssue == nil {
+      nativeIssue = classifyIssue(issue)
+    }
     if failureCategory == nil {
       if let failure = issue.associatedError as? Failure {
         failureCategory = failure
@@ -498,6 +523,7 @@ final class PaadLiveUITests: XCTestCase {
     pendingCategory = failure
     updateInteraction(target, field: field, phase: phase)
     emit(outcome: .inProgress)
+    diagnoseResolution(target, field: field, query: query, capture: .initial)
     let predicate = NSPredicate { [self] _, _ in
       let unique = query.count == 1
       return updateInteraction(target, field: field, phase: phase) && unique
@@ -514,15 +540,15 @@ final class PaadLiveUITests: XCTestCase {
       if XCTWaiter().wait(
         for: [expectation], timeout: min(Timeout.interactionPoll, remaining)
       ) == .completed {
-        diagnoseResolution(target, field: field, query: query)
+        diagnoseResolution(target, field: field, query: query, capture: .ready)
         pendingCategory = nil
         observe(target)
         // Unlike firstMatch, element also fails if ambiguity appears at tap time.
         return query.element
       }
     }
+    diagnoseResolution(target, field: field, query: query, capture: .timedOut)
     let ambiguous = query.count > 1
-    diagnoseResolution(target, field: field, query: query)
     if ambiguous {
       throw Failure.ambiguousElement
     }
@@ -844,6 +870,32 @@ final class PaadLiveUITests: XCTestCase {
 
   // MARK: Diagnostics
 
+  private func classifyIssue(_ issue: XCTIssue) -> NativeIssue {
+    if issue.associatedError is Failure {
+      return .harnessFailure
+    }
+    let description = issue.compactDescription.lowercased()
+    if description.contains("matching snapshot") || description.contains("snapshot request") {
+      return .snapshot
+    }
+    if description.contains("multiple matching elements") {
+      return .multipleMatches
+    }
+    if description.contains("no matches found") {
+      return .noMatches
+    }
+    if description.contains("not hittable") || description.contains("hittable point") {
+      return .notHittable
+    }
+    if description.contains("timed out") || description.contains("timeout") {
+      return .timeout
+    }
+    if description.contains("lost connection") || description.contains("connection was interrupted") {
+      return .connectionLost
+    }
+    return .other
+  }
+
   private func matchCount(_ count: Int) -> MatchCount {
     switch count {
     case 0: return .zero
@@ -895,36 +947,65 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   private func diagnoseResolution(
-    _ target: Target, field: XCUIElement, query: XCUIElementQuery
+    _ target: Target, field: XCUIElement, query: XCUIElementQuery, capture: ResolutionCapture
   ) {
-    // Terminal readiness evidence only, not an accessibility-tree dump. Frames
-    // are reduced to categories and are never used to synthesize a tap.
+    // Cache each completed read separately from polling, including the checkpoint
+    // an XCTest query aborts at. No raw frames or accessibility tree leave here.
+    let unavailable = ["type": NativeElementType.unavailable.rawValue,
+      "state": InteractionElement.unavailable.rawValue,
+      "frame": FrameVisibility.unavailable.rawValue]
+    resolutionTarget = target
+    resolutionDiagnostics = [
+      "capture": capture.rawValue,
+      "checkpoint": "viewport",
+      "queryType": target == .connectionDetails ? "button" : "any",
+      "queryMatches": MatchCount.unavailable.rawValue,
+      "identifierMatches": MatchCount.unavailable.rawValue,
+      "buttonMatches": MatchCount.unavailable.rawValue,
+      "capsuleMatches": MatchCount.unavailable.rawValue,
+      "capsuleButtonMatches": MatchCount.unavailable.rawValue,
+      "selected": unavailable,
+      "untypedFirst": unavailable,
+      "candidates": [[String: String]](),
+      "capsule": unavailable,
+      "status": unavailable,
+    ]
+    emit(outcome: .inProgress)
     let viewport = app.frame
+    resolutionDiagnostics?["checkpoint"] = "query-count"
+    resolutionDiagnostics?["queryMatches"] = matchCount(query.count).rawValue
     let matches = app.descendants(matching: .any).matching(identifier: target.rawValue)
+    resolutionDiagnostics?["checkpoint"] = "identifier-count"
     let count = matches.count
+    resolutionDiagnostics?["identifierMatches"] = matchCount(count).rawValue
+    resolutionDiagnostics?["checkpoint"] = "button-count"
+    resolutionDiagnostics?["buttonMatches"] =
+      matchCount(app.buttons.matching(identifier: target.rawValue).count).rawValue
     let capsuleQuery = app.descendants(matching: .any)
       .matching(identifier: Target.connectionStatusCapsule.rawValue)
+    resolutionDiagnostics?["checkpoint"] = "capsule-count"
     let capsuleCount = capsuleQuery.count
+    resolutionDiagnostics?["capsuleMatches"] = matchCount(capsuleCount).rawValue
     let capsule = capsuleQuery.firstMatch
+    resolutionDiagnostics?["checkpoint"] = "selected-geometry"
+    resolutionDiagnostics?["selected"] = elementGeometry(field, viewport: viewport)
+    resolutionDiagnostics?["checkpoint"] = "untyped-geometry"
+    resolutionDiagnostics?["untypedFirst"] = elementGeometry(matches.firstMatch, viewport: viewport)
+    resolutionDiagnostics?["checkpoint"] = "candidate-geometry"
     var candidates: [[String: String]] = []
     for index in 0..<min(count, Diagnostic.maximumCandidates) {
       candidates.append(elementGeometry(matches.element(boundBy: index), viewport: viewport))
+      resolutionDiagnostics?["candidates"] = candidates
     }
+    resolutionDiagnostics?["checkpoint"] = "capsule-button-count"
     let scopedButtons: MatchCount = capsuleCount == 1
       ? matchCount(capsule.buttons.matching(identifier: target.rawValue).count) : .unavailable
-    interactionDiagnostics?["resolution"] = [
-      "queryType": target == .connectionDetails ? "button" : "any",
-      "queryMatches": matchCount(query.count).rawValue,
-      "identifierMatches": matchCount(count).rawValue,
-      "buttonMatches": matchCount(app.buttons.matching(identifier: target.rawValue).count).rawValue,
-      "capsuleMatches": matchCount(capsuleCount).rawValue,
-      "capsuleButtonMatches": scopedButtons.rawValue,
-      "selected": elementGeometry(field, viewport: viewport),
-      "untypedFirst": elementGeometry(matches.firstMatch, viewport: viewport),
-      "candidates": candidates,
-      "capsule": elementGeometry(capsule, viewport: viewport),
-      "status": elementGeometry(element(.connectionStatus), viewport: viewport),
-    ]
+    resolutionDiagnostics?["capsuleButtonMatches"] = scopedButtons.rawValue
+    resolutionDiagnostics?["checkpoint"] = "capsule-geometry"
+    resolutionDiagnostics?["capsule"] = elementGeometry(capsule, viewport: viewport)
+    resolutionDiagnostics?["checkpoint"] = "status-geometry"
+    resolutionDiagnostics?["status"] = elementGeometry(element(.connectionStatus), viewport: viewport)
+    resolutionDiagnostics?["checkpoint"] = "complete"
     emit(outcome: .inProgress)
   }
 
@@ -1093,11 +1174,18 @@ final class PaadLiveUITests: XCTestCase {
     if let category = failureCategory {
       record["failureCategory"] = category.rawValue
     }
+    if let nativeIssue = nativeIssue {
+      record["nativeIssue"] = nativeIssue.rawValue
+    }
     if !inputDiagnostics.isEmpty {
       record["inputDiagnostics"] = inputDiagnostics
     }
-    if let interactionDiagnostics = interactionDiagnostics {
-      record["interactionDiagnostics"] = interactionDiagnostics
+    if var interaction = interactionDiagnostics {
+      if resolutionTarget?.rawValue == (interaction["target"] as? String),
+        let resolutionDiagnostics = resolutionDiagnostics {
+        interaction["resolution"] = resolutionDiagnostics
+      }
+      record["interactionDiagnostics"] = interaction
     }
     guard
       let data = try? JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]),

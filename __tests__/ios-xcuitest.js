@@ -15,6 +15,7 @@ const {
   INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
   INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
+  RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES,
 } = require('../scripts/ci/ios-xcuitest-result');
 const {sanitizeDiagnostics} = require('../scripts/ci/live-diagnostics');
 const {validateEnvironment} = require('../scripts/ci/run-ios-xcuitest');
@@ -85,6 +86,8 @@ const geometryDiagnostic = () => ({
   type: 'button', state: 'not-hittable', frame: 'inside-app',
 });
 const resolutionDiagnostic = () => ({
+  capture: 'initial',
+  checkpoint: 'complete',
   queryType: 'button',
   queryMatches: 'one',
   identifierMatches: 'two',
@@ -403,6 +406,8 @@ test.each([
   [],
   {},
   {...resolutionDiagnostic(), queryType: 'RAW_CANARY'},
+  {...resolutionDiagnostic(), capture: 'RAW_CANARY'},
+  {...resolutionDiagnostic(), checkpoint: 'RAW_CANARY'},
   ...RESOLUTION_COUNTS.flatMap(key => [
     {...resolutionDiagnostic(), [key]: 'RAW_CANARY'},
     {...resolutionDiagnostic(), [key]: 1},
@@ -420,6 +425,41 @@ test.each([
   expect(sanitizeNativeResult({
     ...nativeResult(), interactionDiagnostics: {...interactionDiagnostic(), resolution},
   })).toBeUndefined();
+});
+
+test.each(NATIVE_ISSUES)('a recorded native %s issue cannot become a success', nativeIssue => {
+  for (const mode of ['smoke', 'live']) {
+    const result = {...nativeResult(mode), nativeIssue};
+    expect(sanitizeNativeResult(result)).toEqual(result);
+    expect(nativeFlowPassed(result, mode)).toBe(false);
+  }
+});
+
+test.each(['RAW_CANARY', {description: 'RAW_CANARY'}, null])(
+  'native issue classification rejects free-form data (%#)', nativeIssue => {
+    expect(sanitizeNativeResult({...nativeResult(), nativeIssue})).toBeUndefined();
+  },
+);
+
+test.each(RESOLUTION_CHECKPOINTS)('preserves interrupted resolution at %s through the final summary', checkpoint => {
+  const unavailable = {type: 'unavailable', state: 'unavailable', frame: 'unavailable'};
+  const resolution = {
+    ...resolutionDiagnostic(),
+    checkpoint,
+    ...Object.fromEntries(RESOLUTION_COUNTS.map(key => [key, 'unavailable'])),
+    selected: unavailable, untypedFirst: unavailable,
+    capsule: unavailable, status: unavailable, candidates: [],
+  };
+  const result = {
+    ...nativeResult(), outcome: 'failed', stage: 'connecting',
+    applicationState: 'running-foreground', failureCategory: 'not-hittable',
+    nativeIssue: 'snapshot', nonceSubmitted: false, coldRestored: false,
+    interactionDiagnostics: {...interactionDiagnostic(), resolution},
+  };
+  const parsed = parseNativeLog(`${PREFIX}${JSON.stringify(result)}`, 'live');
+  expect(parsed).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: parsed}).nativeUi).toEqual(result);
+  expect(nativeFlowPassed(parsed, 'live')).toBe(false);
 });
 
 test.each(FRAME_VISIBILITIES)('native geometry accepts only the fixed frame category %s', frame => {
@@ -777,6 +817,8 @@ test('Swift diagnostics use only the parser vocabularies and stable public contr
   expect(values('MatchCount').sort()).toEqual([...MATCH_COUNTS].sort());
   expect(values('NativeElementType').sort()).toEqual([...NATIVE_ELEMENT_TYPES].sort());
   expect(values('FrameVisibility').sort()).toEqual([...FRAME_VISIBILITIES].sort());
+  expect(values('NativeIssue').sort()).toEqual([...NATIVE_ISSUES].sort());
+  expect(values('ResolutionCapture').sort()).toEqual([...RESOLUTION_CAPTURES].sort());
   for (const value of values('Failure')) expect(FAILURE_CATEGORIES).toContain(value);
   for (const value of values('Target')) expect(TARGETS).toContain(value);
   expect(swift).toContain('FileHandle.standardOutput.write(Data("PAAD_XCTEST_RESULT:');
@@ -825,12 +867,13 @@ test('Details waits for real header hittability and sheet appearance without swi
   expect(record).not.toMatch(/updateInteraction|app\.|permissionAlertState/);
 });
 
-test('resolution evidence is terminal-only, bounded, and never reads text or drives a coordinate tap', () => {
+test('resolution evidence survives polling and query aborts without text or coordinate taps', () => {
   const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
   const wait = swift.split('private func waitForDetailsTarget(')[1].split('private func requireIdentity(')[0];
   const predicate = wait.split('let predicate =')[1].split('while ProcessInfo')[0];
   expect(predicate).not.toContain('diagnoseResolution');
-  expect(wait.match(/diagnoseResolution\(/g)).toHaveLength(2);
+  expect(wait.match(/diagnoseResolution\(/g)).toHaveLength(3);
+  expect(wait.indexOf('capture: .initial')).toBeLessThan(wait.indexOf('let predicate'));
   const diagnosis = swift.split('private func diagnoseResolution(')[1].split('private func permissionAlertState(')[0];
   expect(diagnosis).toContain('0..<min(count, Diagnostic.maximumCandidates)');
   expect(diagnosis).toContain('matches.element(boundBy: index)');
@@ -839,6 +882,19 @@ test('resolution evidence is terminal-only, bounded, and never reads text or dri
   expect(diagnosis).toContain('capsuleCount == 1');
   expect(diagnosis).toContain('elementGeometry(element(.connectionStatus), viewport: viewport)');
   expect(diagnosis).not.toMatch(/\.label\b|\.value\b|debugDescription|screenshot|\.tap\(/);
+  expect(diagnosis.indexOf('resolutionDiagnostics =')).toBeLessThan(diagnosis.indexOf('let viewport = app.frame'));
+  expect(diagnosis).not.toContain('interactionDiagnostics?["resolution"]');
+  for (const checkpoint of RESOLUTION_CHECKPOINTS) {
+    expect(diagnosis).toContain(`"${checkpoint}"`);
+  }
+  const update = swift.split('private func updateInteraction(')[1].split('private func diagnoseInput(')[0];
+  expect(update).not.toContain('resolutionDiagnostics');
+  const emitter = swift.split('private func emit(outcome:')[1];
+  expect(emitter).toContain('interaction["resolution"] = resolutionDiagnostics');
+  expect(emitter).toContain('resolutionTarget?.rawValue == (interaction["target"] as? String)');
+  const classifier = swift.split('private func classifyIssue(')[1].split('private func matchCount(')[0];
+  expect(classifier).toContain('issue.compactDescription.lowercased()');
+  expect(classifier).not.toMatch(/print\(|standardOutput|emit\(/);
   const geometry = swift.split('private func frameVisibility(')[1].split('private func diagnoseResolution(')[0];
   expect(geometry).toContain('frame.origin.x.isFinite');
   expect(geometry).toContain('viewport.contains(frame)');

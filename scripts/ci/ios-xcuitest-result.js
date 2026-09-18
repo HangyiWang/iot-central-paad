@@ -41,13 +41,13 @@ const INTERACTION_TARGETS = Object.freeze(['connection-details', 'connection-det
 const INTERACTION_PHASES = Object.freeze([
   'waiting-for-hittability', 'dismissing-permission', 'tapping', 'waiting-for-sheet', 'sheet-visible',
 ]);
-const INTERACTION_ELEMENTS = Object.freeze(['missing', 'disabled', 'not-hittable', 'hittable']);
+const INTERACTION_ELEMENTS = Object.freeze(['unavailable', 'missing', 'disabled', 'not-hittable', 'hittable']);
 const PERMISSION_ALERTS = Object.freeze(['none', 'other', 'denial-present', 'denial-hittable']);
 const INTERACTION_FLAGS = Object.freeze([
   'busyOverlay', 'keyboardVisible', 'permissionDismissed', 'permissionLimitReached',
 ]);
 const MATCH_COUNTS = Object.freeze(['unavailable', 'zero', 'one', 'two', 'three', 'more-than-three']);
-const NATIVE_ELEMENT_TYPES = Object.freeze(['missing', 'button', 'static-text', 'other']);
+const NATIVE_ELEMENT_TYPES = Object.freeze(['unavailable', 'missing', 'button', 'static-text', 'other']);
 const FRAME_VISIBILITIES = Object.freeze([
   'unavailable', 'invalid', 'empty', 'outside-app', 'partly-inside-app', 'inside-app',
 ]);
@@ -55,6 +55,16 @@ const RESOLUTION_COUNTS = Object.freeze([
   'queryMatches', 'identifierMatches', 'buttonMatches', 'capsuleMatches', 'capsuleButtonMatches',
 ]);
 const MAX_RESOLUTION_CANDIDATES = 3;
+const RESOLUTION_CAPTURES = Object.freeze(['initial', 'ready', 'timed-out']);
+const RESOLUTION_CHECKPOINTS = Object.freeze([
+  'viewport', 'query-count', 'identifier-count', 'button-count', 'capsule-count',
+  'selected-geometry', 'untyped-geometry', 'candidate-geometry', 'capsule-button-count',
+  'capsule-geometry', 'status-geometry', 'complete',
+]);
+const NATIVE_ISSUES = Object.freeze([
+  'harness-failure', 'snapshot', 'multiple-matches', 'no-matches', 'not-hittable',
+  'timeout', 'connection-lost', 'other',
+]);
 
 function sanitizeInputDiagnostics(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > INPUT_PHASES.length ||
@@ -95,6 +105,8 @@ function sanitizeGeometry(value) {
 function sanitizeResolution(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
       !['button', 'any'].includes(value.queryType) ||
+      (value.capture !== undefined && !RESOLUTION_CAPTURES.includes(value.capture)) ||
+      (value.checkpoint !== undefined && !RESOLUTION_CHECKPOINTS.includes(value.checkpoint)) ||
       RESOLUTION_COUNTS.some(key => !MATCH_COUNTS.includes(value[key])) ||
       !Array.isArray(value.candidates) || value.candidates.length > MAX_RESOLUTION_CANDIDATES) return undefined;
   const selected = sanitizeGeometry(value.selected);
@@ -106,6 +118,8 @@ function sanitizeResolution(value) {
       candidates.some(candidate => !candidate)) return undefined;
   return {
     queryType: value.queryType,
+    ...(value.capture ? {capture: value.capture} : {}),
+    ...(value.checkpoint ? {checkpoint: value.checkpoint} : {}),
     ...Object.fromEntries(RESOLUTION_COUNTS.map(key => [key, value[key]])),
     selected, untypedFirst, candidates, capsule, status,
   };
@@ -121,6 +135,7 @@ function sanitizeNativeResult(value) {
       !Array.isArray(value.observedTargets) || value.observedTargets.length > TARGETS.length ||
       value.observedTargets.some(id => !TARGETS.includes(id)) ||
       (value.failureCategory !== undefined && !FAILURE_CATEGORIES.includes(value.failureCategory)) ||
+      (value.nativeIssue !== undefined && !NATIVE_ISSUES.includes(value.nativeIssue)) ||
       (value.execution !== undefined && !EXECUTIONS.includes(value.execution))) return undefined;
   const inputDiagnostics = value.inputDiagnostics === undefined ? undefined
     : sanitizeInputDiagnostics(value.inputDiagnostics);
@@ -132,6 +147,7 @@ function sanitizeNativeResult(value) {
     schemaVersion: 1, runner: 'xcuitest', mode: value.mode, outcome: value.outcome,
     stage: value.stage, applicationState: value.applicationState,
     ...(value.failureCategory ? {failureCategory: value.failureCategory} : {}),
+    ...(value.nativeIssue ? {nativeIssue: value.nativeIssue} : {}),
     observedTargets: [...new Set(value.observedTargets)].sort(),
     connected: value.connected, nonceSubmitted: value.nonceSubmitted, coldRestored: value.coldRestored,
     ...(value.execution ? {execution: value.execution} : {}),
@@ -161,7 +177,7 @@ function parseNativeLog(text, mode) {
 
 function nativeFlowPassed(result, mode) {
   return result?.mode === mode && result.outcome === 'passed' && result.stage === 'finished' &&
-    result.applicationState === 'not-running' && !result.failureCategory &&
+    result.applicationState === 'not-running' && !result.failureCategory && !result.nativeIssue &&
     ['connected', 'nonceSubmitted', 'coldRestored'].every(key => result[key] === (mode === 'live'));
 }
 
@@ -170,5 +186,6 @@ module.exports = {
   INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
   INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
+  RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };
