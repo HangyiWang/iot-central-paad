@@ -50,6 +50,12 @@ committed for subsequent deployment-mode builds on both branches.
 Podfile.lock SHA256:
 `f3f51f8763c8e690b0ff06c0dd0df6cfce0735e7e6c1f43aa56a0d59d9b20cd7`.
 
+Foundation run `35385478270` subsequently passed JavaScript and both native lanes
+on `070841a21c0d2cd2cc709eea31eab07f644c0ee3`. Its iOS artifact records
+`deployment` mode and that exact committed lock hash, confirming ordinary
+locked builds after the deliberate refresh. This is simulator startup and
+compatibility evidence, not physical-device or production-signing acceptance.
+
 The iOS harness presents only its explicitly owned simulator with the pinned
 Xcode Simulator app before Maestro requests XCTest screenshots. GUI launch is
 bounded to sixty seconds and rejects live device inputs. This addresses a

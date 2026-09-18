@@ -26,7 +26,7 @@ You can read more about all features with instructions [here](./docs/Features.md
 ### CI-first modernization
 
 The [modernization plan](docs/plans/MODERNIZATION.md) records the migration from
-the preserved RN 0.75 baseline to **Expo 57.0.23 / React Native 0.86.3 /
+the preserved RN 0.75 baseline to **Expo 57.0.24 / React Native 0.86.3 /
 React 19.2.3**, using the New Architecture and development builds, not Expo Go.
 Minimum operating systems are iOS 16.4 and Android 7/API 24. The current modern
 native build results, not the historical baseline run, determine compatibility.
