@@ -354,7 +354,7 @@ restart, without relaxing the readiness guard. This delivery did not submit a ne
 cloud nonce. APK SHA256:
 `c6dca3e0f8b69793a65d81505bd04da3c867ad456f6c7aff91cc7745ad6b4045`.
 The iOS lane of that run failed at the explicit Pod lock refresh, before an app
-build; its repair and pending lock review are recorded in the modernization plan.
+build; its repair and reviewed lock are recorded in the modernization plan.
 
 After approving that footer, the owner requested the same coherent treatment for
 connection and snapshot actions. The follow-up reuses its row component in
@@ -362,8 +362,18 @@ connection and snapshot actions. The follow-up reuses its row component in
 destructive actions and adding concise, local-only explanations. The accepted
 diagnostics footer, callbacks, IDs, disabled states and existing confirmation
 semantics are preserved; snapshot removal does not acquire a new confirmation.
-The snapshot editor's Import/Cancel controls remain compact. Native delivery of
-this follow-up is pending.
+The snapshot editor's Import/Cancel controls remain compact.
+
+This follow-up passed the Android lane in `35385882890`, source
+`e8d4d6644aa5eb88611982230d84fcadbde370c0`, and was installed in place on the
+retained Windows emulator. Native inspection confirmed aligned, readable rows,
+minimum touch targets and the expected action order. The Replace editor was
+opened and cancelled without importing or removing anything; Disconnect and
+Remove were not invoked. Saved identity/model, namespace, subscription, resource
+group, region and activity remained available without credential entry or snapshot
+reimport. Public-controls-only crops were inspected. This UI delivery does not
+claim a fresh Android cloud nonce. APK SHA256:
+`b666614a534c25a5f308ac8c6d21853ba19145b3818234915f9e2b31c64ebd12`.
 
 ### Connection capsule delivery (2026-09-17)
 
