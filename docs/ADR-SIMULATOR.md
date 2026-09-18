@@ -8,6 +8,9 @@ Implementation and acceptance are distinct: inspect the actual run result and
 independent operator report before treating a mobile-to-cloud case as proven.
 The foundation's credential-free native gate is recorded in
 [MODERNIZATION.md](plans/MODERNIZATION.md).
+The completed Android/iOS simulator cloud-proof and cold-restoration evidence is
+recorded in the [acceptance ledger](plans/ADR-NAMESPACE-INTEGRATION.md#completed-simulator-acceptance-2026-09-18).
+These results do not establish physical-phone or downstream telemetry acceptance.
 
 ## Prepare Azure once, then enroll each phone
 
@@ -104,6 +107,10 @@ assuming the public default.
 The phone model remains `dtmi:azureiot:PhoneAsADevice;2`. After connecting, compare
 the displayed assigned device and Hub with the actual DPS result. The assigned
 device ID is not assumed to equal the registration ID.
+
+If iOS presents **Save Password?**, choose **Not Now** before opening Details.
+PAAD manages device credentials in its own secure local storage; this system
+password-manager sheet is not an Azure sign-in or provisioning step.
 
 The device protocols use DPS `2019-03-31` and IoT Hub `2021-04-12` (MQTT and
 file-upload APIs), matching the respective device SDK contracts. These are

@@ -4,8 +4,9 @@ Date: 2026-09-18
 
 **Design proposal, not authorization to implement a new UI.** This develops
 [PRODUCT-BRAINSTORM.md](PRODUCT-BRAINSTORM.md) into a staged customer experience.
-It does not replace the current branch implementation, pending platform
-acceptance, or the already requested Azure section refinement.
+It does not replace the current branch implementation or authorize a broader
+redesign. The completed simulator acceptance and delivered Details refinements
+are recorded in the [implementation ledger](docs/plans/ADR-NAMESPACE-INTEGRATION.md#completed-simulator-acceptance-2026-09-18).
 
 Prepared through GPT-6 Astra's source-level analysis and an independent
 **Claude Opus 5 high** product/UX critique. The synthesis below deliberately
@@ -43,7 +44,7 @@ before reaching a familiar feature.
 
 Keep the accepted "Phone as a device" identity, phone mark, connection capsule,
 warm neutral surfaces, restrained teal, system body typography, compact
-Registration footer and recognizable outlined actions. Reuse the refined Azure
+Registration footer and grouped Details action rows. Reuse the refined Azure
 Scope/Resources groups. No new branding, font family, illustration pack or
 design-system replacement is needed.
 
@@ -237,8 +238,8 @@ an abstract new aesthetic.
 Later, the technical proof action may link to an experiment, but there should
 still be one implementation and one mounted set of its native controls. Do not
 duplicate `proof-send` or identity selectors in two simultaneously mounted views.
-The pending iOS presentation issue is not a reason to redesign away its
-acceptance requirement.
+The former iOS obstruction was resolved in the native workflow without replacing
+Details. New navigation must preserve that same acceptance requirement.
 
 ### Telemetry, properties and hardware tools
 
@@ -525,7 +526,7 @@ at a useful outcome without committing to all later phases.
 
 | Phase | Small deliverable | Gate before moving on |
 | --- | --- | --- |
-| **0. Preserve the working product** | Record current navigation, connection/storage behavior and exact platform evidence; finish current UI delivery and resolve pending iOS acceptance separately | Known baseline and no attempt to hide an existing failure with new navigation |
+| **0. Preserve the working product** | Record and preserve the accepted UI, navigation, connection/storage behavior and exact platform evidence before new design work | Known baseline and no attempt to hide a regression with new navigation |
 | **1. Improve orientation in place** | Small optional first-action guidance, existing source labels, clearer property direction and explicit sensor controls within current navigation | Existing tasks remain as reachable; defaults, message contracts and credentials unchanged |
 | **2. Add truthful observations** | Source timestamps and typed submission/receive facts; extract a single runtime owner in a separate small change before distributing its state | Every label has a typed source; unknown, simulated, stale and interrupted cases are covered; existing navigation still works |
 | **3. Reorganize only if useful** | Device / Explore / Activity shell; existing tools reused and completely mapped, with the original log viewer consuming the new facts | Customer tasks support the move; no duplicate listeners/network effects; native navigation and restoration work on both platforms |

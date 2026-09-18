@@ -1,7 +1,7 @@
 # PAAD ADR namespace integration plan
 
-Status: SAS-first application integrated; Android end-to-end and cold restore confirmed;
-iOS nonce/cold-restore acceptance remains pending.
+Status: SAS-first prototype implemented; Android and iOS simulator cloud-proof
+and connected cold-restoration gates completed.
 Date: 2026-09-18. Branch: `feature/adr-onboarding`.
 Parent: `modernize/paad-foundation`.
 
@@ -65,6 +65,41 @@ The operator-only `scripts/ci/verify-mobile-proof.js` reads DPS assignment,
 the Hub model/nonce and the actual ADR record using an existing Entra CLI session.
 It requests no keys and performs no cloud writes. See the
 [simulator guide](../ADR-SIMULATOR.md) for manual use and evidence boundaries.
+
+### Completed simulator acceptance (2026-09-18)
+
+The foundation's ordinary locked build/startup lanes passed on Android and iOS
+in `35385478270`, source `070841a21c0d2cd2cc709eea31eab07f644c0ee3`.
+The current Android action refinement was delivered from `35385882890`, source
+`e8d4d6644aa5eb88611982230d84fcadbde370c0`, preserving the retained connection
+and imported Azure context. Earlier app-submitted Android markers and genuine
+cold-restoration evidence are preserved below; this UI-only update is not a new
+Android marker submission.
+
+Strict iOS live run `35390910824`, source
+`7a0f664799436b97f87776b3dca99f39c50e9a66`, passed real credential entry and
+masking, Connected, Details, exact assignment/model, proof submission and genuine
+terminate/relaunch restoration of the same connected identity. Its native record
+confirms that the observed password-saving sheet was dismissed. The ordinary
+Details gesture began from a hittable target; no extra ordinary tap, coordinate
+fallback, injected application state or weakened preflight was used.
+
+At 20:51:21 UTC, the independent operator verifier matched the actual DPS
+assignment, Hub phone model and exact iOS nonce with the namespace's actual
+registry-device external ID. The run reuses the retained device and existing
+automatic record; it does not claim a new registry-record creation case.
+The owned temporary input was removed at 20:49:46 UTC and both dedicated slots
+were independently confirmed empty. No diagnostic capture was enabled in this
+successful run. Its pre-secret Simulator app archive SHA256 is:
+`2bde3c652cc0575b231c39d4a5d901ad99bf4b1040e424fcfe1f644c7b41646d`.
+
+This completes the current simulator prototype gate, not production or physical
+device acceptance. Independent downstream telemetry receipt, physical sensors,
+BLE/camera, secure hardware, background reliability, certificate onboarding and
+automatic authorized Azure context remain separate work. In-app registry status
+still correctly says **Not checked** without a separately authorized observer.
+The dated entries below retain the earlier failures and incomplete attempts;
+they do not supersede this completed acceptance record.
 
 ### Follow-up: automatic Azure details
 
@@ -545,7 +580,7 @@ one automatic ADR record, but failed the initial Connected assertion before
 nonce submission. Its allowlisted category was an assertion failure; a captured
 hierarchy contained none of the fixed target names. That does not identify the
 cause or establish a driver disconnect. Temporary inputs were removed, and the
-iOS nonce/cold-restoration gate remains open.
+iOS nonce/cold-restoration gate remained open at that point.
 
 An isolated Foundation API probe (`35240491338`) compared 15-second and
 180-second request timeouts on iOS Simulator with 30 seconds of loopback
@@ -569,8 +604,8 @@ Ordinary Maestro smoke remains in place. By default, credentialed runs export on
 fixed-category native milestones and the existing nonsecret proof summary.
 The explicitly approved, failure-only encrypted capture exception is described
 above; it never exports plaintext or entire result bundles. Raw Xcode test output,
-result bundles and device inputs are deleted. Implementation
-of this lane does not itself close the remaining iOS acceptance gate.
+result bundles and device inputs are deleted. Implementation of this lane alone
+did not close the gate; the later accepted run is recorded above.
 Set `ios_smoke_only=true` with `platform=ios` and `ios_driver=xcuitest` to
 exercise the new runner without ever requesting a device secret or sending
 device traffic. This credential-free-only mode additionally retains the final

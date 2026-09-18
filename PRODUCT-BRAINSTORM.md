@@ -304,11 +304,11 @@ The repository already provides sensor telemetry, property/command plumbing,
 charts, logs, image upload, narrow BLE support, provisioning, assigned identity,
 local proof submission and optional historical Azure context.[2]
 
-The recorded Android prototype evidence includes real assignment, a matching
-reported-property nonce/model and registry record, and genuine process-stop
-restoration. iOS end-to-end acceptance is still incomplete. Physical sensors,
-camera/BLE behavior, secure hardware and background reliability remain separate
-acceptance work.[3]
+The recorded Android and iOS simulator evidence includes real assignment,
+matching reported-property nonces/models and registry records, and genuine
+process-stop restoration. The current simulator prototype gate is complete;
+independent downstream telemetry receipt, physical sensors, camera/BLE behavior,
+secure hardware and background reliability remain separate acceptance work.[3]
 
 Guided closed-loop experiments, general contract validation, deliberate-failure
 scenarios, comprehensive run reports and automatic authorized cloud context are
