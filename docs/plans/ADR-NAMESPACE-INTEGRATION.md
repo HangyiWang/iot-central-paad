@@ -302,6 +302,24 @@ the diagnostic artifact, local plaintext and one-time key after inspection.
 Ordinary runs still retain fixed-category results only. This opt-in is diagnostic,
 not a relaxed mobile proof or authorization to implement the new customer design.
 
+The first opted-in run `35376592786` compiled `21dff58` but stopped during the
+credential-free cold-launch preflight (`launch-failed`, native timeout, app
+not running after termination). The live step and capture were not attempted;
+no ciphertext or plaintext diagnostic was produced. Its temporary input was
+removed at 18:12:42 UTC and both slots were confirmed empty. The capture approval
+remains for a guarded retry; no preflight assertion is weakened.
+
+### Details utility footer refinement (2026-09-18)
+
+At the owner's request, Opus 5 high refined only Share nonsecret diagnostics and
+Forget credentials. They are grouped in a card matching the sheet, with aligned
+leading glyphs, full-width text rows, a restrained sharing accent and a separate
+destructive treatment. Supporting text describes the redacted connection report
+and phone-only credential removal. Existing callbacks, share payload, confirmation,
+error handling and busy/disabled guards are unchanged. This is a narrow refinement,
+not implementation of the broader customer-experience proposal. Native delivery
+and in-place Windows Android inspection are pending.
+
 ### Connection capsule delivery (2026-09-17)
 
 The accepted capsule keeps status, a ringed cloud icon and a separated Details

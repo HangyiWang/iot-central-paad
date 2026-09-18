@@ -653,3 +653,87 @@ it('styles share failures and disabled forgetting without changing their actions
   });
   expect(cancel).toHaveBeenCalledWith({clear: true});
 });
+
+it.each([false, true])(
+  'groups the diagnostics and credential utilities as accented and destructive rows (dark %s)',
+  dark => {
+    hooks.useTheme.mockReturnValue({dark, colors: {card: '#fff'}});
+    jest.spyOn(require('react-native'), 'useWindowDimensions').mockReturnValue({
+      width: 390,
+      height: 844,
+      fontScale: 1,
+      scale: 3,
+    });
+    act(() => {
+      view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+    });
+    act(() => press('Connection details'));
+    const colors = palette(dark);
+    const summary = Strings.Connection.Summary;
+    const control = id => view.root.findAllByProps({testID: id})[0];
+    const style = node =>
+      StyleSheet.flatten(
+        typeof node.props.style === 'function'
+          ? node.props.style({pressed: false})
+          : node.props.style,
+      );
+    const textNode = content =>
+      view.root
+        .findAllByType('Text')
+        .find(node => node.props.children === content);
+    const group = textNode(summary.Utilities).parent;
+    expect(textNode(summary.Utilities).props.accessibilityRole).toBe('header');
+    expect(style(group)).toMatchObject({
+      borderRadius: 20,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      gap: 12,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    });
+    for (const id of ['connection-share', 'connection-forget']) {
+      expect(group.findAllByProps({testID: id})).not.toHaveLength(0);
+      expect(style(control(id))).toMatchObject({
+        minHeight: 48,
+        borderRadius: 14,
+        borderWidth: 1,
+        paddingHorizontal: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+      });
+      expect(control(id).props.accessibilityRole).toBe('button');
+    }
+    expect(style(control('connection-share'))).toMatchObject({
+      backgroundColor: colors.tints[0],
+      borderColor: colors.border,
+    });
+    expect(style(control('connection-forget'))).toMatchObject({
+      backgroundColor: colors.dangerSurface,
+      borderColor: colors.danger,
+    });
+    expect(control('connection-share').props.accessibilityLabel).toBe(
+      summary.Share,
+    );
+    expect(control('connection-share').props.accessibilityHint).toBe(
+      summary.ShareDetail,
+    );
+    expect(control('connection-forget').props.accessibilityLabel).toBe(
+      summary.Forget,
+    );
+    expect(control('connection-forget').props.accessibilityHint).toBe(
+      summary.ForgetDetail,
+    );
+    expect(summary.ShareDetail).toContain('redacted');
+    expect(summary.ForgetDetail).toContain('this phone only');
+    expect(summary.ForgetDetail).toContain('No Azure device');
+    expect(style(textNode(summary.Share)).color).toBe(colors.text);
+    expect(style(textNode(summary.Forget)).color).toBe(colors.danger);
+    for (const detail of [summary.ShareDetail, summary.ForgetDetail]) {
+      expect(style(textNode(detail))).toMatchObject({
+        fontSize: 13,
+        lineHeight: 19,
+        color: colors.muted,
+      });
+    }
+  },
+);

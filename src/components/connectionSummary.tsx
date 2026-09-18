@@ -4,6 +4,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
   AccessibilityState,
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
@@ -425,78 +426,98 @@ export default function ConnectionSummary({
               <AzureContextPanel
                 identity={simulated ? null : client?.identity ?? null}
               />
-              <DetailsAction
-                label={text.Share}
-                icon="share-variant"
-                onPress={async () => {
-                  setShareFailed(false);
-                  try {
-                    await Share.share({
-                      message: JSON.stringify(
-                        connectionDiagnostics(
-                          client?.identity ?? null,
-                          stage,
-                          connected,
-                          simulated,
-                          error,
-                        ),
-                        null,
-                        2,
-                      ),
-                    });
-                  } catch {
-                    if (mounted.current) {
-                      setShareFailed(true);
-                    }
-                  }
-                }}
-              />
-              {shareFailed && (
+              <View
+                style={[
+                  detailStyles.card,
+                  detailStyles.bordered,
+                  {
+                    backgroundColor: appearance.surface,
+                    borderColor: appearance.border,
+                  },
+                ]}>
                 <Text
-                  accessibilityLiveRegion="polite"
-                  style={[detailStyles.status, {color: appearance.danger}]}>
-                  {text.ShareFailed}
+                  accessibilityRole="header"
+                  style={[detailStyles.sectionTitle, {color: appearance.text}]}>
+                  {text.Utilities}
                 </Text>
-              )}
-              {credentials && (
-                <DetailsAction
-                  id="connection-forget"
-                  label={text.Forget}
-                  icon="delete-outline"
-                  variant="danger"
-                  disabled={forgetting || loading}
-                  busy={forgetting}
-                  onPress={() =>
-                    Alert.alert(text.ForgetTitle, text.ForgetMessage, [
-                      {text: Strings.Core.Cancel, style: 'cancel'},
-                      {
-                        text: text.Forget,
-                        style: 'destructive',
-                        onPress: async () => {
-                          if (forgettingRef.current || !mounted.current) {
-                            return;
-                          }
-                          forgettingRef.current = true;
-                          setForgetting(true);
-                          try {
-                            await cancel({clear: true});
-                            if (mounted.current) {
-                              closeDetails();
-                            }
-                          } catch {
-                            // The shared hook publishes a safe storage failure.
-                          } finally {
-                            forgettingRef.current = false;
-                            if (mounted.current) {
-                              setForgetting(false);
-                            }
-                          }
-                        },
-                      },
-                    ])
-                  }
+                <UtilityAction
+                  id="connection-share"
+                  label={text.Share}
+                  supporting={text.ShareDetail}
+                  icon="share-variant"
+                  stacked={stacked}
+                  onPress={async () => {
+                    setShareFailed(false);
+                    try {
+                      await Share.share({
+                        message: JSON.stringify(
+                          connectionDiagnostics(
+                            client?.identity ?? null,
+                            stage,
+                            connected,
+                            simulated,
+                            error,
+                          ),
+                          null,
+                          2,
+                        ),
+                      });
+                    } catch {
+                      if (mounted.current) {
+                        setShareFailed(true);
+                      }
+                    }
+                  }}
                 />
-              )}
+                {shareFailed && (
+                  <Text
+                    accessibilityLiveRegion="polite"
+                    style={[detailStyles.status, {color: appearance.danger}]}>
+                    {text.ShareFailed}
+                  </Text>
+                )}
+                {credentials && (
+                  <UtilityAction
+                    id="connection-forget"
+                    label={text.Forget}
+                    supporting={text.ForgetDetail}
+                    icon="delete-outline"
+                    destructive
+                    stacked={stacked}
+                    disabled={forgetting || loading}
+                    busy={forgetting}
+                    onPress={() =>
+                      Alert.alert(text.ForgetTitle, text.ForgetMessage, [
+                        {text: Strings.Core.Cancel, style: 'cancel'},
+                        {
+                          text: text.Forget,
+                          style: 'destructive',
+                          onPress: async () => {
+                            if (forgettingRef.current || !mounted.current) {
+                              return;
+                            }
+                            forgettingRef.current = true;
+                            setForgetting(true);
+                            try {
+                              await cancel({clear: true});
+                              if (mounted.current) {
+                                closeDetails();
+                              }
+                            } catch {
+                              // The shared hook publishes a safe storage failure.
+                            } finally {
+                              forgettingRef.current = false;
+                              if (mounted.current) {
+                                setForgetting(false);
+                              }
+                            }
+                          },
+                        },
+                      ])
+                    }
+                  />
+                )}
+              </View>
             </ScrollView>
           </KeyboardAvoidingView>
         </Modal>
@@ -559,6 +580,87 @@ function SummaryAction({
           )}
         </View>
       )}
+    </Pressable>
+  );
+}
+
+function UtilityAction({
+  id,
+  label,
+  supporting,
+  icon,
+  stacked,
+  destructive = false,
+  disabled = false,
+  busy = false,
+  onPress,
+}: {
+  id: string;
+  label: string;
+  supporting: string;
+  icon: string;
+  stacked: boolean;
+  destructive?: boolean;
+  disabled?: boolean;
+  busy?: boolean;
+  onPress(): void | Promise<void>;
+}) {
+  const {dark} = useTheme();
+  const appearance = palette(dark);
+  const inactive = disabled || busy;
+  const accent = destructive ? appearance.danger : appearance.primary;
+  return (
+    <Pressable
+      testID={id}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={supporting}
+      accessibilityState={{disabled: inactive, busy}}
+      disabled={inactive}
+      onPress={onPress}
+      style={({pressed}) => [
+        styles.utility,
+        stacked && styles.stackedUtility,
+        {
+          backgroundColor: destructive
+            ? appearance.dangerSurface
+            : appearance.tints[0],
+          borderColor: destructive ? appearance.danger : appearance.border,
+        },
+        pressed && !inactive && {backgroundColor: appearance.border},
+        inactive && detailStyles.disabled,
+      ]}>
+      <View
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          styles.utilityGlyph,
+          {backgroundColor: appearance.surface, borderColor: accent},
+        ]}>
+        {busy ? (
+          <ActivityIndicator size="small" color={accent} />
+        ) : (
+          <Icon
+            name={icon}
+            type="material-community"
+            size={19}
+            color={accent}
+          />
+        )}
+      </View>
+      <View style={styles.utilityText}>
+        <Text
+          style={[
+            detailStyles.actionLabel,
+            {color: destructive ? appearance.danger : appearance.text},
+          ]}>
+          {label}
+        </Text>
+        <Text style={[detailStyles.supporting, {color: appearance.muted}]}>
+          {supporting}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -727,4 +829,24 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
+  utility: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  stackedUtility: {alignItems: 'flex-start'},
+  utilityGlyph: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  utilityText: {flex: 1, minWidth: 0, gap: 3},
 });

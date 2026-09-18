@@ -93,6 +93,8 @@ const Strings = {
       Manual: 'Connect manually',
       Details: 'Connection details',
       Forget: 'Forget credentials',
+      ForgetDetail:
+        'Clears the saved credentials from this phone only. No Azure device, enrollment or registry record is deleted.',
       ForgetTitle: 'Forget saved device credentials?',
       ForgetMessage:
         'Disconnect and remove credentials from this phone only. No Azure device, enrollment or registry record will be deleted.',
@@ -107,7 +109,10 @@ const Strings = {
       NotChecked: 'Not checked',
       RegistryExplanation:
         'An authorized operator must independently check Azure Device Registry and the matching device activity. DPS assignment and Hub connection do not confirm a registry record. Namespace links are configured server-side.',
+      Utilities: 'Diagnostics and credentials',
       Share: 'Share nonsecret diagnostics',
+      ShareDetail:
+        'Shares a redacted connection report without device keys, tokens or connection strings.',
       ShareFailed:
         'Diagnostics could not be shared. You can select the values instead.',
       ProofTitle: 'Device activity proof',
