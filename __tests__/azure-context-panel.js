@@ -588,3 +588,99 @@ test('groups scope and resource facts, discloses identifiers once and keeps ever
   open.mockRestore();
   expect(storage.credentials).toEqual(credentials);
 });
+
+test.each([false, true])(
+  'stacks snapshot management as full-width rows with honest local-only copy (dark %s)',
+  async dark => {
+    useTheme.mockReturnValue({dark});
+    const colors = palette(dark);
+    const text = Strings.AzureContext;
+    await act(async () => {
+      await storage.save({azureContext: fixture()});
+    });
+    const style = node =>
+      StyleSheet.flatten(
+        typeof node.props.style === 'function'
+          ? node.props.style({pressed: false})
+          : node.props.style,
+      );
+    const toggle = () => control('azure-context-import-toggle');
+    const remove = () => control('azure-context-remove');
+    const caption = tree.root
+      .findAllByType('Text')
+      .find(node => node.props.children === text.Manage);
+    expect(caption.props.accessibilityRole).toBe('header');
+    const rows = caption.parent;
+    expect(
+      rows
+        .findAll(
+          node =>
+            typeof node.type === 'string' &&
+            node.props.accessibilityRole === 'button',
+        )
+        .map(node => node.props.testID),
+    ).toEqual(['azure-context-import-toggle', 'azure-context-remove']);
+    for (const [row, label, hint] of [
+      [toggle(), text.Replace, text.ReplaceDetail],
+      [remove(), text.Remove, text.RemoveDetail],
+    ]) {
+      expect(row.props.accessibilityRole).toBe('button');
+      expect(row.props.accessibilityLabel).toBe(label);
+      expect(row.props.accessibilityHint).toBe(hint);
+      expect(style(row).minHeight).toBeGreaterThanOrEqual(48);
+      expect(style(row).height).toBeUndefined();
+      expect(style(row)).toMatchObject({
+        alignSelf: 'stretch',
+        borderRadius: 14,
+        borderWidth: 1,
+        flexDirection: 'row',
+      });
+      expect(content()).toContain(hint);
+    }
+    expect(style(remove())).toMatchObject({
+      backgroundColor: colors.dangerSurface,
+      borderColor: colors.danger,
+    });
+    expect(style(toggle()).backgroundColor).toBe(colors.surface);
+    expect(toggle().props.accessibilityState).toMatchObject({
+      expanded: false,
+      disabled: false,
+    });
+    await press('azure-context-import-toggle');
+    expect(toggle().props.accessibilityState.expanded).toBe(true);
+    expect(style(toggle()).backgroundColor).toBe(colors.tints[0]);
+    expect(control('azure-context-input').props.editable).toBe(true);
+    // The editor keeps its own submit pair; the rows above stay unchanged.
+    expect(control('azure-context-import').props.accessibilityLabel).toBe(
+      text.Import,
+    );
+    await press('azure-context-import-toggle');
+    expect(
+      tree.root.findAllByProps({testID: 'azure-context-input'}),
+    ).toHaveLength(0);
+    expect(text.RemoveDetail).toContain('this phone only');
+    expect(text.RemoveDetail).toContain('No Azure resource');
+    await press('azure-context-remove');
+    expect(storage.azureContext).toBeNull();
+    expect(storage.credentials).toEqual(credentials);
+    expect(content()).toContain(text.Empty);
+  },
+);
+
+test('offers import copy and no removal row before a snapshot exists', async () => {
+  const text = Strings.AzureContext;
+  const toggle = control('azure-context-import-toggle');
+  expect(toggle.props.accessibilityLabel).toBe(text.Import);
+  expect(toggle.props.accessibilityHint).toBe(text.ImportDetail);
+  expect(toggle.findByType('Icon').props.name).toBe('tray-arrow-down');
+  expect(
+    tree.root.findAllByProps({testID: 'azure-context-remove'}),
+  ).toHaveLength(0);
+  await enter();
+  await press('azure-context-import');
+  expect(storage.azureContext.namespace.name).toBe('context-ns');
+  const replaced = control('azure-context-import-toggle');
+  expect(replaced.props.accessibilityLabel).toBe(text.Replace);
+  expect(replaced.props.accessibilityHint).toBe(text.ReplaceDetail);
+  expect(replaced.findByType('Icon').props.name).toBe('pencil-outline');
+});

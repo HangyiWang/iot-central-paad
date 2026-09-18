@@ -4,7 +4,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
   AccessibilityState,
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
@@ -33,6 +32,7 @@ import {Icon} from '@rneui/themed';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import AzureContextPanel from './azureContextPanel';
 import DetailsAction from './detailsAction';
+import DetailsRow from './detailsRow';
 
 export default function ConnectionSummary({
   onManualConnection,
@@ -357,19 +357,16 @@ export default function ConnectionSummary({
                     borderColor: appearance.border,
                   },
                 ]}>
-                {client && (
-                  <DetailsAction
-                    id="connection-disconnect"
-                    label={text.Disconnect}
-                    icon="link-variant-off"
-                    variant="danger"
-                    onPress={clear}
-                  />
-                )}
+                <Text
+                  accessibilityRole="header"
+                  style={[detailStyles.sectionTitle, {color: appearance.text}]}>
+                  {text.Manage}
+                </Text>
                 {credentials && !connected && (
-                  <DetailsAction
+                  <DetailsRow
                     id="connection-reconnect"
                     label={text.Reconnect}
+                    supporting={text.ReconnectDetail}
                     icon="refresh"
                     onPress={() => {
                       closeDetails();
@@ -377,15 +374,26 @@ export default function ConnectionSummary({
                     }}
                   />
                 )}
-                <DetailsAction
+                <DetailsRow
                   id="connection-manual"
                   label={text.Manual}
+                  supporting={text.ManualDetail}
                   icon="lan-connect"
                   onPress={() => {
                     closeDetails();
                     onManualConnection();
                   }}
                 />
+                {client && (
+                  <DetailsRow
+                    id="connection-disconnect"
+                    label={text.Disconnect}
+                    supporting={text.DisconnectDetail}
+                    icon="link-variant-off"
+                    destructive
+                    onPress={clear}
+                  />
+                )}
               </View>
               <View
                 style={[
@@ -440,12 +448,11 @@ export default function ConnectionSummary({
                   style={[detailStyles.sectionTitle, {color: appearance.text}]}>
                   {text.Utilities}
                 </Text>
-                <UtilityAction
+                <DetailsRow
                   id="connection-share"
                   label={text.Share}
                   supporting={text.ShareDetail}
                   icon="share-variant"
-                  stacked={stacked}
                   onPress={async () => {
                     setShareFailed(false);
                     try {
@@ -477,13 +484,12 @@ export default function ConnectionSummary({
                   </Text>
                 )}
                 {credentials && (
-                  <UtilityAction
+                  <DetailsRow
                     id="connection-forget"
                     label={text.Forget}
                     supporting={text.ForgetDetail}
                     icon="delete-outline"
                     destructive
-                    stacked={stacked}
                     disabled={forgetting || loading}
                     busy={forgetting}
                     onPress={() =>
@@ -580,87 +586,6 @@ function SummaryAction({
           )}
         </View>
       )}
-    </Pressable>
-  );
-}
-
-function UtilityAction({
-  id,
-  label,
-  supporting,
-  icon,
-  stacked,
-  destructive = false,
-  disabled = false,
-  busy = false,
-  onPress,
-}: {
-  id: string;
-  label: string;
-  supporting: string;
-  icon: string;
-  stacked: boolean;
-  destructive?: boolean;
-  disabled?: boolean;
-  busy?: boolean;
-  onPress(): void | Promise<void>;
-}) {
-  const {dark} = useTheme();
-  const appearance = palette(dark);
-  const inactive = disabled || busy;
-  const accent = destructive ? appearance.danger : appearance.primary;
-  return (
-    <Pressable
-      testID={id}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={supporting}
-      accessibilityState={{disabled: inactive, busy}}
-      disabled={inactive}
-      onPress={onPress}
-      style={({pressed}) => [
-        styles.utility,
-        stacked && styles.stackedUtility,
-        {
-          backgroundColor: destructive
-            ? appearance.dangerSurface
-            : appearance.tints[0],
-          borderColor: destructive ? appearance.danger : appearance.border,
-        },
-        pressed && !inactive && {backgroundColor: appearance.border},
-        inactive && detailStyles.disabled,
-      ]}>
-      <View
-        accessible={false}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        style={[
-          styles.utilityGlyph,
-          {backgroundColor: appearance.surface, borderColor: accent},
-        ]}>
-        {busy ? (
-          <ActivityIndicator size="small" color={accent} />
-        ) : (
-          <Icon
-            name={icon}
-            type="material-community"
-            size={19}
-            color={accent}
-          />
-        )}
-      </View>
-      <View style={styles.utilityText}>
-        <Text
-          style={[
-            detailStyles.actionLabel,
-            {color: destructive ? appearance.danger : appearance.text},
-          ]}>
-          {label}
-        </Text>
-        <Text style={[detailStyles.supporting, {color: appearance.muted}]}>
-          {supporting}
-        </Text>
-      </View>
     </Pressable>
   );
 }
@@ -829,24 +754,4 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  utility: {
-    minHeight: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  stackedUtility: {alignItems: 'flex-start'},
-  utilityGlyph: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  utilityText: {flex: 1, minWidth: 0, gap: 3},
 });

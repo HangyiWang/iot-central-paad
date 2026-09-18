@@ -337,6 +337,15 @@ cloud nonce. APK SHA256:
 The iOS lane of that run failed at the explicit Pod lock refresh, before an app
 build; its repair and pending lock review are recorded in the modernization plan.
 
+After approving that footer, the owner requested the same coherent treatment for
+connection and snapshot actions. The follow-up reuses its row component in
+`Manage connection` and `Manage snapshot`, keeping recovery/manual entry before
+destructive actions and adding concise, local-only explanations. The accepted
+diagnostics footer, callbacks, IDs, disabled states and existing confirmation
+semantics are preserved; snapshot removal does not acquire a new confirmation.
+The snapshot editor's Import/Cancel controls remain compact. Native delivery of
+this follow-up is pending.
+
 ### Connection capsule delivery (2026-09-17)
 
 The accepted capsule keeps status, a ringed cloud icon and a separated Details

@@ -10,6 +10,7 @@ import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
 import {Text} from './typography';
 import DetailsAction from './detailsAction';
+import DetailsRow from './detailsRow';
 
 export default function AzureContextPanel({
   identity,
@@ -197,30 +198,35 @@ export default function AzureContextPanel({
   const manage = (
     <View style={styles.manage}>
       {caption(text.Manage)}
-      <View style={styles.actions}>
-        {action({
-          label: snapshot ? text.Replace : text.Import,
-          onPress: () => {
+      <View style={styles.rows}>
+        <DetailsRow
+          id="azure-context-import-toggle"
+          label={snapshot ? text.Replace : text.Import}
+          supporting={snapshot ? text.ReplaceDetail : text.ImportDetail}
+          icon={snapshot ? 'pencil-outline' : 'tray-arrow-down'}
+          expanded={importing}
+          onInset
+          disabled={busy}
+          onPress={() => {
             setImporting(!importing);
             setInput('');
             setError('');
-          },
-          id: 'azure-context-import-toggle',
-          selected: importing,
-          icon: snapshot ? 'pencil-outline' : 'tray-arrow-down',
-          grouped: true,
-        })}
-        {(azureContext || azureContextError) &&
-          action({
-            label: text.Remove,
-            onPress: () => {
+          }}
+        />
+        {(azureContext || azureContextError) && (
+          <DetailsRow
+            id="azure-context-remove"
+            label={text.Remove}
+            supporting={text.RemoveDetail}
+            icon="delete-outline"
+            destructive
+            onInset
+            disabled={busy}
+            onPress={() => {
               void remove();
-            },
-            id: 'azure-context-remove',
-            variant: 'danger',
-            icon: 'delete-outline',
-            grouped: true,
-          })}
+            }}
+          />
+        )}
       </View>
       {importing && (
         <>
@@ -505,6 +511,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   manage: {gap: 10},
+  rows: {gap: 8},
   actions: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
   grouped: {alignSelf: 'stretch'},
   input: {

@@ -23,7 +23,11 @@ const Strings = {
     View: 'View Azure details',
     Hide: 'Hide Azure details',
     Import: 'Import snapshot',
+    ImportDetail:
+      'Paste an operator export to show the namespace, subscription and resource group saved for this device.',
     Replace: 'Replace snapshot',
+    ReplaceDetail:
+      'Paste a newer operator export to update the snapshot saved for this device.',
     Input: 'Azure context JSON or Base64',
     Placeholder: 'Paste exported JSON or Base64',
     Hint: 'Use the operator’s Azure context export. Never paste device keys, connection strings or access tokens here.',
@@ -34,6 +38,8 @@ const Strings = {
     RemoveFailed: 'The saved snapshot could not be removed. Try again.',
     OpenFailed: 'Azure Portal could not be opened.',
     Remove: 'Remove snapshot',
+    RemoveDetail:
+      'Clears the saved snapshot from this phone only. No Azure resource, device or registry record is changed.',
     Captured: 'Snapshot captured',
     Scope: 'Scope',
     Resources: 'Resources',
@@ -89,8 +95,15 @@ const Strings = {
       Device: 'Assigned device',
       Hub: 'Assigned Hub',
       Disconnect: 'Disconnect',
+      DisconnectDetail:
+        'Stops the cloud connection on this phone. The saved credentials are kept, so you can reconnect.',
       Reconnect: 'Reconnect',
+      ReconnectDetail:
+        'Connects again with the credentials already saved on this phone.',
       Manual: 'Connect manually',
+      ManualDetail:
+        'Enter connection details to connect this phone to Azure IoT.',
+      Manage: 'Manage connection',
       Details: 'Connection details',
       Forget: 'Forget credentials',
       ForgetDetail:

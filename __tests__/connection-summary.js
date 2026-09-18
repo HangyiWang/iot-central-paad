@@ -571,18 +571,22 @@ it.each([
       lineHeight: 18,
       fontWeight: '600',
     });
-    for (const id of [
-      'connection-details-close',
-      'connection-reconnect',
-      'connection-manual',
-    ]) {
+    expect(style(control('connection-details-close'))).toMatchObject({
+      minHeight: 48,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: colors.controlBorder,
+      backgroundColor: colors.inset,
+    });
+    for (const id of ['connection-reconnect', 'connection-manual']) {
       expect(style(control(id))).toMatchObject({
         minHeight: 48,
         borderRadius: 14,
         paddingHorizontal: 14,
         borderWidth: 1,
-        borderColor: colors.controlBorder,
-        backgroundColor: colors.inset,
+        borderColor: colors.border,
+        backgroundColor: colors.tints[0],
       });
     }
     expect(style(textNode(Strings.Connection.Summary.Disconnect)).color).toBe(
@@ -735,5 +739,115 @@ it.each([false, true])(
         color: colors.muted,
       });
     }
+  },
+);
+
+it.each([
+  [false, 1],
+  [true, 1],
+  [false, 2.5],
+])(
+  'groups connection actions under one heading with the shared row treatment (dark %s, font scale %s)',
+  (dark, fontScale) => {
+    hooks.useTheme.mockReturnValue({dark, colors: {card: '#fff'}});
+    jest.spyOn(require('react-native'), 'useWindowDimensions').mockReturnValue({
+      width: 320,
+      height: 800,
+      fontScale,
+      scale: 2,
+    });
+    connected = false;
+    act(() => {
+      view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+    });
+    act(() => press('Connection details'));
+    const colors = palette(dark);
+    const summary = Strings.Connection.Summary;
+    const control = id => view.root.findAllByProps({testID: id})[0];
+    const style = node =>
+      StyleSheet.flatten(
+        typeof node.props.style === 'function'
+          ? node.props.style({pressed: false})
+          : node.props.style,
+      );
+    const textNode = content =>
+      view.root
+        .findAllByType('Text')
+        .find(node => node.props.children === content);
+    const heading = textNode(summary.Manage);
+    expect(heading.props.accessibilityRole).toBe('header');
+    expect(style(heading)).toMatchObject({
+      fontSize: 17,
+      lineHeight: 24,
+      fontWeight: '600',
+      color: colors.text,
+    });
+    const card = heading.parent;
+    expect(style(card)).toMatchObject({
+      borderRadius: 20,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      gap: 12,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    });
+    // Recovery first, destructive last: the same order as the accepted footer.
+    expect(
+      card
+        .findAll(
+          node =>
+            typeof node.type === 'string' &&
+            node.props.accessibilityRole === 'button',
+        )
+        .map(node => node.props.testID),
+    ).toEqual([
+      'connection-reconnect',
+      'connection-manual',
+      'connection-disconnect',
+    ]);
+    for (const [id, label, hint] of [
+      ['connection-reconnect', summary.Reconnect, summary.ReconnectDetail],
+      ['connection-manual', summary.Manual, summary.ManualDetail],
+      ['connection-disconnect', summary.Disconnect, summary.DisconnectDetail],
+    ]) {
+      const row = control(id);
+      expect(row.props.accessibilityRole).toBe('button');
+      expect(row.props.accessibilityLabel).toBe(label);
+      expect(row.props.accessibilityHint).toBe(hint);
+      expect(row.props.accessibilityState).toMatchObject({disabled: false});
+      const rowStyle = style(row);
+      expect(rowStyle.minHeight).toBeGreaterThanOrEqual(48);
+      expect(rowStyle.height).toBeUndefined();
+      expect(rowStyle).toMatchObject({
+        alignSelf: 'stretch',
+        borderRadius: 14,
+        borderWidth: 1,
+        flexDirection: 'row',
+        alignItems: fontScale > 1.45 ? 'flex-start' : 'center',
+      });
+      expect(textNode(hint).props.numberOfLines).toBeUndefined();
+      expect(style(textNode(hint)).color).toBe(colors.muted);
+    }
+    expect(style(control('connection-disconnect'))).toMatchObject({
+      backgroundColor: colors.dangerSurface,
+      borderColor: colors.danger,
+    });
+    expect(style(textNode(summary.Disconnect)).color).toBe(colors.danger);
+    expect(style(textNode(summary.Manual)).color).toBe(colors.text);
+    for (const [id, icon] of [
+      ['connection-reconnect', 'refresh'],
+      ['connection-manual', 'lan-connect'],
+      ['connection-disconnect', 'link-variant-off'],
+    ]) {
+      expect(control(id).findByType('Icon').props).toMatchObject({
+        name: icon,
+        color: id === 'connection-disconnect' ? colors.danger : colors.primary,
+      });
+    }
+    // Disconnecting stops the session only; credentials stay for a reconnect.
+    act(() => control('connection-disconnect').props.onPress());
+    expect(clear).toHaveBeenCalledTimes(1);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(summary.DisconnectDetail).toContain('saved credentials are kept');
   },
 );
