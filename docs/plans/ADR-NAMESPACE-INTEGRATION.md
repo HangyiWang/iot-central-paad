@@ -317,8 +317,25 @@ leading glyphs, full-width text rows, a restrained sharing accent and a separate
 destructive treatment. Supporting text describes the redacted connection report
 and phone-only credential removal. Existing callbacks, share payload, confirmation,
 error handling and busy/disabled guards are unchanged. This is a narrow refinement,
-not implementation of the broader customer-experience proposal. Native delivery
-and in-place Windows Android inspection are pending.
+not implementation of the broader customer-experience proposal.
+
+The first delivery run `35379275362` stopped at Expo's newly updated compatibility
+requirements before building either platform. After the shared SDK patch alignment,
+the Android lane of `35380792854` passed for
+`4f5554ce403868f705d2bb0352f1a2a488e0f965`. Its APK was installed in place on the
+retained Windows emulator. Native inspection confirmed aligned full-width rows,
+48 dp minimum targets and the unchanged Forget confirmation, which was cancelled;
+no report was shared and no credentials were removed. A public-controls-only crop
+was inspected without exporting a full live screenshot.
+
+The same saved identity/model and imported Azure context/activity survived the
+upgrade and a genuine stopped-process/new-process cold restart. An initial restart
+attempt correctly refused an open Details sheet; it was closed before the actual
+restart, without relaxing the readiness guard. This delivery did not submit a new
+cloud nonce. APK SHA256:
+`c6dca3e0f8b69793a65d81505bd04da3c867ad456f6c7aff91cc7745ad6b4045`.
+The iOS lane of that run failed at the explicit Pod lock refresh, before an app
+build; its repair and pending lock review are recorded in the modernization plan.
 
 ### Connection capsule delivery (2026-09-17)
 
