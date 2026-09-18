@@ -176,6 +176,15 @@ allowlisted categories; it never exports the raw accessibility value. This
 distinguishes an undelivered tap from a pending native presentation before any
 app-side recovery is considered.
 
+Retained-device run `35308619148` on `1722f0e` passed preflight and connected.
+The Details tap completed from a non-hittable target, with no permission handled
+during that gesture. The sheet, Close and identity markers were absent, and the
+new presentation probe remained `closed`. No JS-open state was observed; this
+does not support adding a speculative native Modal remount. The exact gesture
+failure remains to be diagnosed. Nonce submission and connected cold restoration
+are still unproven. Its owned temporary input was removed, and both dedicated
+device-input slots were confirmed empty.
+
 ### Connection capsule delivery (2026-09-17)
 
 The accepted capsule keeps status, a ringed cloud icon and a separated Details
