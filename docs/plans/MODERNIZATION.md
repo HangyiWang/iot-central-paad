@@ -34,16 +34,21 @@ On September 18, the ADR footer run `35379275362` stopped before native builds
 because Expo's online compatibility check required newly published SDK 57 patches.
 The shared foundation pins now select Expo `57.0.24`, build-properties `57.0.21`,
 and constants, image-picker and location `57.0.19`; React and React Native are
-unchanged. The online check remains enabled. Native rebuilding and an explicit,
-reviewed CocoaPods lock refresh are pending; earlier native results below apply
-to their recorded sources, not these new dependency pins.
+unchanged. The online check remains enabled; earlier native results below apply
+to their recorded sources rather than automatically covering new dependency pins.
 
 The first refresh attempt, ADR run `35380792854`, rejected the changed
 `ExpoLocation` podspec while still using `pod install`. Explicit refresh now uses
 `pod update --no-repo-update` to resolve the requested new lock for review;
 ordinary runs still require `pod install --deployment` and never update silently.
-The generated resolution must be reviewed and committed before normal deployment
-mode is considered restored.
+The repaired iOS build and startup lane passed in `35382356967` on ADR source
+`2fed1f91619084c0b5d2ceaa7a0b0f1db9b93663`; Android passed in `35380792854`
+on `4f5554ce403868f705d2bb0352f1a2a488e0f965`. The generated Pod lock was
+reviewed: only Expo, EXConstants, ExpoAsset, ExpoImagePicker and ExpoLocation
+versions/checksums changed, matching the npm resolution. Its exact bytes are now
+committed for subsequent deployment-mode builds on both branches.
+Podfile.lock SHA256:
+`f3f51f8763c8e690b0ff06c0dd0df6cfce0735e7e6c1f43aa56a0d59d9b20cd7`.
 
 The iOS harness presents only its explicitly owned simulator with the pinned
 Xcode Simulator app before Maestro requests XCTest screenshots. GUI launch is

@@ -1,10 +1,10 @@
 PODS:
-  - EXConstants (57.0.18):
+  - EXConstants (57.0.19):
     - ExpoModulesCore
   - EXJSONUtils (57.0.2)
   - EXManifests (57.0.2):
     - ExpoModulesCore
-  - Expo (57.0.23):
+  - Expo (57.0.24):
     - ExpoModulesCore
     - ExpoModulesJSI
     - hermes-engine
@@ -178,7 +178,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - ExpoAsset (57.0.17):
+  - ExpoAsset (57.0.18):
     - ExpoModulesCore
   - ExpoBattery (57.0.3):
     - ExpoModulesCore
@@ -192,11 +192,11 @@ PODS:
     - ExpoModulesCore
   - ExpoFont (57.0.4):
     - ExpoModulesCore
-  - ExpoImagePicker (57.0.18):
+  - ExpoImagePicker (57.0.19):
     - ExpoModulesCore
   - ExpoKeepAwake (57.0.2):
     - ExpoModulesCore
-  - ExpoLocation (57.0.18):
+  - ExpoLocation (57.0.19):
     - ExpoModulesCore
   - ExpoLogBox (57.0.4):
     - React-Core
@@ -2790,24 +2790,24 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  EXConstants: 8948a340eb14bf2bdaaa0e21a63cb9343860b87a
+  EXConstants: 2dc4473aff5574eccaccb9f3eefe6d95247e5d38
   EXJSONUtils: a49e3ef80dff762108e5690c7b2f360675dcf7f6
   EXManifests: 4c53b2602e03ccf44d0b4ff9c5d655b2c5acba3f
-  Expo: d06878ab7512dbcb2deec84c4d56f07af8a8b765
+  Expo: c04c9bde6ce9344f6da189e3d594c34884bba88b
   expo-dev-client: 9cd43bb07fb625c51b436d4cb23be2fc932f8d26
   expo-dev-launcher: 05c72f3a22b4c742b06bd36fa391a30a990556a0
   expo-dev-menu: 272e23ced973a0e401c2b9a679595ea6c7c05d78
   expo-dev-menu-interface: 7a59e803916fbfd1b96c75ff91ea8dddac7e722f
-  ExpoAsset: b3999ffb3d4049b6c870708c60ea2209ace9f170
+  ExpoAsset: a917b756b2e4fe12cef1ac3bca5fd849ddb2b919
   ExpoBattery: 76ee547a85a1a87b113d696ca6685f97e12ba054
   ExpoCamera: c4c16b83b6db376e5a0e538fe2a04deafbb5b6d8
   ExpoCameraBarcodeScanning: 69275ab8ecd76f338da22df825c59405bcf36472
   ExpoDomWebView: beaec034e51bd028428b98bb1f2633ab79c6d095
   ExpoFileSystem: 28778f942725170102f7c6cf4dee05a526ddacd0
   ExpoFont: f8198a952ba2ff53c9b393b5269ea435f232cfc3
-  ExpoImagePicker: bcbd037dd189d0c26e723628fd8a5df69fe65496
+  ExpoImagePicker: 8103235f8451e31ba809c70011abcf5301295a42
   ExpoKeepAwake: 72af0b3be3615e59bc819d26061ff4e06b155ee0
-  ExpoLocation: ad6f80b0d2d96fa05505156cbfcb534b66bcd279
+  ExpoLocation: 758f198c25f7639684356e0b7f7414200bc2ed33
   ExpoLogBox: 80957303325cd4439137765c90a87d7f22aaf2ff
   ExpoModulesCore: 57f7981f5df3782f61265f71fdfc9da7be646317
   ExpoModulesJSI: 9df8e7c9719f59e8c001ec33611774137fc1484a
