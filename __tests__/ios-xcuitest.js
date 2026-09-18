@@ -18,7 +18,7 @@ const {
   RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
   DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES, DETAILS_PRESENTATIONS,
   CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES, CONTROL_COMPARATORS,
-  PERMISSION_SOURCES, MAX_PERMISSION_ACTIONS,
+  PERMISSION_SOURCES, MAX_PERMISSION_ACTIONS, PASSWORD_SAVE_PROMPTS,
   APPROVED_CAPTURES,
 } = require('../scripts/ci/ios-xcuitest-result');
 const {sanitizeDiagnostics} = require('../scripts/ci/live-diagnostics');
@@ -670,6 +670,22 @@ test('permission action evidence names only bounded alert or system-control atte
   })).toBeDefined();
 });
 
+test.each(PASSWORD_SAVE_PROMPTS)('password-save handling emits only fixed state %s', passwordSavePrompt => {
+  const result = {...nativeResult(), passwordSavePrompt};
+  expect(parseNativeLog(`${PREFIX}${JSON.stringify(result)}`, 'live')).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: result}).nativeUi).toEqual(result);
+  expect(sanitizeNativeResult({...nativeResult('smoke'), passwordSavePrompt})).toBeUndefined();
+  expect(sanitizeNativeResult({...result, connected: false})).toBeUndefined();
+  expect(nativeFlowPassed(result, 'live')).toBe(passwordSavePrompt === 'dismissed');
+  expect(nativeFlowPassed({...result, nonceSubmitted: false}, 'live')).toBe(false);
+});
+
+test.each([null, {}, [], true, 'Not Now', 'Save Password?', 'RAW_CANARY'])(
+  'rejects arbitrary password-save observations (%#)', passwordSavePrompt => {
+    expect(sanitizeNativeResult({...nativeResult(), passwordSavePrompt})).toBeUndefined();
+  },
+);
+
 test.each([
   null, [], {}, ['RAW_CANARY'], [{label: 'RAW_CANARY'}],
   Array(MAX_PERMISSION_ACTIONS + 1).fill('alert'),
@@ -773,6 +789,7 @@ test.each(['smoke', 'live'])('maximum mode-specific %s diagnostics fit the uncha
         ...Object.fromEntries(INPUT_FLAGS.map(key => [key, false])),
       })),
     } : {
+      passwordSavePrompt: longest(PASSWORD_SAVE_PROMPTS),
       approvedCapture: longest(APPROVED_CAPTURES),
       detailsTapDiagnostics: DETAILS_TAP_ATTEMPTS.map((attempt, index) => ({
         ...tapDiagnostic(attempt), targetState: longest(INTERACTION_ELEMENTS),
@@ -1415,6 +1432,36 @@ test('resolution evidence survives polling and query aborts without text or coor
   expect(geometry).toContain('frameVisibility(field.frame, in: viewport).rawValue');
   expect(geometry).not.toMatch(/\.label\b|\.value\b|print\(|\.tap\(|coordinate/);
   expect(swift).toContain(`static let maximumCandidates = ${MAX_RESOLUTION_CANDIDATES}`);
+});
+
+test('password saving is declined only inside the observed native sheet, once and within the shared budget', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const dismissal = swift.split('private func dismissPasswordSaveSheet()')[1]
+    .split('private func dismissKnownPermissionAlert()')[0];
+  expect(dismissal).toContain('mode == "live", connected, passwordSavePrompt == nil');
+  expect(dismissal).toContain('permissionAttempts < Permission.maximumAttempts');
+  expect(dismissal).toContain('app.state == .runningForeground, !element(.formDeviceKey).exists');
+  expect(dismissal).toContain('app.sheets.matching(NSPredicate(format: "label == %@", "Save Password?"))');
+  expect(dismissal).toContain('guard sheets.count <= 1 else { throw Failure.ambiguousElement }');
+  expect(dismissal).toContain('guard sheets.count == 1 else { return false }');
+  expect(dismissal).toContain('sheet.buttons.matching(NSPredicate(format: "label == %@", "Not Now"))');
+  expect(dismissal).toContain('sheet.buttons.matching(NSPredicate(format: "label == %@", "Save"))');
+  expect(dismissal).toContain('guard declines.count == 1, saves.count == 1');
+  expect(dismissal).toContain('guard decline.isEnabled, decline.isHittable');
+  const events = [
+    'permissionAttempts += 1', 'passwordSavePrompt = .declining',
+    'emit(outcome: .inProgress)', 'decline.tap()', 'try waitFor(',
+    'NSPredicate(format: "exists == false"), on: sheet', 'passwordSavePrompt = .dismissed',
+  ].map(text => dismissal.indexOf(text));
+  expect(events.every(index => index >= 0)).toBe(true);
+  expect(events).toEqual([...events].sort((a, b) => a - b));
+  expect(dismissal.match(/\.tap\(\)/g)).toHaveLength(1);
+  expect(dismissal).not.toMatch(/springBoard|app\.buttons|permissionDismissals \+=|coordinate|while |\.label\b|\.value\b/);
+  const labels = swift.split('private static let permissionDenyLabels = [')[1].split(']')[0];
+  expect(labels).not.toMatch(/Not Now|Save/);
+  const wait = swift.split('private func waitForDetailsTarget(')[1].split('private func requireIdentity(')[0];
+  expect(wait.match(/try dismissPasswordSaveSheet\(\)/g)).toHaveLength(2);
+  expect(wait).toContain('if target == .connectionDetails, try dismissPasswordSaveSheet()');
 });
 
 test('explicit and interruption permission handling share a bounded allowlisted denial action', () => {

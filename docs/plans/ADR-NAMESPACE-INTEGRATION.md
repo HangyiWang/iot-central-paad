@@ -309,6 +309,25 @@ no ciphertext or plaintext diagnostic was produced. Its temporary input was
 removed at 18:12:42 UTC and both slots were confirmed empty. The capture approval
 remains for a guarded retry; no preflight assertion is weakened.
 
+Retained retry `35379301590` on `ad1e17c` passed preflight, connected and produced
+the approved encrypted capture. Local inspection identified an app-owned native
+`Save Password?` sheet above the connected screen, with `Not Now` and `Save`
+buttons. This explains why alert-only permission handling missed the obstruction.
+It does not indicate a capsule-layout or native Modal presentation failure.
+No nonce or connected cold restoration was completed. Its temporary input was
+removed at 19:07:49 UTC, and both dedicated slots were independently confirmed
+empty. After inspection, the remote encrypted artifact, local ciphertext,
+plaintext capture and one-time key files were deleted and their absence confirmed.
+
+The native driver now declines only that exact app-owned sheet, only after a
+live connection with the credential form absent, and only through its unique
+enabled/hittable `Not Now` button alongside `Save`. It never presses Save or
+adds a global Not Now dismissal. A single attempt consumes the existing shared
+four-action budget and requires actual sheet disappearance. Fixed
+`declining`/`dismissed` evidence distinguishes the gesture from its outcome.
+This does not enable another Details tap or relax identity, nonce, preflight or
+cold-restoration assertions. A new native run must establish the result.
+
 ### Details utility footer refinement (2026-09-18)
 
 At the owner's request, Opus 5 high refined only Share nonsecret diagnostics and

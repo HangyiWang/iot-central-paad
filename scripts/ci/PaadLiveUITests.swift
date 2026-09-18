@@ -160,6 +160,11 @@ private enum PermissionSource: String {
   case systemControl = "system-control"
 }
 
+private enum PasswordSavePrompt: String {
+  case declining
+  case dismissed
+}
+
 private enum ApprovedCapture: String {
   case ineligible
   case hierarchyOnly = "hierarchy-only"
@@ -214,6 +219,7 @@ private enum NativeOperation: String {
   case activate
   case sheetAbsence = "sheet-absence"
   case permissionCheck = "permission-check"
+  case passwordSave = "password-save"
   case matchCount = "match-count"
   case stateCheck = "state-check"
   case resolution
@@ -337,6 +343,7 @@ final class PaadLiveUITests: XCTestCase {
   private var detailsForeground: [String: Any]?
   private var detailsReadinessPolls = 0
   private var permissionActions: [String] = []
+  private var passwordSavePrompt: PasswordSavePrompt?
   private var approvedCapture: ApprovedCapture?
   private var captureRedactionKey: String?
   private var permissionAttempts = 0
@@ -726,6 +733,9 @@ final class PaadLiveUITests: XCTestCase {
     pendingCategory = failure
     nativeOperation = .permissionCheck
     dismissKnownPermissionAlert()
+    if target == .connectionDetails {
+      _ = try dismissPasswordSaveSheet()
+    }
     nativeOperation = .stateCheck
     updateInteraction(target, field: field, phase: phase)
     emit(outcome: .inProgress)
@@ -746,6 +756,9 @@ final class PaadLiveUITests: XCTestCase {
       // predicate callback, and explicitly handle only known permission denials.
       nativeOperation = .permissionCheck
       dismissKnownPermissionAlert()
+      if target == .connectionDetails, try dismissPasswordSaveSheet() {
+        deadline = ProcessInfo.processInfo.systemUptime + Timeout.standard
+      }
       nativeOperation = .matchCount
       let unique = query.count == 1
       nativeOperation = .stateCheck
@@ -1017,6 +1030,41 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   // MARK: Permission dialogs
+
+  /// iOS exposes its password-saving suggestion as an app-owned sheet, not an alert.
+  private func dismissPasswordSaveSheet() throws -> Bool {
+    guard mode == "live", connected, passwordSavePrompt == nil,
+      permissionAttempts < Permission.maximumAttempts,
+      app.state == .runningForeground, !element(.formDeviceKey).exists else { return false }
+    let sheets = app.sheets.matching(NSPredicate(format: "label == %@", "Save Password?"))
+    guard sheets.count <= 1 else { throw Failure.ambiguousElement }
+    guard sheets.count == 1 else { return false }
+    let sheet = sheets.element
+    let declines = sheet.buttons.matching(NSPredicate(format: "label == %@", "Not Now"))
+    let saves = sheet.buttons.matching(NSPredicate(format: "label == %@", "Save"))
+    guard declines.count == 1, saves.count == 1 else { return false }
+    let decline = declines.element
+    guard decline.isEnabled, decline.isHittable else { return false }
+    let previousCategory = pendingCategory
+    let previousOperation = nativeOperation
+    pendingCategory = .notHittable
+    nativeOperation = .passwordSave
+    // Share the four-action budget, but do not enable a permission-only Details retry.
+    permissionAttempts += 1
+    passwordSavePrompt = .declining
+    interactionDiagnostics?["permissionLimitReached"] =
+      permissionAttempts == Permission.maximumAttempts
+    emit(outcome: .inProgress)
+    decline.tap()
+    try waitFor(
+      NSPredicate(format: "exists == false"), on: sheet,
+      timeout: Timeout.short, failure: .notHittable)
+    passwordSavePrompt = .dismissed
+    emit(outcome: .inProgress)
+    pendingCategory = previousCategory
+    nativeOperation = previousOperation
+    return true
+  }
 
   /// Presses a known permission denial button when one is on screen. Never
   /// dismisses unrelated dialogs.
@@ -1578,6 +1626,9 @@ final class PaadLiveUITests: XCTestCase {
     }
     if !permissionActions.isEmpty {
       record["permissionActions"] = permissionActions
+    }
+    if let passwordSavePrompt = passwordSavePrompt {
+      record["passwordSavePrompt"] = passwordSavePrompt.rawValue
     }
     if let approvedCapture = approvedCapture {
       record["approvedCapture"] = approvedCapture.rawValue

@@ -66,7 +66,7 @@ const NATIVE_ISSUES = Object.freeze([
   'timeout', 'connection-lost', 'other',
 ]);
 const NATIVE_OPERATIONS = Object.freeze([
-  'activate', 'sheet-absence', 'permission-check', 'match-count', 'state-check', 'resolution', 'resolve-element', 'tap', 'presentation',
+  'activate', 'sheet-absence', 'permission-check', 'password-save', 'match-count', 'state-check', 'resolution', 'resolve-element', 'tap', 'presentation',
 ]);
 const DETAILS_TAP_ATTEMPTS = Object.freeze(['initial', 'permission-retry']);
 const ELEMENT_PRESENCES = Object.freeze(['unavailable', 'missing', 'present']);
@@ -76,6 +76,7 @@ const TOUCH_TARGET_SIZES = Object.freeze(['unavailable', 'below-minimum', 'meets
 const CONTROL_COMPARATORS = Object.freeze(['details', 'settings', 'telemetry', 'navigation']);
 const PERMISSION_SOURCES = Object.freeze(['alert', 'system-control']);
 const MAX_PERMISSION_ACTIONS = 4;
+const PASSWORD_SAVE_PROMPTS = Object.freeze(['declining', 'dismissed']);
 const APPROVED_CAPTURES = Object.freeze(['ineligible', 'hierarchy-only', 'captured', 'failed']);
 
 function sanitizeControlComparisons(value) {
@@ -234,6 +235,9 @@ function sanitizeNativeResult(value) {
       (!Array.isArray(value.permissionActions) || value.permissionActions.length === 0 ||
         value.permissionActions.length > MAX_PERMISSION_ACTIONS ||
         value.permissionActions.some(source => !PERMISSION_SOURCES.includes(source)))) return undefined;
+  if (value.passwordSavePrompt !== undefined &&
+      (value.mode !== 'live' || !value.connected ||
+        !PASSWORD_SAVE_PROMPTS.includes(value.passwordSavePrompt))) return undefined;
   if (value.approvedCapture !== undefined &&
         (value.mode !== 'live' || !APPROVED_CAPTURES.includes(value.approvedCapture))) return undefined;
   if (value.approvedCaptureExport !== undefined &&
@@ -253,6 +257,7 @@ function sanitizeNativeResult(value) {
     ...(detailsControlComparisons ? {detailsControlComparisons} : {}),
     ...(detailsForeground ? {detailsForeground} : {}),
     ...(value.permissionActions ? {permissionActions: [...value.permissionActions]} : {}),
+    ...(value.passwordSavePrompt ? {passwordSavePrompt: value.passwordSavePrompt} : {}),
     ...(value.approvedCapture ? {approvedCapture: value.approvedCapture} : {}),
     ...(value.approvedCaptureExport ? {approvedCaptureExport: value.approvedCaptureExport} : {}),
   };
@@ -280,6 +285,7 @@ function parseNativeLog(text, mode) {
 function nativeFlowPassed(result, mode) {
   return result?.mode === mode && result.outcome === 'passed' && result.stage === 'finished' &&
     result.applicationState === 'not-running' && !result.failureCategory && !result.nativeIssue &&
+    (!result.passwordSavePrompt || result.passwordSavePrompt === 'dismissed') &&
     ['connected', 'nonceSubmitted', 'coldRestored'].every(key => result[key] === (mode === 'live'));
 }
 
@@ -291,7 +297,7 @@ module.exports = {
   RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
   DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES, DETAILS_PRESENTATIONS,
   CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES, CONTROL_COMPARATORS,
-  PERMISSION_SOURCES, MAX_PERMISSION_ACTIONS,
+  PERMISSION_SOURCES, MAX_PERMISSION_ACTIONS, PASSWORD_SAVE_PROMPTS,
   APPROVED_CAPTURES,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };
