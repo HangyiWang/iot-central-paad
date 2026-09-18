@@ -287,14 +287,21 @@ test.each([false, true])(
     const name = control('azure-context-namespace');
     expect(name.props.children).toBe(snapshot.namespace.name);
     expect(name.props.selectable).toBe(true);
-    expect(style(name)).toEqual(style(textNode(Strings.AzureContext.Title)));
-    expect(style(name)).toMatchObject({
+    // Exactly one 17/24 section header; the subject line is a 15/22 name.
+    expect(style(textNode(Strings.AzureContext.Title))).toMatchObject({
       fontSize: 17,
       lineHeight: 24,
       fontWeight: '600',
       letterSpacing: -0.2,
       color: colors.text,
     });
+    expect(style(name)).toMatchObject({
+      fontSize: 15,
+      lineHeight: 22,
+      fontWeight: '600',
+      color: colors.text,
+    });
+    expect(style(name).letterSpacing).toBeUndefined();
     await press('azure-context-toggle');
     const resourceName = control('azure-context-subscription');
     expect(style(resourceName)).toMatchObject({
@@ -305,15 +312,66 @@ test.each([false, true])(
     });
     expect(style(resourceName).fontFamily).toBeUndefined();
     expect(style(resourceName.parent).paddingTop).toBeUndefined();
-    let row = resourceName.parent;
-    while (row && style(row)?.borderTopWidth === undefined) {
-      row = row.parent;
-    }
-    expect(style(row)).toMatchObject({
+    const ancestor = (node, match) => {
+      let current = node.parent;
+      while (current && !match(style(current))) {
+        current = current.parent;
+      }
+      return current;
+    };
+    const rowOf = node =>
+      ancestor(node, found => found?.paddingVertical === 14);
+    const groupOf = node =>
+      ancestor(rowOf(node), found => found?.borderRadius === 16);
+    // The first fact in a group carries no rule; later facts are separated.
+    expect(style(rowOf(resourceName))).toMatchObject({
       paddingVertical: 14,
       gap: 4,
-      borderTopWidth: StyleSheet.hairlineWidth,
     });
+    expect(style(rowOf(resourceName)).borderTopWidth).toBeUndefined();
+    expect(style(rowOf(control('azure-context-resource-group')))).toMatchObject(
+      {
+        paddingVertical: 14,
+        gap: 4,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: colors.border,
+      },
+    );
+    // Facts sit on the brightest surface; the panel itself stays recessed.
+    for (const id of [
+      'azure-context-subscription',
+      'azure-context-region',
+      'azure-context-resource-group',
+    ]) {
+      expect(style(groupOf(control(id)))).toMatchObject({
+        backgroundColor: colors.surface,
+        borderColor: colors.border,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+      });
+    }
+    // Small captions label each group without competing with the section
+    // header, and stay distinct from the muted field labels below them.
+    for (const groupLabel of [
+      Strings.AzureContext.Scope,
+      Strings.AzureContext.Resources,
+      Strings.AzureContext.Activities,
+      Strings.AzureContext.Manage,
+    ]) {
+      const caption = textNode(groupLabel);
+      expect(caption.props.accessibilityRole).toBe('header');
+      expect(style(caption)).toMatchObject({
+        fontSize: 12,
+        lineHeight: 16,
+        fontWeight: '600',
+        letterSpacing: 0.2,
+        color: colors.text,
+      });
+    }
+    expect(style(textNode(Strings.AzureContext.Subscription)).color).toBe(
+      colors.muted,
+    );
     await press('azure-context-ids');
     await press('azure-context-activities');
     for (const resourceId of [
@@ -330,27 +388,55 @@ test.each([false, true])(
     }
     expect(style(textNode('Succeeded')).color).toBe(colors.text);
     expect(style(textNode('Failed')).color).toBe(colors.danger);
-    expect(style(textNode(Strings.AzureContext.Activities))).toEqual(
-      style(name),
-    );
     expect(content()).toContain(Strings.AzureContext.Source);
     expect(content()).toContain(Strings.AzureContext.ActivityExplanation);
+    // The portal affordance repeats once per resource, so it stays a short
+    // recessed pill inside the data group and carries the full name only on
+    // its accessible label.
+    expect(textNode(Strings.AzureContext.Portal)).toBeUndefined();
+    expect(textNode(Strings.AzureContext.PortalShort)).toBeDefined();
+    const portals = tree.root.findAll(
+      node => node.props.onPress && node.props.accessibilityRole === 'link',
+    );
+    expect(portals.length).toBeGreaterThan(1);
+    for (const portal of portals) {
+      expect(
+        portal.props.accessibilityLabel.endsWith(
+          `: ${Strings.AzureContext.Portal}`,
+        ),
+      ).toBe(true);
+      expect(style(portal)).toMatchObject({
+        minHeight: 48,
+        backgroundColor: colors.inset,
+        borderWidth: 1,
+        borderColor: colors.controlBorder,
+      });
+    }
     for (const id of [
       'azure-context-toggle',
       'azure-context-ids',
       'azure-context-activities',
     ]) {
       expect(style(control(id)).minHeight).toBe(48);
+      expect(style(control(id)).alignSelf).toBe('flex-start');
       expect(style(control(id))).toMatchObject({
         backgroundColor: colors.tints[0],
         borderWidth: 1,
         borderColor: colors.controlBorder,
       });
     }
+    // Snapshot management is one grouped row rather than scattered pills.
+    for (const id of ['azure-context-import-toggle', 'azure-context-remove']) {
+      expect(style(control(id)).alignSelf).toBe('stretch');
+    }
     expect(style(control('azure-context-import-toggle'))).toMatchObject({
       minHeight: 48,
       borderRadius: 14,
       backgroundColor: colors.surface,
+    });
+    expect(style(control('azure-context-remove'))).toMatchObject({
+      backgroundColor: colors.dangerSurface,
+      borderColor: colors.danger,
     });
     for (const node of tree.root.findAllByType('Text')) {
       expect(node.props.numberOfLines).toBeUndefined();
@@ -418,4 +504,87 @@ test('keeps importing controls visibly disabled while saving and reports failure
     fontWeight: '600',
   });
   expect(control('azure-context-input').props.editable).toBe(true);
+});
+
+test('groups scope and resource facts, discloses identifiers once and keeps every portal callback working', async () => {
+  await act(async () => {
+    await storage.save({azureContext: fixture()});
+  });
+  // Collapsed the section stays a subject line, a caveat and management only.
+  expect(content()).not.toContain(Strings.AzureContext.Scope);
+  expect(content()).not.toContain('context-rg');
+  expect(content()).toContain(Strings.AzureContext.Manage);
+  expect(content()).toContain(Strings.AzureContext.Explanation);
+  await press('azure-context-toggle');
+  for (const label of [
+    Strings.AzureContext.Scope,
+    Strings.AzureContext.Resources,
+    Strings.AzureContext.Activities,
+  ]) {
+    expect(content()).toContain(label);
+  }
+  expect(control('azure-context-resource-group').props.children).toBe(
+    'context-rg',
+  );
+  expect(control('azure-context-region').props.children).toBe('testregion');
+  expect(content()).toContain(Strings.AzureContext.RegistryMissing);
+
+  const detailed = fixture();
+  detailed.dps = {
+    name: 'context-dps',
+    resourceId: `${scope}/providers/Microsoft.Devices/provisioningServices/context-dps`,
+  };
+  detailed.registryDevice = {
+    name: 'context-registry',
+    externalDeviceId: identity.deviceId,
+    resourceId: `${namespace}/registryDevices/context-registry`,
+  };
+  await act(async () => {
+    await storage.save({azureContext: detailed});
+  });
+  expect(content()).not.toContain(Strings.AzureContext.RegistryMissing);
+  expect(content()).toContain('context-dps');
+  expect(content()).toContain('context-registry');
+
+  // One disclosure reveals every technical identifier, facts and activity
+  // alike, and hides them again.
+  expect(content()).not.toContain(`/subscriptions/${subscription}`);
+  await press('azure-context-activities');
+  await press('azure-context-ids');
+  expect(content()).toContain(`/subscriptions/${subscription}`);
+  expect(content()).toContain(detailed.activities[0].resourceId);
+  await press('azure-context-ids');
+  expect(content()).not.toContain(detailed.activities[0].resourceId);
+  expect(content()).toContain('another-device');
+
+  const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+  const portal = async label => {
+    await act(async () => {
+      await tree.root
+        .findAllByProps({
+          accessibilityLabel: `${label}: ${Strings.AzureContext.Portal}`,
+        })[0]
+        .props.onPress();
+    });
+  };
+  for (const [label, resourceId] of [
+    [Strings.AzureContext.Subscription, `/subscriptions/${subscription}`],
+    [Strings.AzureContext.ResourceGroup, scope],
+    [Strings.AzureContext.Namespace, namespace],
+    [Strings.AzureContext.Hub, detailed.hub.resourceId],
+    [Strings.AzureContext.Dps, detailed.dps.resourceId],
+    [Strings.AzureContext.Registry, detailed.registryDevice.resourceId],
+  ]) {
+    await portal(label);
+    expect(open).toHaveBeenLastCalledWith(
+      `https://portal.azure.com/#resource${resourceId}/overview`,
+    );
+  }
+  open.mockRejectedValueOnce(new Error('no portal'));
+  await portal(Strings.AzureContext.Hub);
+  expect(control('azure-context-error').props.children).toBe(
+    Strings.AzureContext.OpenFailed,
+  );
+  open.mockRestore();
+  expect(storage.credentials).toEqual(credentials);
 });
