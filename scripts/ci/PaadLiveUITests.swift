@@ -217,6 +217,14 @@ private enum ElementPresence: String {
   case present
 }
 
+private enum DetailsPresentation: String {
+  case unavailable
+  case closed
+  case opening
+  case shown
+  case unknown
+}
+
 // MARK: - Test case configuration
 
 private struct CaseConfig {
@@ -560,6 +568,7 @@ final class PaadLiveUITests: XCTestCase {
       "sheet": ElementPresence.unavailable.rawValue,
       "close": ElementPresence.unavailable.rawValue,
       "identity": ElementPresence.unavailable.rawValue,
+      "presentation": DetailsPresentation.unavailable.rawValue,
     ])
     let index = detailsTapDiagnostics.count - 1
     pendingCategory = .notHittable
@@ -588,7 +597,24 @@ final class PaadLiveUITests: XCTestCase {
       detailsTapDiagnostics[index][key] =
         (element(target).exists ? ElementPresence.present : .missing).rawValue
     }
+    detailsTapDiagnostics[index]["presentation"] = detailsPresentation().rawValue
     return sheet
+  }
+
+  private func detailsPresentation() -> DetailsPresentation {
+    // RN maps the button's ordinary busy/expanded accessibility states to value.
+    // Read only this fixed button; never publish the native value itself.
+    let query = app.buttons.matching(identifier: Target.connectionDetails.rawValue)
+    guard query.count == 1 else { return .unavailable }
+    let value = query.element.value
+    if value == nil { return .closed }
+    guard let text = value as? String else { return .unknown }
+    switch text {
+    case "": return .closed
+    case "busy": return .opening
+    case "expanded": return .shown
+    default: return .unknown
+    }
   }
 
   private func waitForDetailsTarget(

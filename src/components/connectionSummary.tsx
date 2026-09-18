@@ -3,6 +3,7 @@
 
 import React, {useEffect, useRef, useState} from 'react';
 import {
+  AccessibilityState,
   Alert,
   KeyboardAvoidingView,
   Modal,
@@ -47,7 +48,13 @@ export default function ConnectionSummary({
   const {fontScale} = useWindowDimensions();
   const stacked = fontScale > 1.45;
   const [connected, setConnected] = useState(false);
-  const [details, setDetails] = useState(false);
+  const [detailsPhase, setDetailsPhase] = useState<
+    'closed' | 'opening' | 'open'
+  >('closed');
+  const details = detailsPhase !== 'closed';
+  const openDetails = () =>
+    setDetailsPhase(phase => (phase === 'closed' ? 'opening' : phase));
+  const closeDetails = () => setDetailsPhase('closed');
   const [shareFailed, setShareFailed] = useState(false);
   const [forgetting, setForgetting] = useState(false);
   const mounted = useRef(true);
@@ -146,7 +153,7 @@ export default function ConnectionSummary({
         }
       : {
           label: Strings.Connection.Notice.Review,
-          onPress: () => setDetails(true),
+          onPress: openDetails,
           testID: 'connection-error-details',
         };
   return (
@@ -234,7 +241,11 @@ export default function ConnectionSummary({
             title={text.OpenDetails}
             stacked={stacked}
             disclosure
-            onPress={() => setDetails(true)}
+            accessibilityState={{
+              busy: detailsPhase === 'opening',
+              expanded: detailsPhase === 'open',
+            }}
+            onPress={openDetails}
           />
         )}
         {loading && (
@@ -258,7 +269,10 @@ export default function ConnectionSummary({
           animationType="slide"
           presentationStyle="pageSheet"
           allowSwipeDismissal={Platform.OS === 'ios'}
-          onRequestClose={() => setDetails(false)}>
+          onShow={() =>
+            setDetailsPhase(phase => (phase === 'opening' ? 'open' : phase))
+          }
+          onRequestClose={closeDetails}>
           <KeyboardAvoidingView
             testID="connection-details-sheet"
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -292,7 +306,7 @@ export default function ConnectionSummary({
                 id="connection-details-close"
                 label={Strings.Core.Close}
                 icon="close"
-                onPress={() => setDetails(false)}
+                onPress={closeDetails}
               />
             </View>
             <ScrollView
@@ -357,7 +371,7 @@ export default function ConnectionSummary({
                     label={text.Reconnect}
                     icon="refresh"
                     onPress={() => {
-                      setDetails(false);
+                      closeDetails();
                       void connect(credentials);
                     }}
                   />
@@ -367,7 +381,7 @@ export default function ConnectionSummary({
                   label={text.Manual}
                   icon="lan-connect"
                   onPress={() => {
-                    setDetails(false);
+                    closeDetails();
                     onManualConnection();
                   }}
                 />
@@ -467,7 +481,7 @@ export default function ConnectionSummary({
                           try {
                             await cancel({clear: true});
                             if (mounted.current) {
-                              setDetails(false);
+                              closeDetails();
                             }
                           } catch {
                             // The shared hook publishes a safe storage failure.
@@ -497,6 +511,7 @@ function SummaryAction({
   title,
   stacked,
   disclosure = false,
+  accessibilityState,
   onPress,
 }: {
   id: 'connection-details' | 'connection-cancel';
@@ -504,6 +519,7 @@ function SummaryAction({
   title: string;
   stacked: boolean;
   disclosure?: boolean;
+  accessibilityState?: AccessibilityState;
   onPress(): void;
 }) {
   const {dark} = useTheme();
@@ -513,6 +529,7 @@ function SummaryAction({
       testID={id}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={accessibilityState}
       onPress={onPress}
       hitSlop={8}
       style={[styles.detailsAction, stacked && styles.stackedAction]}>

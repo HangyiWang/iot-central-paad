@@ -70,12 +70,14 @@ const NATIVE_OPERATIONS = Object.freeze([
 ]);
 const DETAILS_TAP_ATTEMPTS = Object.freeze(['initial', 'permission-retry']);
 const ELEMENT_PRESENCES = Object.freeze(['unavailable', 'missing', 'present']);
+const DETAILS_PRESENTATIONS = Object.freeze(['unavailable', 'closed', 'opening', 'shown', 'unknown']);
 
 function sanitizeDetailsTaps(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > DETAILS_TAP_ATTEMPTS.length ||
       value.some((entry, index) => !entry || typeof entry !== 'object' || Array.isArray(entry) ||
         entry.attempt !== DETAILS_TAP_ATTEMPTS[index] ||
         !INTERACTION_ELEMENTS.includes(entry.targetState) ||
+        (entry.presentation !== undefined && !DETAILS_PRESENTATIONS.includes(entry.presentation)) ||
         typeof entry.completed !== 'boolean' || typeof entry.permissionHandled !== 'boolean' ||
         ['sheet', 'close', 'identity'].some(key => !ELEMENT_PRESENCES.includes(entry[key]))) ||
       (value.length === 2 && (!value[0].completed || !value[0].permissionHandled))) return undefined;
@@ -83,6 +85,7 @@ function sanitizeDetailsTaps(value) {
     attempt: entry.attempt, targetState: entry.targetState,
     completed: entry.completed, permissionHandled: entry.permissionHandled,
     sheet: entry.sheet, close: entry.close, identity: entry.identity,
+    ...(entry.presentation ? {presentation: entry.presentation} : {}),
   }));
 }
 
@@ -213,6 +216,6 @@ module.exports = {
   INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
   RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
-  DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES,
+  DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES, DETAILS_PRESENTATIONS,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };

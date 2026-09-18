@@ -162,6 +162,20 @@ live-workflow attempt `35302135929` failed in synthetic welcome/manual navigatio
 before the device-input step. The temporary input was removed; this is not an
 additional connected Details result.
 
+Run `35305013750` on the delivered `df5bcb6` app passed preflight and connected.
+Its completed Details tap began with a non-hittable target and did not handle a
+permission interruption; the sheet, Close and identity markers were all absent
+afterward. The temporary input was removed. No nonce or connected cold-restoration
+claim follows from this run.
+
+The Details control now reports ordinary busy/expanded accessibility states for
+requested versus native-confirmed presentation (`Modal.onShow`), clearing them
+when closed. This changes no visual styling or navigation and adds no test-only
+entry point. The native harness classifies only that fixed button's state into
+allowlisted categories; it never exports the raw accessibility value. This
+distinguishes an undelivered tap from a pending native presentation before any
+app-side recovery is considered.
+
 ### Connection capsule delivery (2026-09-17)
 
 The accepted capsule keeps status, a ringed cloud icon and a separated Details

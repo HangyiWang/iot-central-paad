@@ -78,6 +78,7 @@ it('opens scrollable details with value-only IDs and local-only destructive forg
   act(() => {
     view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
   });
+
   act(() => press('Connection details'));
   expect(view.root.findByType(Modal).props.allowSwipeDismissal).toBe(
     Platform.OS === 'ios',
@@ -112,6 +113,54 @@ it('opens scrollable details with value-only IDs and local-only destructive forg
   expect(cancel).toHaveBeenCalledWith({clear: true});
   alert.mockRestore();
   share.mockRestore();
+});
+it('announces requested versus presented Details without changing navigation or visuals', () => {
+  act(() => {
+    view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+  });
+  const disclosure = () =>
+    view.root.findAllByProps({testID: 'connection-details'})[0];
+  expect(disclosure().props.accessibilityState).toEqual({
+    busy: false,
+    expanded: false,
+  });
+  const style = disclosure().props.style;
+  act(() => press('Connection details'));
+  expect(disclosure().props.accessibilityState).toEqual({
+    busy: true,
+    expanded: false,
+  });
+  const onShow = view.root.findByType(Modal).props.onShow;
+  act(() => onShow());
+  expect(disclosure().props.accessibilityState).toEqual({
+    busy: false,
+    expanded: true,
+  });
+  expect(disclosure().props.style).toEqual(style);
+  act(() => view.root.findByType(Modal).props.onRequestClose());
+  expect(disclosure().props.accessibilityState).toEqual({
+    busy: false,
+    expanded: false,
+  });
+  act(() => onShow());
+  expect(disclosure().props.accessibilityState).toEqual({
+    busy: false,
+    expanded: false,
+  });
+  act(() => press('Connection details'));
+  expect(disclosure().props.accessibilityState).toEqual({
+    busy: true,
+    expanded: false,
+  });
+  act(() =>
+    view.root
+      .findAllByProps({testID: 'connection-details-close'})[0]
+      .props.onPress(),
+  );
+  expect(disclosure().props.accessibilityState).toEqual({
+    busy: false,
+    expanded: false,
+  });
 });
 afterEach(() => {
   act(() => view?.unmount());
