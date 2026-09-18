@@ -94,6 +94,7 @@ function executeNative(mode, env = process.env) {
   let success = false;
   let smokeBooted = false;
   let diagnostics = unavailable('no-supported-data');
+  let bootstrapStage = 'manifest-read';
   const cleanEnv = {...env};
   delete cleanEnv.MAESTRO_DEVICE_KEY;
   delete cleanEnv.PAAD_LIVE_CONFIG;
@@ -105,6 +106,7 @@ function executeNative(mode, env = process.env) {
     if (result.error || result.signal || result.status !== 0) {
       const reason = result.error?.code === 'ETIMEDOUT' ? 'deadline-exceeded'
         : result.error ? 'spawn-failed' : result.signal ? 'signal' : 'nonzero-exit';
+      diagnostics = {...unavailable('native-bootstrap-failed'), bootstrapStage, execution: reason};
       fs.writeSync(descriptor, `Native bootstrap failure: ${reason}\n`);
       throw new Error('Native UI subprocess failed');
     }
@@ -129,20 +131,26 @@ function executeNative(mode, env = process.env) {
     const configured = configureXCTestRun(JSON.parse(decoded.stdout), products, data);
     const privateManifest = path.join(root, 'case.xctestrun');
     if (fs.existsSync(privateManifest)) throw new Error('Native UI manifest already exists');
+    bootstrapStage = 'manifest-write';
     command('plutil', ['-convert', 'binary1', '-o', privateManifest, '-'], 10000, JSON.stringify(configured));
     if (mode === 'smoke') {
       // This simulator was created by build-ios.sh, not discovered from other running devices.
       fs.writeSync(descriptor, 'Native bootstrap: simulator boot\n');
+      bootstrapStage = 'simulator-boot';
       command('xcrun', ['simctl', 'boot', env.IOS_SIMULATOR_UDID], 15000);
       smokeBooted = true;
       // A fresh iOS 26 runtime can still be migrating location data after three minutes.
+      bootstrapStage = 'simulator-ready';
       command('xcrun', ['simctl', 'bootstatus', env.IOS_SIMULATOR_UDID, '-b'], 300000);
       fs.writeSync(descriptor, 'Native bootstrap: app install\n');
+      bootstrapStage = 'app-install';
       command('xcrun', ['simctl', 'install', env.IOS_SIMULATOR_UDID, path.resolve(APP)], 60000);
       fs.writeSync(descriptor, 'Native bootstrap: simulator presentation\n');
+      bootstrapStage = 'simulator-presentation';
       command('bash', ['scripts/ci/show-ios-simulator.sh', env.IOS_SIMULATOR_UDID], 65000);
     }
     fs.writeSync(descriptor, 'Native bootstrap: XCTest execution\n');
+    bootstrapStage = 'xctest';
     const result = spawnSync('xcodebuild', [
       'test-without-building', '-xctestrun', privateManifest,
       '-destination', `platform=iOS Simulator,id=${env.IOS_SIMULATOR_UDID}`,
@@ -172,6 +180,9 @@ function executeNative(mode, env = process.env) {
     }
   } catch {
     success = false;
+    if (diagnostics.reason === 'no-supported-data') {
+      diagnostics = {...unavailable('native-bootstrap-failed'), bootstrapStage};
+    }
     console.error('Native UI execution failed; raw diagnostics remain private.');
   } finally {
     if (descriptor !== undefined) fs.closeSync(descriptor);

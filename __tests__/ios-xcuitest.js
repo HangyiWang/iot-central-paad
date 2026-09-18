@@ -604,6 +604,10 @@ function withRunner(mode, body, overrides = {}) {
       'fixture',
     );
     spawn.mockImplementation((binary, args, options) => {
+      if (binary === overrides.bootstrap?.binary && args.includes(overrides.bootstrap.argument)) {
+        fs.writeSync(options.stdio[1], 'RAW_CANARY bootstrap output\n');
+        return overrides.bootstrap.result;
+      }
       if (binary === 'plutil' && args.includes('json'))
         return {status: 0, stdout: JSON.stringify(manifest())};
       if (binary === 'plutil') {
@@ -728,6 +732,28 @@ test('native zero exit without complete app proof remains a failure', () => {
   withRunner('live', passed => expect(passed).toBe(false), {
     result: {...nativeResult(), nonceSubmitted: false},
   });
+});
+
+test.each([
+  ['simulator-boot', 'xcrun', 'boot'],
+  ['simulator-ready', 'xcrun', 'bootstatus'],
+  ['app-install', 'xcrun', 'install'],
+  ['simulator-presentation', 'bash', 'scripts/ci/show-ios-simulator.sh'],
+])('pre-secret bootstrap failure reports only its fixed %s checkpoint', (bootstrapStage, binary, argument) => {
+  withRunner('smoke', passed => {
+    expect(passed).toBe(false);
+    const report = fs.readFileSync('build/ios-ui-smoke-summary.json', 'utf8');
+    expect(JSON.parse(report)).toEqual({
+      uiResult: 'failed',
+      diagnostics: {
+        availability: 'unavailable', reason: 'native-bootstrap-failed',
+        bootstrapStage, execution: 'deadline-exceeded',
+      },
+    });
+    expect(report).not.toContain('RAW_CANARY');
+    expect(fs.existsSync('build/ios-ui-smoke.log')).toBe(false);
+    expect(fs.existsSync('build/ios-ui-smoke-private')).toBe(false);
+  }, {bootstrap: {binary, argument, result: {error: {code: 'ETIMEDOUT', message: 'RAW_CANARY'}}}});
 });
 
 test('native smoke deletes owned private state and writes only the fixed synthetic result', () => {
