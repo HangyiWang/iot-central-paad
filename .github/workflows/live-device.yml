@@ -37,6 +37,11 @@ on:
         description: Nonsecret schemaVersion 1 JSON; see scripts/ci/live-config.js --help
         type: string
         required: true
+      diagnostic_public_key:
+        description: Explicitly approved failure-only iOS capture; one-time RSA public key, NEVER a private key
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -75,6 +80,7 @@ jobs:
           IOS_DRIVER: ${{ inputs.ios_driver }}
           IOS_SMOKE_ONLY: ${{ inputs.ios_smoke_only }}
           LIVE_PLATFORM: ${{ inputs.platform }}
+          DIAGNOSTIC_PUBLIC_KEY: ${{ inputs.diagnostic_public_key }}
         run: |
           if [[ "$GITHUB_EVENT_NAME" != workflow_dispatch ||
                 "$CONFIRM_LIVE" != true ||
@@ -83,6 +89,10 @@ jobs:
                 ! "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ||
                 "$EXPECTED_SHA" != "$GITHUB_SHA" ]]; then
             echo 'Live authorization rejected; no device secret was requested.' >&2
+            exit 1
+          fi
+          if [[ -n "$DIAGNOSTIC_PUBLIC_KEY" && ( "$LIVE_PLATFORM" != ios || "$IOS_DRIVER" != xcuitest || "$IOS_SMOKE_ONLY" = true ) ]]; then
+            echo 'Encrypted diagnostics require the explicitly authorized live iOS XCUITest lane.' >&2
             exit 1
           fi
           if [[ "$IOS_SMOKE_ONLY" = true && ( "$LIVE_PLATFORM" != ios || "$IOS_DRIVER" != xcuitest ) ]]; then
@@ -101,6 +111,10 @@ jobs:
           PAAD_LIVE_CONFIG: ${{ inputs.config }}
           LIVE_PLATFORM: ${{ inputs.platform }}
         run: node scripts/ci/live-config.js validate "$LIVE_PLATFORM"
+      - name: Validate optional diagnostic public key
+        env:
+          PAAD_IOS_DIAGNOSTIC_PUBLIC_KEY: ${{ inputs.diagnostic_public_key }}
+        run: node -e 'require("./scripts/ci/encrypted-ios-diagnostic").diagnosticRecipient(process.env.PAAD_IOS_DIAGNOSTIC_PUBLIC_KEY)'
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm test -- --runInBand
@@ -254,6 +268,7 @@ jobs:
           PAAD_LIVE_CONFIG: ${{ inputs.config }}
           MAESTRO_DEVICE_KEY: ${{ secrets.PAAD_LIVE_IOS_DEVICE_KEY }}
           PAAD_IOS_UI_DRIVER: ${{ inputs.ios_driver }}
+          PAAD_IOS_DIAGNOSTIC_PUBLIC_KEY: ${{ inputs.diagnostic_public_key }}
         run: bash scripts/ci/smoke-live-device.sh ios
       - name: Remove only this job's dedicated simulator
         if: always() && env.IOS_SIMULATOR_UDID != '' && env.PAAD_LIVE_SIMULATOR_DELETED != '1'
@@ -266,6 +281,14 @@ jobs:
             echo '::error::Dedicated simulator deletion failed.'
             exit 1
           fi
+      - name: Publish only the approved encrypted diagnostic
+        if: ${{ !cancelled() && inputs.diagnostic_public_key != '' && hashFiles('build/ios-encrypted-diagnostic.json') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: encrypted-ios-diagnostic-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/ios-encrypted-diagnostic.json
+          retention-days: 1
+          if-no-files-found: error
       - name: Upload only nonsecret actual-flow summary
         if: ${{ !cancelled() && hashFiles('build/live-device-summary-ios.json') != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

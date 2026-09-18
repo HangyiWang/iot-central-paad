@@ -278,6 +278,30 @@ indistinguishable from actual readiness polling. App UI and cloud assertions
 are unchanged; the next native result must establish whether this resolves the
 observed permission/readiness issue.
 
+Run `35370709671` on `125bb31` connected but remained non-hittable after more
+than three readiness polls. It recorded one alert denial, no outstanding
+allowlisted system-denial control in either comparison, and a foreground app.
+No Details tap, nonce or connected cold restoration followed. Its temporary
+input was removed at 17:18:28 UTC and both slots were confirmed empty.
+
+The owner explicitly approved a temporary encrypted visual diagnostic after
+these fixed-category observations did not isolate the obstruction. The optional
+`diagnostic_public_key` input is restricted to the trusted live iOS XCUITest
+lane. Only after Connected, with the credential form and editable credential
+inputs absent, may a failing Details wait capture the screen and app/system
+hierarchy. The device key is additionally removed from hierarchy text. Files
+remain in the private runner container, with a hierarchy-only outcome reported
+explicitly if screenshot capture is unavailable.
+
+CI uses a one-time operator-held RSA public key (3072/4096 bits) to wrap a random
+AES-256-GCM key with RSA-OAEP-SHA256. Commit/run metadata is authenticated. Only
+the ciphertext envelope may be uploaded, with one-day retention; the private
+decryption key never enters CI. Raw capture files are removed after sealing and
+the owned simulator is deleted by the existing cleanup. The operator must delete
+the diagnostic artifact, local plaintext and one-time key after inspection.
+Ordinary runs still retain fixed-category results only. This opt-in is diagnostic,
+not a relaxed mobile proof or authorization to implement the new customer design.
+
 ### Connection capsule delivery (2026-09-17)
 
 The accepted capsule keeps status, a ringed cloud icon and a separated Details
@@ -455,9 +479,11 @@ opt-in (`ios_driver=xcuitest`) within the existing owner/exact-SHA live workflow
 The runner is built and exercised with synthetic input before the dedicated
 device-key step; synthetic smoke never presses Connect. The native live path
 retains exact identity/model/nonce and actual terminate/relaunch assertions.
-Ordinary Maestro smoke remains in place. For credentialed runs, only fixed-category native milestones
-and the existing nonsecret proof summary may leave private test state; raw
-Xcode test output, result bundles and device inputs are deleted. Implementation
+Ordinary Maestro smoke remains in place. By default, credentialed runs export only
+fixed-category native milestones and the existing nonsecret proof summary.
+The explicitly approved, failure-only encrypted capture exception is described
+above; it never exports plaintext or entire result bundles. Raw Xcode test output,
+result bundles and device inputs are deleted. Implementation
 of this lane does not itself close the remaining iOS acceptance gate.
 Set `ios_smoke_only=true` with `platform=ios` and `ios_driver=xcuitest` to
 exercise the new runner without ever requesting a device secret or sending

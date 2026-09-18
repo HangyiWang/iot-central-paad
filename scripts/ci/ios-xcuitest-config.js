@@ -29,7 +29,10 @@ function createXCTestCase(mode, input, key) {
   };
 }
 
-function configureXCTestRun(manifest, products, caseData) {
+function configureXCTestRun(manifest, products, caseData, captureDiagnostic = false) {
+  if (typeof captureDiagnostic !== 'boolean' || (captureDiagnostic && caseData.mode !== 'live')) {
+    throw new Error('Diagnostic capture requires an authorized live case');
+  }
   if (!path.isAbsolute(products)) {
     throw new Error('Native UI paths must be absolute');
   }
@@ -57,6 +60,8 @@ function configureXCTestRun(manifest, products, caseData) {
   const target = targets[0];
   target.UITargetAppEnvironmentVariables = {};
   target.EnvironmentVariables = {...target.EnvironmentVariables, PAAD_XCTEST_CASE: JSON.stringify(caseData)};
+  delete target.EnvironmentVariables.PAAD_XCTEST_CAPTURE;
+  if (captureDiagnostic) target.EnvironmentVariables.PAAD_XCTEST_CAPTURE = '1';
   return root;
 }
 

@@ -4,7 +4,8 @@
 // Native XCUITest harness for the CI iOS simulator lane.
 //
 // The harness never prints its input, never prints native error text and never
-// attaches screenshots or element hierarchies. The only structured output is a
+// attaches screenshots or element hierarchies. An explicitly opted-in failure
+// capture stays in private runner files for encryption, never in stdout. Public output is a
 // single-line record prefixed with `PAAD_XCTEST_RESULT:` whose every field is a
 // fixed enumeration, a boolean or an allowlisted test identifier.
 
@@ -157,6 +158,13 @@ private enum PermissionAlert: String {
 private enum PermissionSource: String {
   case alert
   case systemControl = "system-control"
+}
+
+private enum ApprovedCapture: String {
+  case ineligible
+  case hierarchyOnly = "hierarchy-only"
+  case captured
+  case failed
 }
 
 private enum MatchCount: String {
@@ -329,6 +337,8 @@ final class PaadLiveUITests: XCTestCase {
   private var detailsForeground: [String: Any]?
   private var detailsReadinessPolls = 0
   private var permissionActions: [String] = []
+  private var approvedCapture: ApprovedCapture?
+  private var captureRedactionKey: String?
   private var permissionAttempts = 0
   private var permissionDismissals = 0
   private var permissionDismissed = false
@@ -423,6 +433,9 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   private func runLive(_ config: CaseConfig) throws {
+    if ProcessInfo.processInfo.environment["PAAD_XCTEST_CAPTURE"] == "1" {
+      captureRedactionKey = config.deviceKey
+    }
     try launchApp()
     try requireWelcome(timeout: Timeout.launch)
 
@@ -769,6 +782,9 @@ final class PaadLiveUITests: XCTestCase {
     if ambiguous {
       throw Failure.ambiguousElement
     }
+    if target == .connectionDetails {
+      captureApprovedFailure()
+    }
     throw failure
   }
 
@@ -1098,6 +1114,60 @@ final class PaadLiveUITests: XCTestCase {
       nonce: try text("nonce"),
       modelId: try text("modelId"),
       deviceKey: try text("deviceKey"))
+  }
+
+  // MARK: Approved encrypted failure capture
+
+  private func captureEligible() -> Bool {
+    guard connected, app.state == .runningForeground,
+      !element(.formDeviceKey).exists, !element(.formRegistrationId).exists,
+      app.secureTextFields.count == 0, app.textFields.count == 0 else { return false }
+    let status = element(.connectionStatus)
+    return status.exists &&
+      (status.label == AppLabel.connected || (status.value as? String) == AppLabel.connected)
+  }
+
+  private func captureApprovedFailure() {
+    guard let key = captureRedactionKey, approvedCapture == nil else { return }
+    defer { captureRedactionKey = nil }
+    guard mode == "live", captureEligible() else {
+      approvedCapture = .ineligible
+      return
+    }
+    do {
+      guard let documents = FileManager.default.urls(
+        for: .documentDirectory, in: .userDomainMask).first else {
+        approvedCapture = .failed
+        return
+      }
+      let directory = documents.appendingPathComponent("paad-approved-diagnostic", isDirectory: true)
+      guard !FileManager.default.fileExists(atPath: directory.path) else {
+        approvedCapture = .failed
+        return
+      }
+      let springBoard = XCUIApplication(bundleIdentifier: Self.springBoardBundleIdentifier)
+      let hierarchy = ("APP\n" + app.debugDescription + "\nSYSTEM\n" + springBoard.debugDescription)
+        .replacingOccurrences(of: key, with: "[REDACTED]")
+      let data = Data(hierarchy.utf8)
+      guard data.count <= 512 * 1024, captureEligible() else {
+        approvedCapture = .ineligible
+        return
+      }
+      try FileManager.default.createDirectory(
+        at: directory, withIntermediateDirectories: false,
+        attributes: [.posixPermissions: 0o700])
+      try data.write(to: directory.appendingPathComponent("hierarchy.txt"), options: .withoutOverwriting)
+      approvedCapture = .hierarchyOnly
+      emit(outcome: .inProgress)
+      let image = XCUIScreen.main.screenshot().pngRepresentation
+      guard image.count <= 8 * 1024 * 1024, captureEligible() else { return }
+      try image.write(to: directory.appendingPathComponent("screen.png"), options: .withoutOverwriting)
+      approvedCapture = .captured
+    } catch {
+      if approvedCapture != .hierarchyOnly {
+        approvedCapture = .failed
+      }
+    }
   }
 
   // MARK: Diagnostics
@@ -1508,6 +1578,9 @@ final class PaadLiveUITests: XCTestCase {
     }
     if !permissionActions.isEmpty {
       record["permissionActions"] = permissionActions
+    }
+    if let approvedCapture = approvedCapture {
+      record["approvedCapture"] = approvedCapture.rawValue
     }
     if !inputDiagnostics.isEmpty {
       record["inputDiagnostics"] = inputDiagnostics

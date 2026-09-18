@@ -6,6 +6,7 @@ const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const {createXCTestCase, configureXCTestRun} = require('./ios-xcuitest-config');
 const {MAX_LOG_BYTES, parseNativeLog, sanitizeNativeResult, nativeFlowPassed} = require('./ios-xcuitest-result');
+const {diagnosticRecipient, collectEncryptedDiagnostic} = require('./encrypted-ios-diagnostic');
 
 const DEVELOPER = '/Applications/Xcode_26.6.app/Contents/Developer';
 const APP = 'build/ios-derived/Build/Products/Release-iphonesimulator/IoTPnP.app';
@@ -64,12 +65,14 @@ function validateEnvironment(mode, env) {
   if (!['smoke', 'live'].includes(mode) || env.PAAD_VARIANT !== 'ci' ||
       env.DEVELOPER_DIR !== DEVELOPER || env.IOS_SIMULATOR_DEVELOPER_DIR !== DEVELOPER ||
       !/^[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$/.test(env.IOS_SIMULATOR_UDID || '') ||
-      ['GH_TOKEN', 'GITHUB_TOKEN', 'PAAD_XCTEST_CASE', 'TEST_RUNNER_PAAD_XCTEST_CASE']
+      ['GH_TOKEN', 'GITHUB_TOKEN', 'PAAD_XCTEST_CASE', 'TEST_RUNNER_PAAD_XCTEST_CASE',
+        'PAAD_XCTEST_CAPTURE', 'TEST_RUNNER_PAAD_XCTEST_CAPTURE']
         .some(key => Object.hasOwn(env, key))) {
     throw new Error('Native UI invocation rejected');
   }
   if (mode === 'smoke') {
-    if (['MAESTRO_DEVICE_KEY', 'PAAD_LIVE_CONFIG'].some(key => Object.hasOwn(env, key))) {
+    if (env.PAAD_IOS_DIAGNOSTIC_PUBLIC_KEY ||
+        ['MAESTRO_DEVICE_KEY', 'PAAD_LIVE_CONFIG'].some(key => Object.hasOwn(env, key))) {
       throw new Error('Native smoke rejects live inputs');
     }
   } else if (
@@ -83,6 +86,7 @@ function validateEnvironment(mode, env) {
 
 function executeNative(mode, env = process.env) {
   validateEnvironment(mode, env);
+  const recipient = diagnosticRecipient(env.PAAD_IOS_DIAGNOSTIC_PUBLIC_KEY);
   const data = createXCTestCase(mode, env.PAAD_LIVE_CONFIG, env.MAESTRO_DEVICE_KEY);
   process.umask(0o077);
   requireDirectory('build');
@@ -98,6 +102,7 @@ function executeNative(mode, env = process.env) {
   const cleanEnv = {...env};
   delete cleanEnv.MAESTRO_DEVICE_KEY;
   delete cleanEnv.PAAD_LIVE_CONFIG;
+  delete cleanEnv.PAAD_IOS_DIAGNOSTIC_PUBLIC_KEY;
   const command = (binary, args, timeout, input) => {
     const result = spawnSync(binary, args, {
       env: cleanEnv, timeout, killSignal: 'SIGKILL', input,
@@ -128,7 +133,7 @@ function executeNative(mode, env = process.env) {
       env: cleanEnv, encoding: 'utf8', timeout: 10000, killSignal: 'SIGKILL', maxBuffer: MAX_LOG_BYTES,
     });
     if (decoded.error || decoded.signal || decoded.status !== 0) throw new Error('Native UI manifest unreadable');
-    const configured = configureXCTestRun(JSON.parse(decoded.stdout), products, data);
+    const configured = configureXCTestRun(JSON.parse(decoded.stdout), products, data, !!recipient);
     const privateManifest = path.join(root, 'case.xctestrun');
     if (fs.existsSync(privateManifest)) throw new Error('Native UI manifest already exists');
     bootstrapStage = 'manifest-write';
@@ -172,9 +177,17 @@ function executeNative(mode, env = process.env) {
     success = execution === 'passed';
     if (parsed) diagnostics = {availability: 'available', nativeUi: {...parsed, execution}};
     if (mode === 'live' && parsed) {
-      requireDirectory(path.join(root, 'results'));
-      fs.writeFileSync(path.join(root, 'results/native-ui.json'), JSON.stringify(diagnostics.nativeUi),
-        {flag: 'wx', mode: 0o600});
+      try {
+        if (recipient && !success) {
+          diagnostics.nativeUi.approvedCaptureExport = 'failed';
+          collectEncryptedDiagnostic(recipient, parsed.approvedCapture, root, cleanEnv);
+          diagnostics.nativeUi.approvedCaptureExport = 'encrypted';
+        }
+      } finally {
+        requireDirectory(path.join(root, 'results'));
+        fs.writeFileSync(path.join(root, 'results/native-ui.json'), JSON.stringify(diagnostics.nativeUi),
+          {flag: 'wx', mode: 0o600});
+      }
     }
   } catch {
     success = false;

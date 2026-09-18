@@ -76,6 +76,7 @@ const TOUCH_TARGET_SIZES = Object.freeze(['unavailable', 'below-minimum', 'meets
 const CONTROL_COMPARATORS = Object.freeze(['details', 'settings', 'telemetry', 'navigation']);
 const PERMISSION_SOURCES = Object.freeze(['alert', 'system-control']);
 const MAX_PERMISSION_ACTIONS = 4;
+const APPROVED_CAPTURES = Object.freeze(['ineligible', 'hierarchy-only', 'captured', 'failed']);
 
 function sanitizeControlComparisons(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > 2 ||
@@ -233,6 +234,10 @@ function sanitizeNativeResult(value) {
       (!Array.isArray(value.permissionActions) || value.permissionActions.length === 0 ||
         value.permissionActions.length > MAX_PERMISSION_ACTIONS ||
         value.permissionActions.some(source => !PERMISSION_SOURCES.includes(source)))) return undefined;
+  if (value.approvedCapture !== undefined &&
+        (value.mode !== 'live' || !APPROVED_CAPTURES.includes(value.approvedCapture))) return undefined;
+  if (value.approvedCaptureExport !== undefined &&
+        (value.mode !== 'live' || !['encrypted', 'failed'].includes(value.approvedCaptureExport))) return undefined;
   return {
     schemaVersion: 1, runner: 'xcuitest', mode: value.mode, outcome: value.outcome,
     stage: value.stage, applicationState: value.applicationState,
@@ -248,6 +253,8 @@ function sanitizeNativeResult(value) {
     ...(detailsControlComparisons ? {detailsControlComparisons} : {}),
     ...(detailsForeground ? {detailsForeground} : {}),
     ...(value.permissionActions ? {permissionActions: [...value.permissionActions]} : {}),
+    ...(value.approvedCapture ? {approvedCapture: value.approvedCapture} : {}),
+    ...(value.approvedCaptureExport ? {approvedCaptureExport: value.approvedCaptureExport} : {}),
   };
 }
 
@@ -285,5 +292,6 @@ module.exports = {
   DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES, DETAILS_PRESENTATIONS,
   CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES, CONTROL_COMPARATORS,
   PERMISSION_SOURCES, MAX_PERMISSION_ACTIONS,
+  APPROVED_CAPTURES,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };

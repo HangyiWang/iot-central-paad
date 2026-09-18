@@ -447,6 +447,7 @@ test('workflow gates every live job, scopes secrets after binary publication and
     'confirm_live',
     'expected_sha',
     'config',
+    'diagnostic_public_key',
   ]);
   expect(workflow.env.MAESTRO_DEVICE_KEY).toBeUndefined();
   for (const platform of ['android', 'ios']) {
@@ -488,8 +489,19 @@ test('workflow gates every live job, scopes secrets after binary publication and
       expect(synthetic.env.PAAD_NATIVE_SMOKE_DIAGNOSTICS).toBe('${{ inputs.ios_smoke_only }}');
       expect(JSON.stringify(synthetic)).not.toContain('secrets.');
     }
+    const encrypted = job.steps.filter(step =>
+      step.uses?.startsWith('actions/upload-artifact@') &&
+      step.with.path === 'build/ios-encrypted-diagnostic.json',
+    );
+    expect(encrypted).toHaveLength(platform === 'ios' ? 1 : 0);
+    for (const upload of encrypted) {
+      expect(upload.if).toContain("inputs.diagnostic_public_key != ''");
+      expect(upload.with['retention-days']).toBe(1);
+      expect(job.steps.indexOf(upload)).toBeGreaterThan(job.steps.indexOf(secretStep));
+    }
     const uploads = job.steps.filter(step =>
-      step.uses?.startsWith('actions/upload-artifact@') && !nativeUploads.includes(step),
+      step.uses?.startsWith('actions/upload-artifact@') &&
+      !nativeUploads.includes(step) && !encrypted.includes(step),
     );
     expect(uploads).toHaveLength(2);
     expect(job.steps.indexOf(uploads[0])).toBeGreaterThan(buildIndex);

@@ -19,6 +19,7 @@ const {
   DETAILS_TAP_ATTEMPTS, ELEMENT_PRESENCES, DETAILS_PRESENTATIONS,
   CAPSULE_CONTAINMENTS, TOUCH_TARGET_SIZES, CONTROL_COMPARATORS,
   PERMISSION_SOURCES, MAX_PERMISSION_ACTIONS,
+  APPROVED_CAPTURES,
 } = require('../scripts/ci/ios-xcuitest-result');
 const {sanitizeDiagnostics} = require('../scripts/ci/live-diagnostics');
 const {validateEnvironment} = require('../scripts/ci/run-ios-xcuitest');
@@ -281,6 +282,32 @@ test('native lane is opt-in, precedes device input with synthetic smoke and reta
   expect(
     steps.find(step => step.run === 'bash scripts/ci/install-maestro.sh').if,
   ).toBe("inputs.ios_driver != 'xcuitest'");
+});
+
+test('approved capture is opt-in and reaches only the test runner, never the app', () => {
+  const data = createXCTestCase('live', JSON.stringify(liveConfig), key);
+  const configured = configureXCTestRun(manifest(), '/tmp/products', data, true);
+  const target = configured.TestConfigurations[0].TestTargets[0];
+  expect(target.EnvironmentVariables.PAAD_XCTEST_CAPTURE).toBe('1');
+  expect(target.UITargetAppEnvironmentVariables).toEqual({});
+  expect(() => configureXCTestRun(manifest(), '/tmp/products', createXCTestCase('smoke'), true)).toThrow();
+  const prior = manifest();
+  prior.TestConfigurations[0].TestTargets[0].EnvironmentVariables = {PAAD_XCTEST_CAPTURE: '1'};
+  expect(configureXCTestRun(prior, '/tmp/products', data).TestConfigurations[0]
+    .TestTargets[0].EnvironmentVariables.PAAD_XCTEST_CAPTURE).toBeUndefined();
+  for (const name of ['PAAD_XCTEST_CAPTURE', 'TEST_RUNNER_PAAD_XCTEST_CAPTURE']) {
+    expect(() => validateEnvironment('live', {...environment('live'), [name]: '1'})).toThrow();
+  }
+  expect(() => validateEnvironment('smoke', {
+    ...environment('smoke'), PAAD_IOS_DIAGNOSTIC_PUBLIC_KEY: 'not-allowed',
+  })).toThrow();
+});
+
+test.each(APPROVED_CAPTURES)('only a fixed capture state %s can leave private capture processing', approvedCapture => {
+  const result = {...nativeResult(), approvedCapture};
+  expect(sanitizeNativeResult(result)).toEqual(result);
+  expect(sanitizeNativeResult({...nativeResult('smoke'), approvedCapture})).toBeUndefined();
+  expect(sanitizeNativeResult({...nativeResult(), approvedCapture: 'RAW_CANARY'})).toBeUndefined();
 });
 
 test('native fixed-result parser strips extra fields and reports the last milestone only', () => {
@@ -746,6 +773,7 @@ test.each(['smoke', 'live'])('maximum mode-specific %s diagnostics fit the uncha
         ...Object.fromEntries(INPUT_FLAGS.map(key => [key, false])),
       })),
     } : {
+      approvedCapture: longest(APPROVED_CAPTURES),
       detailsTapDiagnostics: DETAILS_TAP_ATTEMPTS.map((attempt, index) => ({
         ...tapDiagnostic(attempt), targetState: longest(INTERACTION_ELEMENTS),
         postTapState: longest(INTERACTION_ELEMENTS), laterTargetState: longest(INTERACTION_ELEMENTS),
@@ -922,6 +950,9 @@ function withRunner(mode, body, overrides = {}) {
         expect(
           JSON.parse(target.EnvironmentVariables.PAAD_XCTEST_CASE).mode,
         ).toBe(mode);
+        expect(target.EnvironmentVariables.PAAD_XCTEST_CAPTURE)
+          .toBe(overrides.env?.PAAD_IOS_DIAGNOSTIC_PUBLIC_KEY ? '1' : undefined);
+        expect(options.env.PAAD_IOS_DIAGNOSTIC_PUBLIC_KEY).toBeUndefined();
         fs.writeSync(
           options.stdio[1],
           `${overrides.logPrefix || 'RAW_CANARY'}\n${PREFIX}${JSON.stringify(
@@ -980,6 +1011,31 @@ test('native live orchestration keeps the key and raw logs private, publishing o
       ),
     ).not.toMatch(/RAW_CANARY|deviceKey/);
   });
+});
+
+test('a successful opted-in live flow does not collect a failure capture', () => {
+  const {publicKey} = require('node:crypto').generateKeyPairSync('rsa', {
+    modulusLength: 3072, publicKeyEncoding: {type: 'spki', format: 'pem'},
+  });
+  withRunner('live', passed => {
+    expect(passed).toBe(true);
+    expect(fs.existsSync('build/ios-encrypted-diagnostic.json')).toBe(false);
+  }, {env: {PAAD_IOS_DIAGNOSTIC_PUBLIC_KEY: publicKey}});
+});
+
+test('an ineligible approved capture fails visibly without publishing any raw file', () => {
+  const {publicKey} = require('node:crypto').generateKeyPairSync('rsa', {
+    modulusLength: 3072, publicKeyEncoding: {type: 'spki', format: 'pem'},
+  });
+  withRunner('live', (passed, runner) => {
+    expect(passed).toBe(false);
+    expect(runner.readDiagnostics().nativeUi.approvedCaptureExport).toBe('failed');
+    expect(fs.existsSync('build/ios-encrypted-diagnostic.json')).toBe(false);
+  }, {
+    env: {PAAD_IOS_DIAGNOSTIC_PUBLIC_KEY: publicKey},
+    result: {...nativeResult(), outcome: 'failed', approvedCapture: 'ineligible'},
+  });
+  expect(sanitizeNativeResult({...nativeResult(), approvedCaptureExport: 'RAW_CANARY'})).toBeUndefined();
 });
 
 test.each(['waiting-for-hittability', 'waiting-for-readiness', 'dismissing-permission', 'tapping', 'waiting-for-sheet'])(
@@ -1149,10 +1205,17 @@ test('Swift diagnostics use only the parser vocabularies and stable public contr
   expect(values('CapsuleContainment').sort()).toEqual([...CAPSULE_CONTAINMENTS].sort());
   expect(values('TouchTargetSize').sort()).toEqual([...TOUCH_TARGET_SIZES].sort());
   expect(values('ResolutionCapture').sort()).toEqual([...RESOLUTION_CAPTURES].sort());
+  expect(values('ApprovedCapture').sort()).toEqual([...APPROVED_CAPTURES].sort());
+  expect(values('PermissionSource').sort()).toEqual([...PERMISSION_SOURCES].sort());
   for (const value of values('Failure')) expect(FAILURE_CATEGORIES).toContain(value);
   for (const value of values('Target')) expect(TARGETS).toContain(value);
   expect(swift).toContain('FileHandle.standardOutput.write(Data("PAAD_XCTEST_RESULT:');
-  expect(swift).not.toMatch(/screenshot\(\)|debugDescription|XCTAttachment\(/);
+  const ordinary = swift.replace(
+    /\/\/ MARK: Approved encrypted failure capture[\s\S]*?\/\/ MARK: Diagnostics/,
+    '// MARK: Diagnostics',
+  );
+  expect(ordinary).not.toMatch(/screenshot\(\)|debugDescription|XCTAttachment\(/);
+  expect(swift).not.toContain('XCTAttachment(');
   expect(swift).not.toContain('"IoT Plug and Play"');
 });
 
@@ -1445,6 +1508,26 @@ test('native smoke never submits credentials and live cold restoration uses an a
   expect(finalized).toContain('stage == .finished && applicationState == .notRunning');
 });
 
+test('approved visual capture is gated after Connected with the credential form absent and no attachments', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const capture = swift.split('// MARK: Approved encrypted failure capture')[1]
+    .split('// MARK: Diagnostics')[0];
+  expect(capture).toContain('guard connected, app.state == .runningForeground');
+  expect(capture).toContain('!element(.formDeviceKey).exists');
+  expect(capture).toContain('!element(.formRegistrationId).exists');
+  expect(capture).toContain('app.secureTextFields.count == 0');
+  expect(capture).toContain('status.label == AppLabel.connected');
+  expect(capture).toContain('guard let key = captureRedactionKey, approvedCapture == nil');
+  expect(capture).toContain('guard mode == "live", captureEligible()');
+  expect(capture).toContain('.replacingOccurrences(of: key, with: "[REDACTED]")');
+  expect(capture).toContain('paad-approved-diagnostic');
+  expect(capture).toContain('options: .withoutOverwriting');
+  expect(capture).not.toMatch(/XCTAttachment|print\(|standardOutput|\.tap\(|\.activate\(/);
+  const timeout = swift.split('private func waitForDetailsTarget(')[1].split('private func requireIdentity(')[0];
+  expect(timeout.indexOf('captureApprovedFailure()')).toBeGreaterThan(timeout.indexOf('capture: .timedOut'));
+  expect(swift.split('override func record(')[1].split('// MARK: Entry point')[0])
+    .not.toContain('captureApprovedFailure');
+});
 test('native project and build preserve existing app signing and reject reused or arbitrary deletion roots', () => {
   const ruby = fs.readFileSync('scripts/ci/create-ios-uitest-project.rb', 'utf8');
   const build = fs.readFileSync('scripts/ci/build-ios-uitests.sh', 'utf8');
