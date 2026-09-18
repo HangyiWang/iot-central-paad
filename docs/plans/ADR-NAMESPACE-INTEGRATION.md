@@ -117,6 +117,16 @@ post-connection readiness and live proof deadlines are unchanged. A Booted state
 alone is never accepted as readiness. Fixed bootstrap-stage/outcome reporting
 does not relax the restrictions on raw logs from credentialed jobs.
 
+Retained-device run `35293248335`, source
+`4e37c8e4bcd6ce46145ab1033c9e0f8cc2e4e0b5`, passed preflight and reached Connected.
+Its preserved diagnostics found exactly one enabled Details button inside the
+app bounds, but the pre-tap hittability flag remained false; the harness stopped
+without attempting the gesture. The following harness revision keeps uniqueness,
+enabled-state, full-frame and overlay checks, then lets XCTest's real `tap()`
+compute the hit point. It requires the sheet to be absent before that action and
+present afterward. No coordinate fallback or application shortcut is introduced,
+and exact identity, nonce and genuine cold-restoration assertions remain required.
+
 ### Connection capsule delivery (2026-09-17)
 
 The accepted capsule keeps status, a ringed cloud icon and a separated Details

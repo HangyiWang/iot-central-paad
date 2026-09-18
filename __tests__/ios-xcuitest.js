@@ -685,7 +685,7 @@ test('native live orchestration keeps the key and raw logs private, publishing o
   });
 });
 
-test.each(['waiting-for-hittability', 'dismissing-permission', 'tapping', 'waiting-for-sheet'])(
+test.each(['waiting-for-hittability', 'waiting-for-readiness', 'dismissing-permission', 'tapping', 'waiting-for-sheet'])(
   'native live failure publishes only fixed %s state without changing proof or log retention',
   phase => {
     const interactionDiagnostics = {
@@ -853,11 +853,13 @@ test('Swift diagnostics use only the parser vocabularies and stable public contr
   expect(swift).not.toContain('"IoT Plug and Play"');
 });
 
-test('Details waits for real header hittability and sheet appearance without swipes or coordinate taps', () => {
+test('Details requires unique enabled in-frame readiness and a real tap-to-sheet transition', () => {
   const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
   const open = swift.split('private func openDetails()')[1].split('private func waitForDetailsTarget(')[0];
   const events = [
-    '.connectionDetails, phase: .waitingForHittability, failure: .notHittable',
+    'NSPredicate(format: "exists == false")',
+    'on: element(.connectionDetailsSheet)',
+    '.connectionDetails, phase: .waitingForReadiness, failure: .notHittable',
     'pendingCategory = .notHittable',
     'InteractionPhase.tapping.rawValue',
     'emit(outcome: .inProgress)',
@@ -885,7 +887,10 @@ test('Details waits for real header hittability and sheet appearance without swi
   expect(wait.split('let predicate =')[1].split('while ProcessInfo')[0]).not.toContain('dismissKnownPermissionAlert');
   expect(open + wait).not.toMatch(/swipe|coordinate|tap\(\.connectionDetails\)|try find\(|try hittable\(/i);
   const state = swift.split('private func updateInteraction(')[1].split('private func diagnoseInput(')[0];
-  expect(state).toContain('target == .connectionDetailsSheet ? exists : state == .hittable');
+  expect(state).toContain('target == .connectionDetailsSheet ? exists');
+  expect(state).toContain(': exists && state != .disabled');
+  expect(state).toContain('frameVisibility(field.frame, in: app.frame) == .insideApp');
+  expect(state.split('let targetReady =')[1]).not.toContain('state == .hittable');
   expect(state).toContain('targetReady && !busyOverlay && systemAlert == .none && applicationAlert == .none');
   expect(state).not.toMatch(/\.label\b|\.value\b|placeholderValue|debugDescription|screenshot/);
   expect(state).toContain('element(.appBusyOverlay).exists');

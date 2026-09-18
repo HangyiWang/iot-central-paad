@@ -39,7 +39,7 @@ const INPUT_VALUES = Object.freeze([
 const INPUT_FLAGS = Object.freeze(['hasNewline', 'uiFocused', 'hittable', 'enabled', 'keyboardVisible']);
 const INTERACTION_TARGETS = Object.freeze(['connection-details', 'connection-details-sheet']);
 const INTERACTION_PHASES = Object.freeze([
-  'waiting-for-hittability', 'dismissing-permission', 'tapping', 'waiting-for-sheet', 'sheet-visible',
+  'waiting-for-hittability', 'waiting-for-readiness', 'dismissing-permission', 'tapping', 'waiting-for-sheet', 'sheet-visible',
 ]);
 const INTERACTION_ELEMENTS = Object.freeze(['unavailable', 'missing', 'disabled', 'not-hittable', 'hittable']);
 const PERMISSION_ALERTS = Object.freeze(['none', 'other', 'denial-present', 'denial-hittable']);

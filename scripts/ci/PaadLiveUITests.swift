@@ -129,6 +129,7 @@ private enum InputValue: String {
 
 private enum InteractionPhase: String {
   case waitingForHittability = "waiting-for-hittability"
+  case waitingForReadiness = "waiting-for-readiness"
   case dismissingPermission = "dismissing-permission"
   case tapping
   case waitingForSheet = "waiting-for-sheet"
@@ -495,8 +496,13 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   private func openDetails() throws {
+    try waitFor(
+      NSPredicate(format: "exists == false"),
+      on: element(.connectionDetailsSheet),
+      timeout: Timeout.standard,
+      failure: .unexpectedIssue)
     let control = try waitForDetailsTarget(
-      .connectionDetails, phase: .waitingForHittability, failure: .notHittable)
+      .connectionDetails, phase: .waitingForReadiness, failure: .notHittable)
     pendingCategory = .notHittable
     interactionDiagnostics?["phase"] = InteractionPhase.tapping.rawValue
     emit(outcome: .inProgress)
@@ -1054,9 +1060,12 @@ final class PaadLiveUITests: XCTestCase {
       "permissionDismissed": permissionDismissed,
       "permissionLimitReached": permissionAttempts == Permission.maximumAttempts,
     ]
-    // A sheet container need only exist; its actionable children are checked
-    // individually by the identity/input steps. The header must be hittable.
-    let targetReady = target == .connectionDetailsSheet ? exists : state == .hittable
+    // The pre-tap flag is diagnostic, not a substitute for XCTest's real tap.
+    // Require the unique enabled header to be in-frame; tap() must compute its
+    // hit point and actually open the previously absent sheet.
+    let targetReady = target == .connectionDetailsSheet ? exists
+      : exists && state != .disabled
+        && frameVisibility(field.frame, in: app.frame) == .insideApp
     return targetReady && !busyOverlay && systemAlert == .none && applicationAlert == .none
   }
 
