@@ -8,6 +8,7 @@ const {
   ProofError,
   azureReader,
   validateTargets,
+  registryDevices,
 } = require('./verify-mobile-proof');
 
 class AzureContextExportError extends Error {
@@ -187,23 +188,7 @@ function collectAzureContext(
     exportFail('ASSIGNMENT_MISMATCH');
   }
 
-  const registryMatches = array(
-    read(
-      [
-        'iot',
-        'adr',
-        'ns',
-        'registry-device',
-        'list',
-        '--namespace',
-        targets.namespace,
-        '--resource-group',
-        targets.resourceGroup,
-      ],
-      '[].{resourceId:id,name:name,externalDeviceId:properties.externalDeviceId}',
-    ),
-    'INVALID_REGISTRY_RESPONSE',
-  ).filter(
+  const registryMatches = registryDevices(targets, read).filter(
     record =>
       record &&
       typeof record === 'object' &&
@@ -266,7 +251,7 @@ function collectAzureContext(
   };
   if (registryMatches.length === 1) {
     snapshot.registryDevice = {
-      resourceId: registryMatches[0].resourceId,
+      resourceId: registryMatches[0].id,
       name: registryMatches[0].name,
       externalDeviceId: registryMatches[0].externalDeviceId,
     };
@@ -318,6 +303,7 @@ function parseInvocation(argv) {
         namespace: {type: 'string'},
         'dps-service-host': {type: 'string'},
         'hub-service-host': {type: 'string'},
+        'registry-arm-endpoint': {type: 'string'},
         out: {type: 'string'},
         help: {type: 'boolean', default: false},
       },
@@ -340,6 +326,9 @@ Required:
   --dps-service-host <DPS service FQDN>
   --hub-service-host <IoT Hub service FQDN>
   --out <new JSON file>
+Optional: --registry-arm-endpoint <https://management.azure.com or
+  https://centraluseuap.management.azure.com> explicitly reads preview registry
+  inventory through ARM when the installed CLI lacks registry-device.
 The output file is created exclusively with mode 0600 and is never overwritten.
 Only allowlisted resource metadata, exact DPS assignment, optional registry identity,
 and up to 20 namespace activity events from the last 24 hours are read. No keys,
@@ -386,6 +375,7 @@ function run(argv, environment = process.env, dependencies = {}) {
     namespace: values.namespace,
     dpsServiceHost: values['dps-service-host'],
     hubServiceHost: values['hub-service-host'],
+    registryArmEndpoint: values['registry-arm-endpoint'],
   });
   const deadline = Date.now() + 180000;
   const read = dependencies.read || azureReader(targets, deadline);

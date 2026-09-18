@@ -3,6 +3,7 @@ const {
   checkBefore,
   validateTargets,
   azureReader,
+  registryDevices,
 } = require('../scripts/ci/verify-mobile-proof');
 const {validateLiveConfig, MODEL_ID} = require('../scripts/ci/live-config');
 const {spawnSync} = require('node:child_process');
@@ -44,6 +45,68 @@ const record = {
   externalDeviceId: 'different-assigned-id',
 };
 const reader = (...responses) => jest.fn(() => responses.shift());
+const armTargets = {...targets, registryArmEndpoint: 'https://centraluseuap.management.azure.com'};
+const registryPath = `/subscriptions/${targets.subscription}/resourceGroups/${targets.resourceGroup}` +
+  `/providers/Microsoft.DeviceRegistry/namespaces/${targets.namespace}/registryDevices`;
+const inventoryUrl = `${armTargets.registryArmEndpoint}${registryPath}?api-version=2026-11-02-preview`;
+const armRecord = {...record, id: `${registryPath}/${record.name}`};
+
+test('explicit ARM registry reads require a known origin and cover all pages without fetching keys', () => {
+  const nextLink = `${inventoryUrl}&$skiptoken=second`;
+  const read = reader(
+    {value: [{...armRecord, externalDeviceId: 'other', arbitrary: 'RAW_CANARY'}], nextLink},
+    {value: [armRecord], nextLink: null},
+  );
+  expect(registryDevices(armTargets, read)).toEqual([
+    {...armRecord, externalDeviceId: 'other'}, armRecord,
+  ]);
+  expect(read.mock.calls.map(([command]) => command)).toEqual([
+    ['rest', '--method', 'get', '--url', inventoryUrl, '--resource', 'https://management.azure.com/'],
+    ['rest', '--method', 'get', '--url', nextLink, '--resource', 'https://management.azure.com/'],
+  ]);
+  expect(validateTargets(armTargets)).toEqual(armTargets);
+  expect(() => validateTargets({...targets, registryArmEndpoint: 'https://example.com'}))
+    .toThrow('INVALID_REGISTRY_ARM_ENDPOINT');
+  expect(() => registryDevices({...targets, registryArmEndpoint: 'https://example.com'}, read))
+    .toThrow('INVALID_REGISTRY_ARM_ENDPOINT');
+  expect(JSON.stringify(read.mock.calls)).not.toMatch(/show-keys|list-keys|primaryKey/);
+});
+
+test.each([
+  `${inventoryUrl}#fragment`,
+  inventoryUrl.replace('https:', 'http:'),
+  inventoryUrl.replace('centraluseuap.management.azure.com', 'example.com'),
+  inventoryUrl.replace('https://', 'https://user@'),
+  inventoryUrl.replace('fixture-ns', 'another-ns'),
+  inventoryUrl.replace('2026-11-02-preview', 'other-version'),
+  `${inventoryUrl}&api-version=2026-11-02-preview`,
+  inventoryUrl,
+  '../registryDevices?api-version=2026-11-02-preview',
+  'x'.repeat(8193),
+  1,
+])('rejects unsafe, duplicate or changed-scope ARM continuations before requesting them (%#)', nextLink => {
+  const read = reader({value: [], nextLink});
+  expect(() => registryDevices(armTargets, read)).toThrow('INVALID_REGISTRY_PAGE');
+  expect(read).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  null, [], {}, {value: {}}, {value: [null]},
+  {value: [{...armRecord, id: '/another/namespace/record'}]},
+])('rejects malformed ARM registry inventory instead of claiming absence (%#)', response => {
+  expect(() => registryDevices(armTargets, reader(response))).toThrow('INVALID_REGISTRY_RESPONSE');
+});
+
+test('bounds ARM pages and records and propagates read failures', () => {
+  let page = 0;
+  const read = jest.fn(() => ({value: [], nextLink: `${inventoryUrl}&$skiptoken=${++page}`}));
+  expect(() => registryDevices(armTargets, read)).toThrow('REGISTRY_INVENTORY_LIMIT');
+  expect(read).toHaveBeenCalledTimes(20);
+  expect(() => registryDevices(armTargets, reader({value: Array(10001).fill(armRecord)})))
+    .toThrow('REGISTRY_INVENTORY_LIMIT');
+  expect(() => registryDevices(armTargets, () => { throw new Error('AZURE_READ_DENIED'); }))
+    .toThrow('AZURE_READ_DENIED');
+});
 
 test('recognizes the actual pre-registration DPS service code without logging its body', () => {
   spawnSync.mockReturnValueOnce({

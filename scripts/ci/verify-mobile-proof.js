@@ -5,6 +5,11 @@ const fs = require('node:fs');
 const {spawnSync} = require('node:child_process');
 const {parseArgs} = require('node:util');
 const {validateLiveConfig, MODEL_ID} = require('./live-config');
+const REGISTRY_API_VERSION = '2026-11-02-preview';
+const REGISTRY_ARM_ENDPOINTS = Object.freeze([
+  'https://management.azure.com',
+  'https://centraluseuap.management.azure.com',
+]);
 
 class ProofError extends Error {
   constructor(code) {
@@ -27,6 +32,12 @@ function validateTargets(input) {
       throw new ProofError('INVALID_OPERATOR_TARGET');
     }
     result[key] = input[key];
+  }
+  if (input.registryArmEndpoint !== undefined) {
+    if (!REGISTRY_ARM_ENDPOINTS.includes(input.registryArmEndpoint)) {
+      throw new ProofError('INVALID_REGISTRY_ARM_ENDPOINT');
+    }
+    result.registryArmEndpoint = input.registryArmEndpoint;
   }
   return result;
 }
@@ -61,6 +72,52 @@ function azureReader(targets, deadline) {
 }
 
 function registryDevices(targets, read) {
+  if (targets.registryArmEndpoint) {
+    if (!REGISTRY_ARM_ENDPOINTS.includes(targets.registryArmEndpoint)) {
+      throw new ProofError('INVALID_REGISTRY_ARM_ENDPOINT');
+    }
+    const resourcePath = `/subscriptions/${encodeURIComponent(targets.subscription)}` +
+      `/resourceGroups/${encodeURIComponent(targets.resourceGroup)}` +
+      `/providers/Microsoft.DeviceRegistry/namespaces/${encodeURIComponent(targets.namespace)}/registryDevices`;
+    let next = `${targets.registryArmEndpoint}${resourcePath}?api-version=${REGISTRY_API_VERSION}`;
+    const seen = new Set();
+    const records = [];
+    for (let page = 0; page < 20; page++) {
+      let url;
+      try {
+        url = new URL(next);
+      } catch {
+        throw new ProofError('INVALID_REGISTRY_PAGE');
+      }
+      if (url.origin !== targets.registryArmEndpoint || url.username || url.password || url.hash ||
+          url.pathname.toLowerCase() !== resourcePath.toLowerCase() ||
+          url.searchParams.getAll('api-version').length !== 1 ||
+          url.searchParams.get('api-version') !== REGISTRY_API_VERSION || seen.has(url.href)) {
+        throw new ProofError('INVALID_REGISTRY_PAGE');
+      }
+      seen.add(url.href);
+      const result = read([
+        'rest', '--method', 'get', '--url', url.href,
+        '--resource', 'https://management.azure.com/',
+      ], '{value:value[].{id:id,name:name,externalDeviceId:properties.externalDeviceId},nextLink:nextLink}');
+      if (!result || typeof result !== 'object' || Array.isArray(result) || !Array.isArray(result.value) ||
+          result.value.some(record => !record || typeof record !== 'object' ||
+            typeof record.id !== 'string' || typeof record.name !== 'string' ||
+            !record.id.toLowerCase().startsWith(`${resourcePath.toLowerCase()}/`))) {
+        throw new ProofError('INVALID_REGISTRY_RESPONSE');
+      }
+      records.push(...result.value.map(record => ({
+        id: record.id, name: record.name, externalDeviceId: record.externalDeviceId,
+      })));
+      if (records.length > 10000) throw new ProofError('REGISTRY_INVENTORY_LIMIT');
+      if (result.nextLink === undefined || result.nextLink === null || result.nextLink === '') return records;
+      if (typeof result.nextLink !== 'string' || result.nextLink.length > 8192) {
+        throw new ProofError('INVALID_REGISTRY_PAGE');
+      }
+      next = result.nextLink;
+    }
+    throw new ProofError('REGISTRY_INVENTORY_LIMIT');
+  }
   const records = read([
     'iot', 'adr', 'ns', 'registry-device', 'list',
     '--namespace', targets.namespace,
@@ -159,6 +216,7 @@ async function main() {
     namespace: {type: 'string'},
     'dps-service-host': {type: 'string'},
     'hub-service-host': {type: 'string'},
+    'registry-arm-endpoint': {type: 'string'},
     timeout: {type: 'string', default: '180'},
     before: {type: 'boolean', default: false},
     help: {type: 'boolean', default: false},
@@ -170,6 +228,9 @@ Required: --config <nonsecret-live-config.json> --subscription <id>
   --resource-group <rg> --namespace <name> --dps-service-host <configured DNS>
   --hub-service-host <configured service DNS>
 Optional: --platform all|android|ios --timeout <1-600 seconds> --before
+  --registry-arm-endpoint <supported ARM origin> explicitly uses the preview
+  registry inventory REST API when the installed CLI lacks registry-device.
+  Supported: ${REGISTRY_ARM_ENDPOINTS.join(', ')}
 Use --before before mobile traffic and retain its JSON result.
 Without --before, require exact DPS assignment, Hub model/nonce and ADR identity.
 Configured service hosts must come from operator readback, not guessed endpoints.
@@ -184,6 +245,7 @@ Output is allowlisted JSON; no raw Azure CLI errors or device properties are pri
     namespace: values.namespace,
     dpsServiceHost: values['dps-service-host'],
     hubServiceHost: values['hub-service-host'],
+    registryArmEndpoint: values['registry-arm-endpoint'],
   });
   if (
     targets.hubServiceHost.replace('.service.azure-devices.', '.azure-devices.') !==
@@ -219,7 +281,7 @@ Output is allowlisted JSON; no raw Azure CLI errors or device properties are pri
   throw new ProofError('VERIFICATION_TIMEOUT');
 }
 
-module.exports = {ProofError, validateTargets, azureReader, checkBefore, inspectProof};
+module.exports = {ProofError, validateTargets, azureReader, registryDevices, checkBefore, inspectProof};
 if (require.main === module) {
   main().catch(error => {
     const code = error instanceof ProofError ? error.code : 'INVALID_OPERATOR_INPUT';

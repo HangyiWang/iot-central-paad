@@ -2,6 +2,7 @@ const {
   collectAzureContext,
   ensureSafeEnvironment,
   writeExclusive,
+  run,
 } = require('../scripts/ci/export-azure-context');
 const {validateLiveConfig} = require('../scripts/ci/live-config');
 const {validateTargets} = require('../scripts/ci/verify-mobile-proof');
@@ -64,7 +65,7 @@ const responses = () => [
   },
   [
     {
-      resourceId: `${namespaceId}/registryDevices/operator-record`,
+      id: `${namespaceId}/registryDevices/operator-record`,
       name: 'operator-record',
       externalDeviceId: 'operator-device',
     },
@@ -157,6 +158,55 @@ test('allows a missing registry record but rejects ambiguity and denied activity
   expect(() => collectAzureContext(config, 'android', targets, read)).toThrow(
     'AZURE_READ_DENIED',
   );
+});
+
+test('explicit ARM inventory works through the exporter invocation and shared snapshot validation', () => {
+  const values = responses();
+  values[5] = {value: values[5], nextLink: null};
+  const read = reader(values);
+  const fileSystem = {
+    readFileSync: jest.fn(() => JSON.stringify(config)),
+    writeFileSync: jest.fn(),
+    chmodSync: jest.fn(),
+  };
+  const result = run(
+    [
+      '--config',
+      'nonsecret.json',
+      '--platform',
+      'android',
+      '--subscription',
+      subscriptionId,
+      '--resource-group',
+      resourceGroup,
+      '--namespace',
+      namespaceName,
+      '--dps-service-host',
+      targets.dpsServiceHost,
+      '--hub-service-host',
+      targets.hubServiceHost,
+      '--out',
+      'new-context.json',
+      '--registry-arm-endpoint',
+      'https://centraluseuap.management.azure.com',
+    ],
+    {},
+    {read, fs: fileSystem, now: () => new Date('2026-09-17T19:00:00.000Z')},
+  );
+  expect(result.snapshot.registryDevice).toMatchObject({
+    resourceId: `${namespaceId}/registryDevices/operator-record`,
+    externalDeviceId: 'operator-device',
+  });
+  expect(read.mock.calls[5][0]).toEqual(
+    expect.arrayContaining([
+      'rest',
+      '--method',
+      'get',
+      '--resource',
+      'https://management.azure.com/',
+    ]),
+  );
+  expect(fileSystem.writeFileSync).toHaveBeenCalledTimes(1);
 });
 
 test('requires exact links and assignment identity', () => {

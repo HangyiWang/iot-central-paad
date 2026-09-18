@@ -224,6 +224,15 @@ node scripts/ci/verify-mobile-proof.js --before \
   --hub-service-host <configured-Hub-service-host>
 ```
 
+If the installed preview CLI no longer exposes `iot adr ns registry-device`,
+both operator helpers accept an explicit `--registry-arm-endpoint` of
+`https://management.azure.com` or `https://centraluseuap.management.azure.com`.
+This selects read-only inventory requests using API `2026-11-02-preview`, not
+an automatic fallback or a CLI downgrade. Continuations must retain the same
+origin, namespace path and API version; inventory is bounded to 20 pages and
+10,000 records within the existing deadline. No permissions or resources are
+changed, and no operator credentials enter the app or device-input workflow.
+
 Retain this pre-traffic absence report. After the app sends the same nonce, run
 the same command **without `--before`**. It performs bounded, read-only checks
 for the exact DPS assignment, Hub twin model/nonce, and ADR external-device
