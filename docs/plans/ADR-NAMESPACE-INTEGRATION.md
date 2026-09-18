@@ -195,6 +195,27 @@ record bounds. Actual gestures, readiness/proof assertions and the narrowly
 permission-gated retry rule are unchanged. Opening a sheet from `onPressIn`
 would change user interaction semantics and is deliberately not used.
 
+Credential-free replay `35313776253` passed that harness (`fcd01c6`) against
+the pre-secret `1722f0e` app, including exact synthetic input and cold startup;
+its owned simulator was deleted. Retained live run `35314665825` on `fcd01c6`
+then passed preflight and connected, but again did not open Details. New evidence
+found one button inside one capsule, with the expected capsule membership and
+at least a 44-point frame. It was non-hittable before the unsuccessful tap but
+hittable immediately afterward and at the later observation. Presentation
+remained closed; no permission was handled during that tap. This rules against
+a persistently undersized or out-of-container target, not every possible cause.
+The run ended at 06:49 UTC; the local watcher next reported and confirmed removal
+of its temporary input at 13:12 UTC. Both dedicated secret slots were then empty.
+
+The native driver now uses its direct bounded polling to require hittability
+before the initial gesture as well as any permission-gated retry, and checks
+again after collecting readiness diagnostics. It does not use nested XCTest
+predicate polling for this readiness check. An in-frame but non-hittable target
+no longer triggers a speculative first tap. This strengthens the precondition
+without changing app behavior, introducing a second ordinary tap, or relaxing
+the sheet/identity/nonce/cold-restoration requirements. Its live outcome remains
+to be established.
+
 ### Connection capsule delivery (2026-09-17)
 
 The accepted capsule keeps status, a ringed cloud icon and a separated Details

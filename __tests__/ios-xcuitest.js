@@ -978,7 +978,7 @@ test('Swift diagnostics use only the parser vocabularies and stable public contr
   expect(swift).not.toContain('"IoT Plug and Play"');
 });
 
-test('Details requires unique enabled in-frame readiness and a real tap-to-sheet transition', () => {
+test('Details requires unique hittable in-frame readiness and a real tap-to-sheet transition', () => {
   const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
   const open = swift.split('private func openDetails()')[1].split('private func tapDetails(')[0];
   const events = [
@@ -1008,9 +1008,8 @@ test('Details requires unique enabled in-frame readiness and a real tap-to-sheet
   expect(open + wait).not.toMatch(/swipe|coordinate|tap\(\.connectionDetails\)|try find\(|try hittable\(/i);
   const state = swift.split('private func updateInteraction(')[1].split('private func diagnoseInput(')[0];
   expect(state).toContain('target == .connectionDetailsSheet ? exists');
-  expect(state).toContain(': exists && state != .disabled');
+  expect(state).toContain(': exists && state == .hittable');
   expect(state).toContain('frameVisibility(field.frame, in: app.frame) == .insideApp');
-  expect(state.split('let targetReady =')[1]).not.toContain('state == .hittable');
   expect(state).toContain('targetReady && !busyOverlay && systemAlert == .none && applicationAlert == .none');
   expect(state).not.toMatch(/\.label\b|\.value\b|placeholderValue|debugDescription|screenshot/);
   expect(state).toContain('element(.appBusyOverlay).exists');
@@ -1025,7 +1024,7 @@ test('Details retries only a handled in-tap interruption with a still-absent she
   expect(open).toContain('detailsTapDiagnostics = []');
   expect(open).toContain('if interrupted && !element(.connectionDetailsSheet).waitForExistence(timeout: Timeout.short)');
   expect(open).toContain('if !diagnoseDetailsPresentation()');
-  expect(open).toContain('requireHittable: true');
+  expect(open.match(/\.connectionDetails, phase: \.waitingForReadiness, failure: \.notHittable/g)).toHaveLength(2);
   expect(open.match(/attempt: \.permissionRetry/g)).toHaveLength(1);
   expect(open).not.toMatch(/\bfor\b|\bwhile\b|\bcatch\b/);
   const tap = swift.split('private func tapDetails(')[1].split('private func diagnoseDetailsPresentation(')[0];
@@ -1044,7 +1043,7 @@ test('Details retries only a handled in-tap interruption with a still-absent she
   expect(presentation).toContain('("identity", .assignedDeviceId)');
   expect(tap + presentation).not.toMatch(/\.label\b|\.value\b|debugDescription|screenshot|coordinate|swipe/);
   const wait = swift.split('private func waitForDetailsTarget(')[1].split('private func requireIdentity(')[0];
-  expect(wait).toContain('&& (!requireHittable || field.isHittable)');
+  expect(wait).not.toContain('requireHittable');
   const emitter = swift.split('private func emit(outcome:')[1];
   expect(emitter).toContain('record["detailsTapDiagnostics"] = detailsTapDiagnostics');
 });
@@ -1056,6 +1055,12 @@ test('retains readiness before the real tap and samples later state without chan
   expect(tap.indexOf('["readiness"]')).toBeLessThan(tap.indexOf('control.tap()'));
   expect(tap.indexOf('["postTapState"] = interactionState(control)')).toBeGreaterThan(tap.indexOf('control.tap()'));
   expect(tap.match(/control\.tap\(\)/g)).toHaveLength(1);
+  expect(tap).toContain('throws -> Bool');
+  expect(tap).toContain('let targetState = interactionState(control)');
+  expect(tap).toContain('"targetState": targetState.rawValue');
+  expect(tap).toContain('guard targetState == .hittable else { throw Failure.notHittable }');
+  expect(tap.indexOf('guard targetState == .hittable')).toBeLessThan(tap.indexOf('control.tap()'));
+  expect(tap).not.toMatch(/\bwhile\b|\bfor\b/);
   const presentation = swift.split('private func diagnoseDetailsPresentation(')[1].split('private func detailsPresentation(')[0];
   expect(presentation).toContain('["laterTargetState"] = interactionState(query.firstMatch)');
   const readiness = swift.split('private func retainDetailsReadiness(')[1].split('private func diagnoseResolution(')[0];

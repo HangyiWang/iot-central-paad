@@ -556,15 +556,14 @@ final class PaadLiveUITests: XCTestCase {
       failure: .unexpectedIssue)
     let control = try waitForDetailsTarget(
       .connectionDetails, phase: .waitingForReadiness, failure: .notHittable)
-    let interrupted = tapDetails(control, attempt: .initial)
+    let interrupted = try tapDetails(control, attempt: .initial)
     // A handled permission interruption can consume the original interaction.
     // Retry once only when that happened and the sheet is still absent.
     if interrupted && !element(.connectionDetailsSheet).waitForExistence(timeout: Timeout.short) {
       if !diagnoseDetailsPresentation() {
         let retryControl = try waitForDetailsTarget(
-          .connectionDetails, phase: .waitingForReadiness, failure: .notHittable,
-          requireHittable: true)
-        _ = tapDetails(retryControl, attempt: .permissionRetry)
+          .connectionDetails, phase: .waitingForReadiness, failure: .notHittable)
+        _ = try tapDetails(retryControl, attempt: .permissionRetry)
       }
     }
     _ = try waitForDetailsTarget(
@@ -575,11 +574,14 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   @discardableResult
-  private func tapDetails(_ control: XCUIElement, attempt: DetailsTapAttempt) -> Bool {
+  private func tapDetails(_ control: XCUIElement, attempt: DetailsTapAttempt) throws -> Bool {
     let dismissalsBeforeTap = permissionDismissals
+    pendingCategory = .notHittable
+    nativeOperation = .stateCheck
+    let targetState = interactionState(control)
     detailsTapDiagnostics.append([
       "attempt": attempt.rawValue,
-      "targetState": interactionDiagnostics?["element"] ?? InteractionElement.unavailable.rawValue,
+      "targetState": targetState.rawValue,
       "completed": false,
       "permissionHandled": false,
       "sheet": ElementPresence.unavailable.rawValue,
@@ -593,7 +595,8 @@ final class PaadLiveUITests: XCTestCase {
     if let detailsReadiness = detailsReadiness {
       detailsTapDiagnostics[index]["readiness"] = detailsReadiness
     }
-    pendingCategory = .notHittable
+    // Diagnostic queries take time; do not tap a target that lost readiness.
+    guard targetState == .hittable else { throw Failure.notHittable }
     interactionDiagnostics?["phase"] = InteractionPhase.tapping.rawValue
     nativeOperation = .tap
     emit(outcome: .inProgress)
@@ -648,8 +651,7 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   private func waitForDetailsTarget(
-    _ target: Target, phase: InteractionPhase, failure: Failure,
-    requireHittable: Bool = false
+    _ target: Target, phase: InteractionPhase, failure: Failure
   ) throws -> XCUIElement {
     // Details is a fixed header, not scroll content. Give navigation, the busy
     // overlay and asynchronous sensor permission dialogs time to settle.
@@ -674,8 +676,7 @@ final class PaadLiveUITests: XCTestCase {
       nativeOperation = .matchCount
       let unique = query.count == 1
       nativeOperation = .stateCheck
-      if updateInteraction(target, field: field, phase: phase) && unique
-        && (!requireHittable || field.isHittable) {
+      if updateInteraction(target, field: field, phase: phase) && unique {
         nativeOperation = .resolution
         diagnoseResolution(target, field: field, query: query, capture: .ready)
         pendingCategory = nil
@@ -1238,11 +1239,10 @@ final class PaadLiveUITests: XCTestCase {
       "permissionDismissed": permissionDismissed,
       "permissionLimitReached": permissionAttempts == Permission.maximumAttempts,
     ]
-    // The pre-tap flag is diagnostic, not a substitute for XCTest's real tap.
-    // Require the unique enabled header to be in-frame; tap() must compute its
-    // hit point and actually open the previously absent sheet.
+    // A visible frame alone did not make the first gesture actionable. Wait for
+    // a hittable header; the real tap must still open the previously absent sheet.
     let targetReady = target == .connectionDetailsSheet ? exists
-      : exists && state != .disabled
+      : exists && state == .hittable
         && frameVisibility(field.frame, in: app.frame) == .insideApp
     return targetReady && !busyOverlay && systemAlert == .none && applicationAlert == .none
   }
