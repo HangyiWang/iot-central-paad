@@ -127,6 +127,13 @@ compute the hit point. It requires the sheet to be absent before that action and
 present afterward. No coordinate fallback or application shortcut is introduced,
 and exact identity, nonce and genuine cold-restoration assertions remain required.
 
+Run `35295215422` on `c346af1` still stopped before the gesture: initial resolution
+completed, then XCTest reported an unclassified issue during readiness polling.
+It does not establish a failed tap. Readiness polling now queries the native
+attributes directly, outside a nested predicate waiter, with the same bounded
+deadline and permission checks. Fixed operation markers distinguish permission,
+query, state, resolution and gesture failures without exporting error text.
+
 ### Connection capsule delivery (2026-09-17)
 
 The accepted capsule keeps status, a ringed cloud icon and a separated Details

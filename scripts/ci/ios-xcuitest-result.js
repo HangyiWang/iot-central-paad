@@ -65,6 +65,9 @@ const NATIVE_ISSUES = Object.freeze([
   'harness-failure', 'snapshot', 'multiple-matches', 'no-matches', 'not-hittable',
   'timeout', 'connection-lost', 'other',
 ]);
+const NATIVE_OPERATIONS = Object.freeze([
+  'sheet-absence', 'permission-check', 'match-count', 'state-check', 'resolution', 'resolve-element', 'tap',
+]);
 
 function sanitizeInputDiagnostics(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > INPUT_PHASES.length ||
@@ -136,6 +139,7 @@ function sanitizeNativeResult(value) {
       value.observedTargets.some(id => !TARGETS.includes(id)) ||
       (value.failureCategory !== undefined && !FAILURE_CATEGORIES.includes(value.failureCategory)) ||
       (value.nativeIssue !== undefined && !NATIVE_ISSUES.includes(value.nativeIssue)) ||
+      (value.nativeOperation !== undefined && !NATIVE_OPERATIONS.includes(value.nativeOperation)) ||
       (value.execution !== undefined && !EXECUTIONS.includes(value.execution))) return undefined;
   const inputDiagnostics = value.inputDiagnostics === undefined ? undefined
     : sanitizeInputDiagnostics(value.inputDiagnostics);
@@ -148,6 +152,7 @@ function sanitizeNativeResult(value) {
     stage: value.stage, applicationState: value.applicationState,
     ...(value.failureCategory ? {failureCategory: value.failureCategory} : {}),
     ...(value.nativeIssue ? {nativeIssue: value.nativeIssue} : {}),
+    ...(value.nativeOperation ? {nativeOperation: value.nativeOperation} : {}),
     observedTargets: [...new Set(value.observedTargets)].sort(),
     connected: value.connected, nonceSubmitted: value.nonceSubmitted, coldRestored: value.coldRestored,
     ...(value.execution ? {execution: value.execution} : {}),
@@ -186,6 +191,6 @@ module.exports = {
   INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
   INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
-  RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES,
+  RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
   sanitizeNativeResult, parseNativeLog, nativeFlowPassed,
 };

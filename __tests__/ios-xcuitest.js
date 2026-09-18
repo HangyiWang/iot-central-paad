@@ -15,7 +15,7 @@ const {
   INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
   INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
-  RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES,
+  RESOLUTION_CAPTURES, RESOLUTION_CHECKPOINTS, NATIVE_ISSUES, NATIVE_OPERATIONS,
 } = require('../scripts/ci/ios-xcuitest-result');
 const {sanitizeDiagnostics} = require('../scripts/ci/live-diagnostics');
 const {validateEnvironment} = require('../scripts/ci/run-ios-xcuitest');
@@ -441,6 +441,13 @@ test.each(['RAW_CANARY', {description: 'RAW_CANARY'}, null])(
   },
 );
 
+test.each(NATIVE_OPERATIONS)('retains only the fixed native operation %s', nativeOperation => {
+  const result = {...nativeResult(), nativeOperation};
+  expect(sanitizeNativeResult(result)).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: result}).nativeUi).toEqual(result);
+  expect(sanitizeNativeResult({...result, nativeOperation: 'RAW_CANARY'})).toBeUndefined();
+});
+
 test.each(RESOLUTION_CHECKPOINTS)('preserves interrupted resolution at %s through the final summary', checkpoint => {
   const unavailable = {type: 'unavailable', state: 'unavailable', frame: 'unavailable'};
   const resolution = {
@@ -845,6 +852,7 @@ test('Swift diagnostics use only the parser vocabularies and stable public contr
   expect(values('NativeElementType').sort()).toEqual([...NATIVE_ELEMENT_TYPES].sort());
   expect(values('FrameVisibility').sort()).toEqual([...FRAME_VISIBILITIES].sort());
   expect(values('NativeIssue').sort()).toEqual([...NATIVE_ISSUES].sort());
+  expect(values('NativeOperation').sort()).toEqual([...NATIVE_OPERATIONS].sort());
   expect(values('ResolutionCapture').sort()).toEqual([...RESOLUTION_CAPTURES].sort());
   for (const value of values('Failure')) expect(FAILURE_CATEGORIES).toContain(value);
   for (const value of values('Target')) expect(TARGETS).toContain(value);
@@ -871,7 +879,7 @@ test('Details requires unique enabled in-frame readiness and a real tap-to-sheet
   expect(events.every(index => index >= 0)).toBe(true);
   expect(events).toEqual([...events].sort((a, b) => a - b));
   const wait = swift.split('private func waitForDetailsTarget(')[1].split('private func requireIdentity(')[0];
-  expect(wait).toContain('NSPredicate { [self] _, _ in');
+  expect(wait).not.toMatch(/NSPredicate|XCTWaiter|XCTNSPredicateExpectation/);
   expect(wait).toContain('? app.buttons.matching(identifier: target.rawValue)');
   expect(wait).toContain('let unique = query.count == 1');
   expect(wait).toContain('updateInteraction(target, field: field, phase: phase) && unique');
@@ -880,11 +888,9 @@ test('Details requires unique enabled in-frame readiness and a real tap-to-sheet
   expect(wait).toContain('dismissKnownPermissionAlert()');
   expect(wait).toContain('ProcessInfo.processInfo.systemUptime + Timeout.standard');
   expect(wait).toContain('while ProcessInfo.processInfo.systemUptime < deadline');
-  expect(wait).toContain('XCTNSPredicateExpectation(predicate: predicate, object: NSNull())');
-  expect(wait).toContain('timeout: min(Timeout.interactionPoll, remaining)');
+  expect(wait).toContain('Thread.sleep(forTimeInterval: min(Timeout.interactionPoll, remaining))');
   expect(wait).toContain('throw failure');
-  expect(wait.indexOf('XCTWaiter().wait(')).toBeLessThan(wait.indexOf('observe(target)'));
-  expect(wait.split('let predicate =')[1].split('while ProcessInfo')[0]).not.toContain('dismissKnownPermissionAlert');
+  expect(wait.indexOf('if updateInteraction(')).toBeLessThan(wait.indexOf('observe(target)'));
   expect(open + wait).not.toMatch(/swipe|coordinate|tap\(\.connectionDetails\)|try find\(|try hittable\(/i);
   const state = swift.split('private func updateInteraction(')[1].split('private func diagnoseInput(')[0];
   expect(state).toContain('target == .connectionDetailsSheet ? exists');
@@ -902,10 +908,8 @@ test('Details requires unique enabled in-frame readiness and a real tap-to-sheet
 test('resolution evidence survives polling and query aborts without text or coordinate taps', () => {
   const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
   const wait = swift.split('private func waitForDetailsTarget(')[1].split('private func requireIdentity(')[0];
-  const predicate = wait.split('let predicate =')[1].split('while ProcessInfo')[0];
-  expect(predicate).not.toContain('diagnoseResolution');
   expect(wait.match(/diagnoseResolution\(/g)).toHaveLength(3);
-  expect(wait.indexOf('capture: .initial')).toBeLessThan(wait.indexOf('let predicate'));
+  expect(wait.indexOf('capture: .initial')).toBeLessThan(wait.indexOf('while ProcessInfo'));
   const diagnosis = swift.split('private func diagnoseResolution(')[1].split('private func permissionAlertState(')[0];
   expect(diagnosis).toContain('0..<min(count, Diagnostic.maximumCandidates)');
   expect(diagnosis).toContain('matches.element(boundBy: index)');

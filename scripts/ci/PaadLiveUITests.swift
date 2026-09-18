@@ -194,6 +194,16 @@ private enum ResolutionCapture: String {
   case timedOut = "timed-out"
 }
 
+private enum NativeOperation: String {
+  case sheetAbsence = "sheet-absence"
+  case permissionCheck = "permission-check"
+  case matchCount = "match-count"
+  case stateCheck = "state-check"
+  case resolution
+  case resolveElement = "resolve-element"
+  case tap
+}
+
 // MARK: - Test case configuration
 
 private struct CaseConfig {
@@ -268,6 +278,7 @@ final class PaadLiveUITests: XCTestCase {
   private var resolutionDiagnostics: [String: Any]?
   private var resolutionTarget: Target?
   private var nativeIssue: NativeIssue?
+  private var nativeOperation: NativeOperation?
   private var permissionAttempts = 0
   private var permissionDismissed = false
 
@@ -496,6 +507,7 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   private func openDetails() throws {
+    nativeOperation = .sheetAbsence
     try waitFor(
       NSPredicate(format: "exists == false"),
       on: element(.connectionDetailsSheet),
@@ -505,12 +517,14 @@ final class PaadLiveUITests: XCTestCase {
       .connectionDetails, phase: .waitingForReadiness, failure: .notHittable)
     pendingCategory = .notHittable
     interactionDiagnostics?["phase"] = InteractionPhase.tapping.rawValue
+    nativeOperation = .tap
     emit(outcome: .inProgress)
     control.tap()
     pendingCategory = nil
     _ = try waitForDetailsTarget(
       .connectionDetailsSheet, phase: .waitingForSheet, failure: .missingElement)
     interactionDiagnostics?["phase"] = InteractionPhase.sheetVisible.rawValue
+    nativeOperation = nil
     advance(to: .details)
   }
 
@@ -527,33 +541,36 @@ final class PaadLiveUITests: XCTestCase {
     let field = query.firstMatch
     let deadline = ProcessInfo.processInfo.systemUptime + Timeout.standard
     pendingCategory = failure
+    nativeOperation = .stateCheck
     updateInteraction(target, field: field, phase: phase)
     emit(outcome: .inProgress)
+    nativeOperation = .resolution
     diagnoseResolution(target, field: field, query: query, capture: .initial)
-    let predicate = NSPredicate { [self] _, _ in
-      let unique = query.count == 1
-      return updateInteraction(target, field: field, phase: phase) && unique
-    }
     while ProcessInfo.processInfo.systemUptime < deadline {
-      // Public attribute reads do not trigger interruption monitors. Explicitly
-      // handle known denial buttons between polls, never inside the predicate.
+      // Native queries can perform their own waits. Keep them outside an XCTest
+      // predicate callback, and explicitly handle only known permission denials.
+      nativeOperation = .permissionCheck
       dismissKnownPermissionAlert()
-      let remaining = deadline - ProcessInfo.processInfo.systemUptime
-      guard remaining > 0 else {
-        break
-      }
-      let expectation = XCTNSPredicateExpectation(predicate: predicate, object: NSNull())
-      if XCTWaiter().wait(
-        for: [expectation], timeout: min(Timeout.interactionPoll, remaining)
-      ) == .completed {
+      nativeOperation = .matchCount
+      let unique = query.count == 1
+      nativeOperation = .stateCheck
+      if updateInteraction(target, field: field, phase: phase) && unique {
+        nativeOperation = .resolution
         diagnoseResolution(target, field: field, query: query, capture: .ready)
         pendingCategory = nil
         observe(target)
         // Unlike firstMatch, element also fails if ambiguity appears at tap time.
+        nativeOperation = .resolveElement
         return query.element
       }
+      let remaining = deadline - ProcessInfo.processInfo.systemUptime
+      if remaining > 0 {
+        Thread.sleep(forTimeInterval: min(Timeout.interactionPoll, remaining))
+      }
     }
+    nativeOperation = .resolution
     diagnoseResolution(target, field: field, query: query, capture: .timedOut)
+    nativeOperation = .matchCount
     let ambiguous = query.count > 1
     if ambiguous {
       throw Failure.ambiguousElement
@@ -1185,6 +1202,9 @@ final class PaadLiveUITests: XCTestCase {
     }
     if let nativeIssue = nativeIssue {
       record["nativeIssue"] = nativeIssue.rawValue
+    }
+    if let nativeOperation = nativeOperation {
+      record["nativeOperation"] = nativeOperation.rawValue
     }
     if !inputDiagnostics.isEmpty {
       record["inputDiagnostics"] = inputDiagnostics
