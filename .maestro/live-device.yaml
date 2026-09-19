@@ -87,8 +87,22 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
       id: connection-status
       text: '^Connected$'
     timeout: 180000
+# Connected identity and connection-operation completion are separate app states.
+- extendedWaitUntil:
+    notVisible:
+      id: app-busy-overlay
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: connection-details
+      enabled: true
+    timeout: 15000
 - tapOn:
     id: connection-details
+- extendedWaitUntil:
+    visible:
+      id: connection-details-sheet
+    timeout: 15000
 # Full identity lives in the details sheet, not the compact status row.
 - extendedWaitUntil:
     visible:
@@ -188,8 +202,21 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     notVisible:
       id: registration-manual
     timeout: 180000
+- extendedWaitUntil:
+    notVisible:
+      id: app-busy-overlay
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: connection-details
+      enabled: true
+    timeout: 15000
 - tapOn:
     id: connection-details
+- extendedWaitUntil:
+    visible:
+      id: connection-details-sheet
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: assigned-device-id

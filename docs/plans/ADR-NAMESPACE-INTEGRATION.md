@@ -119,6 +119,28 @@ Further source-bound native acceptance is still required.
 Physical sensors, BLE/camera/torch, background reliability, native large-text
 and direct-Hub scenarios remain separate from the retained DPS simulator lane.
 
+The follow-up run
+[35464823047](https://github.com/HangyiWang/iot-central-paad/actions/runs/35464823047),
+source `22818dcf087095f232bf0b81060974875e72bfd4`, again built both binaries but
+failed connected acceptance. Android stopped at the `connection-details` tap,
+before the assigned-identity assertion. iOS identified the ambiguous selector:
+the global `Nearby devices` text query matched two native static-text elements.
+It had already completed the unsent property-draft round trip and tool navigation
+through Bluetooth; Activity and cold restoration were not reached. Independent
+iOS assignment/model/fresh-proof/registry reads matched again.
+
+The subsequent driver correction identifies the actual Bluetooth tool heading
+by its stable identifier, then requires uniqueness, hittability and the exact
+heading text rather than selecting an arbitrary matching label. Android now
+separately awaits connection-operation completion, an enabled Details control
+and the visible sheet before asserting exact identity. Its existing failure
+metadata also distinguishes pinned driver error categories, empty/unsupported
+hierarchy roots and bounded control counts; no additional capture is enabled.
+Both owned input slots were removed at 20:11 UTC after run completion. The failed APK was
+not installed on Windows; retained data was not cleared, but fresh connection
+and context restoration remain unconfirmed because the bounded observer was
+unavailable.
+
 ### Completed simulator acceptance (2026-09-18)
 
 The foundation's ordinary locked build/startup lanes passed on Android and iOS

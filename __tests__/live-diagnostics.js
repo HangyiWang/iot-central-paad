@@ -57,6 +57,13 @@ test.each(['tapOnElement', 'scrollUntilVisible'])('reads pinned selector shape f
 
 test.each([
   ['Assertion is false: ', 'assertion-failed'],
+  ['Element not found: ', 'element-not-found'],
+  ['Parent element not found: ', 'parent-element-not-found'],
+  ['No visible element found: ', 'visible-element-not-found'],
+  ["'tap' failed: ", 'tap-operation-failed'],
+  ["'viewHierarchy' failed: ", 'hierarchy-operation-failed'],
+  ["'isWindowUpdating' failed: ", 'window-check-failed'],
+  ["Device server died during '", 'device-server-died'],
   ['Device became unreachable during ', 'device-unreachable'],
   ['iOS driver not ready in time,', 'ios-driver-startup-timeout'],
   ['Failed to get screenshot: Timed out while requesting screenshot.', 'screenshot-timeout'],
@@ -78,6 +85,17 @@ test('rejects arbitrary failure categories and untyped hierarchy availability', 
   expect(result).toEqual({
     availability: 'available', failedCommands: [{sequenceNumber: 1, commandKind: 'assertCommand'}], ui: {},
   });
+});
+
+test.each([
+  'Multiple elements found: ', 'Ambiguous element: ', 'Element is not hittable: ',
+  'Timed out waiting for idle: ', 'Element not found without the pinned delimiter ',
+])('does not invent Android ambiguity, hittability or idle-timeout errors (%#)', prefix => {
+  const input = command('tapOnElement');
+  input.metadata.error.message = prefix + CANARY;
+  const result = parseCommands([input]);
+  expect(result[0].failureCategory).toBeUndefined();
+  expect(JSON.stringify(result)).not.toContain(CANARY);
 });
 
 test('ignores unknown kinds, nonfailed commands and invalid sequence numbers', () => {
@@ -468,7 +486,7 @@ test('reads the pinned Android document TreeNode root with omitted empty attribu
     }],
   };
   const parsed = parseHierarchy(documentTree, androidOptions);
-  expect(parsed.androidDetails).toEqual({
+  expect(parsed.androidDetails).toMatchObject({
     sheetPresent: true, assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: 'match',
   });
   mockArtifacts({
@@ -485,7 +503,9 @@ test('reads the pinned Android document TreeNode root with omitted empty attribu
 
 test('unknown hierarchy envelopes are not guessed or misreported as missing Android IDs', () => {
   for (const envelope of [{root: androidTree()}, {roots: [androidTree()]}, {window: androidTree()}]) {
-    expect(parseHierarchy(envelope, androidOptions).androidDetails).toBeUndefined();
+    expect(parseHierarchy(envelope, androidOptions).androidDetails).toEqual({
+      hierarchyShape: 'unsupported-root', visitedNodeCount: 'one',
+    });
   }
 });
 
@@ -504,7 +524,7 @@ test.each([
   tree.children[0].attributes.accessibilityText = androidOptions.expectedDeviceId;
   tree.children[0].attributes.hintText = androidOptions.expectedDeviceId;
   const result = parseHierarchy(tree, androidOptions).androidDetails;
-  expect(result).toEqual({
+  expect(result).toMatchObject({
     sheetPresent: true, assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: expected,
   });
   expect(JSON.stringify(result)).not.toMatch(/SECRET_CANARY|Synthetic/);
@@ -514,7 +534,7 @@ test.each([undefined, '', '.*', '^Synthetic-Assigned.ID$', 'Synthetic-Assigned.I
   CANARY.repeat(129), true, {text: CANARY}])(
   'Android does not compare against untrusted or missing expected identity (%#)', expectedDeviceId => {
     expect(parseHierarchy(androidTree(), {platform: 'android', expectedDeviceId}).androidDetails)
-      .toEqual({sheetPresent: true, assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: 'unavailable'});
+      .toMatchObject({sheetPresent: true, assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: 'unavailable'});
   },
 );
 
@@ -523,11 +543,11 @@ test('Android missing includes omitted/hidden targets, not a claim they are unmo
   const tree = node('connection-details', 'assigned-device-id', [
     node(undefined, androidOptions.expectedDeviceId),
   ]);
-  expect(parseHierarchy(tree, androidOptions).androidDetails).toEqual({
+  expect(parseHierarchy(tree, androidOptions).androidDetails).toMatchObject({
     sheetPresent: false, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
   });
   tree.children.push(node('connection-details-sheet', CANARY));
-  expect(parseHierarchy(tree, androidOptions).androidDetails).toEqual({
+  expect(parseHierarchy(tree, androidOptions).androidDetails).toMatchObject({
     sheetPresent: true, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
   });
 });
@@ -539,7 +559,9 @@ test('Android presence never substitutes for visibility and duplicate IDs remain
   expect(parseHierarchy(tree, androidOptions).androidDetails.assignedDeviceIdPresent).toBe(true);
   tree.children.push(node('assigned-device-id', CANARY));
   expect(parseHierarchy(tree, androidOptions).androidDetails.assignedDeviceIdTextMatch).toBe('ambiguous');
-  expect(parseHierarchy({payload: tree}, androidOptions).androidDetails).toBeUndefined();
+  expect(parseHierarchy({payload: tree}, androidOptions).androidDetails).toEqual({
+    hierarchyShape: 'unsupported-root', visitedNodeCount: 'one',
+  });
   expect(parseHierarchy(androidTree(), {platform: 'ios'}).androidDetails).toBeUndefined();
 });
 
@@ -562,7 +584,7 @@ test('binds Android booleans and text comparison to the same failure, not accumu
     'results/other/screen-hierarchy/step-045-assertCondition.json': androidTree(),
   });
   const result = collectLiveDiagnostics(androidOptions);
-  expect(result.failedCommands[0].androidDetails).toEqual({
+  expect(result.failedCommands[0].androidDetails).toMatchObject({
     detailsTapCompleted: true, sheetPresent: false,
     assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
   });
@@ -578,7 +600,7 @@ test.each(['COMPLETED', 'FAILED', 'SKIPPED'])(
       'results/commands.json': androidCommands(status),
       'results/screen-hierarchy/step-045.json': androidTree(CANARY),
     });
-    expect(collectLiveDiagnostics(androidOptions).failedCommands.find(item => item.targetId === 'assigned-device-id').androidDetails).toEqual({
+    expect(collectLiveDiagnostics(androidOptions).failedCommands.find(item => item.targetId === 'assigned-device-id').androidDetails).toMatchObject({
       detailsTapCompleted: status === 'COMPLETED', sheetPresent: true,
       assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: 'mismatch',
     });
@@ -663,6 +685,156 @@ test('Android failure report independently strips arbitrary names, payloads and 
     expect(sanitizeDiagnostics({availability: 'available', failedCommands: [failure]}).failedCommands[0])
       .not.toHaveProperty('androidDetails');
   }
+});
+
+test('attributes a failed Details tap snapshot even if no allowlisted UI text is captured', () => {
+  const [tap] = androidCommands('FAILED');
+  tap.metadata.error = {message: `Element not found: ${CANARY}`};
+  mockArtifacts({
+    'results/flow/commands.json': [tap],
+    'results/flow/screen-hierarchy/step-044-tapOnElement.json': {children: [{attributes: {text: CANARY}}]},
+    'results/other/screen-hierarchy/step-044-tapOnElement.json': androidTree(),
+    'results/flow/screen-hierarchy/step-045-assertCondition.json': androidTree(),
+  });
+  const result = collectLiveDiagnostics(androidOptions);
+  expect(result.failedCommands).toEqual([{
+    sequenceNumber: 43, commandKind: 'tapOnElement', targetId: 'connection-details',
+    failureCategory: 'element-not-found',
+    androidDetails: {
+      detailsTapCompleted: false, hierarchyShape: 'tree-node', visitedNodeCount: '2-16',
+      detailsButtonPresent: false, detailsButtonCount: 'zero',
+      sheetPresent: false, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
+    },
+  }]);
+  expect(sanitizeDiagnostics(result)).toEqual(result);
+  expect(JSON.stringify(result)).not.toContain(CANARY);
+});
+
+test('reports duplicate Details IDs as observed multiplicity, never a guessed failure category', () => {
+  const [tap] = androidCommands('FAILED');
+  const tree = {children: [node('connection-details', CANARY), node('connection-details', CANARY), androidTree()]};
+  mockArtifacts({
+    'results/commands.json': [tap],
+    'results/screen-hierarchy/step-044.json': tree,
+  });
+  const result = collectLiveDiagnostics(androidOptions);
+  expect(result.failedCommands[0]).toEqual({
+    sequenceNumber: 43, commandKind: 'tapOnElement', targetId: 'connection-details',
+    androidDetails: {
+      detailsTapCompleted: false, hierarchyShape: 'tree-node', visitedNodeCount: '2-16',
+      detailsButtonPresent: true, detailsButtonCount: 'multiple',
+      sheetPresent: true, assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: 'match',
+    },
+  });
+});
+
+test.each(['app-busy-overlay', 'connection-details', 'connection-details-sheet'])(
+  'attributes the existing failure hierarchy to the bounded %s readiness assertion', targetId => {
+    const failure = command();
+    failure.command.assertConditionCommand.condition = targetId === 'app-busy-overlay'
+      ? {notVisible: {idRegex: targetId}} : {visible: {idRegex: targetId}};
+    mockArtifacts({
+      'results/commands.json': [failure],
+      'results/screen-hierarchy/step-043.json': node('connection-details', CANARY),
+    });
+    const result = collectLiveDiagnostics(androidOptions);
+    expect(result.failedCommands[0]).toEqual({
+      sequenceNumber: 42, commandKind: 'assertConditionCommand', targetId,
+      androidDetails: {
+        hierarchyShape: 'tree-node', visitedNodeCount: 'one',
+        detailsButtonPresent: true, detailsButtonCount: 'one',
+        sheetPresent: false, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
+      },
+    });
+  },
+);
+
+test.each([
+  [{}, 'empty-object'],
+  [{root: {children: [androidTree()]}, payload: CANARY}, 'unsupported-root'],
+])('attributes root shape without assuming missing controls in an unrecognized root (%#)', (tree, shape) => {
+  const [tap] = androidCommands('FAILED');
+  mockArtifacts({
+    'results/commands.json': [tap],
+    'results/screen-hierarchy/step-044.json': tree,
+  });
+  const result = collectLiveDiagnostics(androidOptions);
+  expect(result.ui).toEqual({});
+  expect(result.hierarchyCaptured).toBe(true);
+  expect(result.failedCommands[0].androidDetails).toEqual({
+    detailsTapCompleted: false, hierarchyShape: shape, visitedNodeCount: 'one',
+  });
+  expect(JSON.stringify(result)).not.toMatch(/SECRET_CANARY|Synthetic/);
+});
+
+test.each([
+  [1, 'one'], [2, '2-16'], [16, '2-16'], [17, '17-128'],
+  [128, '17-128'], [129, '129-4096'], [4096, '129-4096'],
+])('reports only the visited-node bucket for %s nodes', (count, bucket) => {
+  const tree = {children: Array(count - 1).fill({})};
+  const details = parseHierarchy(tree, androidOptions).androidDetails;
+  expect(details.visitedNodeCount).toBe(bucket);
+  expect(details.hierarchyShape).toBe('tree-node');
+});
+
+test('recognizes completed tap across exactly the new completed sheet readiness assertion', () => {
+  const [tap, failure] = androidCommands();
+  const sheet = {
+    command: {assertConditionCommand: {condition: {visible: {idRegex: 'connection-details-sheet'}}}},
+    metadata: {sequenceNumber: 44, status: 'COMPLETED'},
+  };
+  failure.metadata.sequenceNumber = 45;
+  mockArtifacts({
+    'results/commands.json': [tap, sheet, failure],
+    'results/screen-hierarchy/step-046.json': androidTree(),
+  });
+  expect(collectLiveDiagnostics(androidOptions).failedCommands[0].androidDetails.detailsTapCompleted).toBe(true);
+  jest.restoreAllMocks();
+  sheet.metadata.status = 'FAILED';
+  mockArtifacts({
+    'results/commands.json': [tap, sheet],
+    'results/screen-hierarchy/step-045.json': node('connection-details', CANARY),
+  });
+  expect(collectLiveDiagnostics(androidOptions).failedCommands[0]).toMatchObject({
+    targetId: 'connection-details-sheet',
+    androidDetails: {detailsTapCompleted: true, detailsButtonPresent: true, sheetPresent: false},
+  });
+  jest.restoreAllMocks();
+  sheet.metadata.status = 'SKIPPED';
+  mockArtifacts({
+    'results/commands.json': [tap, sheet, failure],
+    'results/screen-hierarchy/step-046.json': androidTree(),
+  });
+  expect(collectLiveDiagnostics(androidOptions).failedCommands[0].androidDetails.detailsTapCompleted).toBeUndefined();
+});
+
+test('sanitizes root shape and Details-button metadata as fixed consistent categories only', () => {
+  const failure = {sequenceNumber: 43, commandKind: 'tapOnElement', targetId: 'connection-details'};
+  for (const unsafe of [
+    {hierarchyShape: CANARY, visitedNodeCount: 'one'},
+    {hierarchyShape: 'tree-node', visitedNodeCount: 4096},
+    {hierarchyShape: 'tree-node', visitedNodeCount: CANARY},
+    {detailsButtonPresent: true, detailsButtonCount: 'zero'},
+    {detailsButtonPresent: false, detailsButtonCount: 'multiple'},
+    {detailsButtonPresent: CANARY, detailsButtonCount: 'one'},
+    {detailsButtonPresent: true, detailsButtonCount: [CANARY]},
+  ]) {
+    const result = sanitizeDiagnostics({
+      availability: 'available', failedCommands: [{...failure, androidDetails: unsafe}],
+    });
+    expect(result.failedCommands[0]).toEqual(failure);
+  }
+  const result = sanitizeDiagnostics({
+    availability: 'available', failedCommands: [{...failure, androidDetails: {
+      hierarchyShape: 'unsupported-root', visitedNodeCount: 'one', classNames: [CANARY],
+      detailsButtonPresent: false, detailsButtonCount: 'zero', sheetPresent: false,
+      assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
+    }}],
+  });
+  expect(result.failedCommands[0].androidDetails).toEqual({
+    hierarchyShape: 'unsupported-root', visitedNodeCount: 'one',
+  });
+  expect(JSON.stringify(result)).not.toContain(CANARY);
 });
 
 test('smoke passes platform only; trusted expected identity stays inside existing sanitize boundary', () => {

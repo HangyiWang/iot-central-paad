@@ -120,7 +120,12 @@ test('Explore opens all four existing tools and Activity retains filters, Latest
   expect(flow).toContainEqual({
     assertVisible: {id: 'property-name-readOnlyProp', text: '^readOnlyProp$'},
   });
-  expect(flow).toContainEqual({assertVisible: '^Nearby devices$'});
+  expect(flow).toContainEqual({
+    assertVisible: {id: 'bluetooth-tool-title', text: '^Nearby devices$'},
+  });
+  expect(read('src/bluetooth/Bluetooth.tsx')).toContain(
+    'testID="bluetooth-tool-title"',
+  );
   expect(flow).toContainEqual({assertVisible: {id: 'log-payload-[0-9]+'}});
   expect(flow).toContainEqual({assertVisible: {id: 'activity-details-[0-9]+'}});
   const traversal = swift
@@ -135,7 +140,11 @@ test('Explore opens all four existing tools and Activity retains filters, Latest
   expect(traversal).toContain(
     'try requireUnique(query, target: target)',
   );
-  expect(traversal).toContain('try requireUnique(nearby)');
+  expect(traversal).toContain('try requireVisible(.bluetoothTitle)');
+  expect(traversal).toContain(
+    'try requireExactText(.bluetoothTitle, text: "Nearby devices")',
+  );
+  expect(traversal).not.toContain('app.staticTexts.matching');
   expect(traversal).toContain('guard settled == .completed, query.count == 1 else {');
   expect(traversal).toContain('return try hittable(query.element)');
   expect(traversal).toContain('throw Failure.ambiguousElement');

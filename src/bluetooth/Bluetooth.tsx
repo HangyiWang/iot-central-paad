@@ -84,7 +84,10 @@ function BluetoothList({navigation}: BluetoothListProps) {
     <View style={[styles.container, {backgroundColor: appearance.background}]}>
       <View style={styles.heading}>
         <View style={styles.headingText}>
-          <Text accessibilityRole="header" style={styles.title}>
+          <Text
+            testID="bluetooth-tool-title"
+            accessibilityRole="header"
+            style={styles.title}>
             {Strings.Bluetooth.Title}
           </Text>
           <Text style={[styles.description, {color: appearance.muted}]}>

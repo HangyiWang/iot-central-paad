@@ -121,6 +121,7 @@ private enum Target: String, CaseIterable {
   case propertyTechnical = "property-technical-readOnlyProp"
   case propertyName = "property-name-readOnlyProp"
   case imageUploadCard = "image-upload-card"
+  case bluetoothTitle = "bluetooth-tool-title"
   case activityAll = "activity-filter-all"
   case activityIssues = "activity-filter-issues"
   case activityLatest = "activity-latest"
@@ -591,10 +592,8 @@ final class PaadLiveUITests: XCTestCase {
 
     try tapExperience(.exploreBluetooth)
     dismissKnownPermissionAlert()
-    let nearby = app.staticTexts.matching(NSPredicate(format: "label == %@", "Nearby devices"))
-    guard nearby.firstMatch.waitForExistence(timeout: Timeout.standard) else { throw Failure.missingElement }
-    try requireUnique(nearby)
-    _ = try hittable(nearby.element)
+    try requireVisible(.bluetoothTitle)
+    try requireExactText(.bluetoothTitle, text: "Nearby devices")
     try tapExperience(.exploreBack)
     try requireVisible(.exploreDirectory)
 
@@ -644,14 +643,14 @@ final class PaadLiveUITests: XCTestCase {
     return try hittable(query.element)
   }
 
-  private func requireUnique(_ query: XCUIElementQuery, target: Target? = nil) throws {
+  private func requireUnique(_ query: XCUIElementQuery, target: Target) throws {
     // Native navigation may briefly retain both outgoing and incoming headers.
     // Wait for uniqueness; never select an arbitrary match from a duplicate set.
     let expectation = XCTNSPredicateExpectation(
       predicate: NSPredicate { _, _ in query.count == 1 }, object: query)
     let settled = XCTWaiter().wait(for: [expectation], timeout: Timeout.short)
     guard settled == .completed, query.count == 1 else {
-      ambiguousTarget = target?.rawValue ?? "bluetooth-heading"
+      ambiguousTarget = target.rawValue
       pendingCategory = .ambiguousElement
       for index in 0..<min(query.count, Diagnostic.maximumCandidates) {
         let type: NativeElementType

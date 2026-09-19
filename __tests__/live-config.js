@@ -363,7 +363,7 @@ test('iOS key injection uses isolated slow characters without revealing the valu
   expect(android.commands).toEqual([{inputText: '${MAESTRO_DEVICE_KEY}'}]);
 });
 
-test('both details presentations expose exact identity before scrolling to model metadata', () => {
+test('both details presentations wait for readiness and sheet before exact identity', () => {
   const commands = yaml.loadAll(
     fs.readFileSync('.maestro/live-device.yaml', 'utf8'),
   )[1];
@@ -372,7 +372,26 @@ test('both details presentations expose exact identity before scrolling to model
   );
   expect(details).toHaveLength(2);
   for (const index of details) {
+    expect(commands[index - 2]).toEqual({
+      extendedWaitUntil: {
+        notVisible: {id: 'app-busy-overlay'},
+        timeout: 15000,
+      },
+    });
+    expect(commands[index - 1]).toEqual({
+      extendedWaitUntil: {
+        visible: {id: 'connection-details', enabled: true},
+        timeout: 15000,
+      },
+    });
+    expect(commands[index]).toEqual({tapOn: {id: 'connection-details'}});
     expect(commands[index + 1]).toEqual({
+      extendedWaitUntil: {
+        visible: {id: 'connection-details-sheet'},
+        timeout: 15000,
+      },
+    });
+    expect(commands[index + 2]).toEqual({
       extendedWaitUntil: {
         visible: {
           id: 'assigned-device-id',
@@ -381,7 +400,7 @@ test('both details presentations expose exact identity before scrolling to model
         timeout: 15000,
       },
     });
-    expect(commands[index + 2]).toEqual({
+    expect(commands[index + 3]).toEqual({
       scrollUntilVisible: {
         element: {id: 'assigned-hub'},
         direction: 'DOWN',
@@ -389,6 +408,7 @@ test('both details presentations expose exact identity before scrolling to model
       },
     });
   }
+  expect(commands.some(command => command.retry || command.waitForAnimationToEnd || command.sleep)).toBe(false);
 });
 
 test('identity waits retain exact selectors with bounded sheet presentation', () => {

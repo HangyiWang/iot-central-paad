@@ -20,6 +20,7 @@ const TARGET_IDS = Object.freeze([
   'connection-details-sheet', 'connection-details-close',
   'model-id', 'registration-id', 'registry-status', 'proof-nonce', 'proof-send',
   'proof-status', 'connection-error-code', 'connection-service-code', 'connection-http-status',
+  'app-busy-overlay',
 ]);
 const ERROR_CODES = Object.freeze([
   'INVALID_CREDENTIALS', 'UNSAFE_ENDPOINT', 'CANCELLED', 'TIMEOUT',
@@ -51,6 +52,14 @@ const UI_LABELS = new Map([
 const UI_LABEL_CODES = [...UI_LABELS.values()];
 const FAILURE_PREFIXES = Object.freeze([
   ['Assertion is false: ', 'assertion-failed'],
+  // cli-2.10.0 Orchestra lookup/scroll errors and AndroidDeviceConnectionModel errors.
+  ['Element not found: ', 'element-not-found'],
+  ['Parent element not found: ', 'parent-element-not-found'],
+  ['No visible element found: ', 'visible-element-not-found'],
+  ["'tap' failed: ", 'tap-operation-failed'],
+  ["'viewHierarchy' failed: ", 'hierarchy-operation-failed'],
+  ["'isWindowUpdating' failed: ", 'window-check-failed'],
+  ["Device server died during '", 'device-server-died'],
   ['Device became unreachable during ', 'device-unreachable'],
   ['iOS driver not ready in time,', 'ios-driver-startup-timeout'],
   ['Failed to get screenshot: Timed out while requesting screenshot.', 'screenshot-timeout'],
@@ -64,6 +73,12 @@ const SYSTEM_DIALOGS = new Map([
 ]);
 const SYSTEM_DIALOG_CODES = [...new Set(SYSTEM_DIALOGS.values())];
 const ID_TEXT_MATCHES = Object.freeze(['match', 'mismatch', 'missing', 'unavailable', 'ambiguous']);
+const ANDROID_DETAILS_TARGETS = Object.freeze([
+  'app-busy-overlay', 'connection-details', 'connection-details-sheet', 'assigned-device-id',
+]);
+const HIERARCHY_SHAPES = Object.freeze(['tree-node', 'empty-object', 'unsupported-root']);
+const NODE_COUNT_BUCKETS = Object.freeze(['one', '2-16', '17-128', '129-4096']);
+const TARGET_COUNT_BUCKETS = Object.freeze(['zero', 'one', 'multiple']);
 const LIMITS = Object.freeze({
   entries: 256, files: 32, fileBytes: 1024 * 1024, totalBytes: 4 * 1024 * 1024,
   directoryDepth: 6, nodes: 4096, hierarchyDepth: 64, commands: 512,
@@ -128,6 +143,7 @@ function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
   const observedTargets = new Set();
   const observedLabels = new Set();
   let count = 0;
+  let detailsButtonCount = 0;
   function visit(node, depth) {
     if (++count > LIMITS.nodes || depth > LIMITS.hierarchyDepth) {
       throw new DiagnosticUnavailable('hierarchy-limit');
@@ -146,6 +162,7 @@ function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
       const id = attributes['resource-id'];
       if (UI_PRESENCE_IDS.includes(id)) observedTargets.add(id);
       if (android && id === 'assigned-device-id') identityNodes.push(attributes.text);
+      if (android && id === 'connection-details') detailsButtonCount++;
       for (const text of [attributes.text, attributes.accessibilityText]) {
         if (!id && UI_LABELS.has(text)) observedLabels.add(UI_LABELS.get(text));
         if (id === 'connection-status' && ['Connected', 'Disconnected'].includes(text)) {
@@ -173,7 +190,15 @@ function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
   visit(value, 0);
   if (observedTargets.size) ui.observedTargets = [...observedTargets].sort();
   if (observedLabels.size) ui.observedLabels = [...observedLabels].sort();
-  if (android && (object(value.attributes) || Array.isArray(value.children))) {
+  if (android) {
+    const treeNode = object(value.attributes) || Array.isArray(value.children);
+    ui.androidDetails = {
+      hierarchyShape: treeNode ? 'tree-node'
+        : Object.keys(value).length === 0 ? 'empty-object' : 'unsupported-root',
+      visitedNodeCount: count === 1 ? 'one' : count <= 16 ? '2-16' : count <= 128 ? '17-128' : '129-4096',
+    };
+    // Unknown wrappers are not traversed or treated as proof of absent controls.
+    if (!treeNode) return ui;
     const expectedValid = typeof expectedDeviceId === 'string' && expectedDeviceId.length <= 128 &&
       !/[\s\x00-\x1f\x7f]/.test(expectedDeviceId) &&
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(expectedDeviceId);
@@ -181,6 +206,9 @@ function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
     // Android omits invisible children; presence is not visibility or app state.
     // Compare only the tagged value's text, never hints, descendants or labels.
     ui.androidDetails = {
+      ...ui.androidDetails,
+      detailsButtonPresent: detailsButtonCount > 0,
+      detailsButtonCount: detailsButtonCount === 0 ? 'zero' : detailsButtonCount === 1 ? 'one' : 'multiple',
       sheetPresent: observedTargets.has('connection-details-sheet'),
       assignedDeviceIdPresent: identityNodes.length > 0,
       assignedDeviceIdTextMatch: identityNodes.length === 0 ? 'missing'
@@ -196,6 +224,16 @@ function sanitizeAndroidDetails(value) {
   if (!object(value)) return undefined;
   const safe = {};
   if (typeof value.detailsTapCompleted === 'boolean') safe.detailsTapCompleted = value.detailsTapCompleted;
+  if (HIERARCHY_SHAPES.includes(value.hierarchyShape) && NODE_COUNT_BUCKETS.includes(value.visitedNodeCount)) {
+    safe.hierarchyShape = value.hierarchyShape;
+    safe.visitedNodeCount = value.visitedNodeCount;
+  }
+  if (safe.hierarchyShape && safe.hierarchyShape !== 'tree-node') return safe;
+  if (typeof value.detailsButtonPresent === 'boolean' && TARGET_COUNT_BUCKETS.includes(value.detailsButtonCount) &&
+      value.detailsButtonPresent === (value.detailsButtonCount !== 'zero')) {
+    safe.detailsButtonPresent = value.detailsButtonPresent;
+    safe.detailsButtonCount = value.detailsButtonCount;
+  }
   if (typeof value.sheetPresent === 'boolean' && typeof value.assignedDeviceIdPresent === 'boolean' &&
       ID_TEXT_MATCHES.includes(value.assignedDeviceIdTextMatch) &&
       (value.assignedDeviceIdPresent === (value.assignedDeviceIdTextMatch !== 'missing'))) {
@@ -219,7 +257,7 @@ function sanitizeDiagnostics(value) {
         const command = {sequenceNumber: entry.sequenceNumber, commandKind: entry.commandKind};
         if (TARGET_IDS.includes(entry.targetId)) command.targetId = entry.targetId;
         if (FAILURE_CATEGORIES.includes(entry.failureCategory)) command.failureCategory = entry.failureCategory;
-        const androidDetails = entry.targetId === 'assigned-device-id'
+        const androidDetails = ANDROID_DETAILS_TARGETS.includes(entry.targetId)
           ? sanitizeAndroidDetails(entry.androidDetails) : undefined;
         if (androidDetails) command.androidDetails = androidDetails;
         failedCommands.push(command);
@@ -322,16 +360,26 @@ function collectLiveDiagnostics(options = {}) {
             failedCommands.push(...parsed);
             if (options.platform === 'android') {
               for (const command of parsed) {
-                if (command.targetId !== 'assigned-device-id') continue;
+                if (!ANDROID_DETAILS_TARGETS.includes(command.targetId)) continue;
                 if (value.filter(entry => entry?.metadata?.sequenceNumber === command.sequenceNumber).length !== 1) continue;
-                const previous = value.filter(entry => object(entry?.metadata) &&
+                let previous = value.filter(entry => object(entry?.metadata) &&
                   entry.metadata.sequenceNumber === command.sequenceNumber - 1);
+                // The identity wait now follows a separate, completed sheet-ready assertion.
+                if (command.targetId === 'assigned-device-id' && previous.length === 1 &&
+                    previous[0].metadata.status === 'COMPLETED' &&
+                    COMMAND_KINDS.filter(kind => object(previous[0].command?.[kind])).length === 1 &&
+                    previous[0].command?.assertConditionCommand?.condition?.visible?.idRegex === 'connection-details-sheet') {
+                  previous = value.filter(entry => entry?.metadata?.sequenceNumber === command.sequenceNumber - 2);
+                }
                 if (previous.length === 1 &&
                     COMMAND_KINDS.filter(kind => object(previous[0].command?.[kind])).length === 1 &&
                     previous[0].command?.tapOnElement?.selector?.idRegex === 'connection-details' &&
                     ['COMPLETED', 'FAILED', 'SKIPPED'].includes(previous[0].metadata.status)) {
                   // A completed driver tap is a request, not proof that app onPress ran.
                   command.androidDetails = {detailsTapCompleted: previous[0].metadata.status === 'COMPLETED'};
+                }
+                if (command.targetId === 'connection-details' && command.commandKind === 'tapOnElement') {
+                  command.androidDetails = {detailsTapCompleted: false};
                 }
                 androidCommands.push({filename, command});
               }

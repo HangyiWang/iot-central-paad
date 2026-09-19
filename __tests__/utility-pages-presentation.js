@@ -179,6 +179,14 @@ test('Bluetooth does not duplicate the app header and keeps scanning failures ex
   act(() => {
     view.update(<Component navigation={navigation} />);
   });
+  const titles = view.root
+    .findAllByType('Text')
+    .filter(node => node.props.testID === 'bluetooth-tool-title');
+  expect(titles).toHaveLength(1);
+  expect(titles[0].props).toMatchObject({
+    accessibilityRole: 'header',
+    children: 'Nearby devices',
+  });
   expect(visibleText()).toContain('Looking for devices');
   act(() => manager.observeAdvertisements.mock.calls[0][1]());
   expect(visibleText()).toContain('Bluetooth unavailable');
