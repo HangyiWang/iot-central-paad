@@ -58,7 +58,7 @@ cleanup() {
     if [[ "$driver" = xcuitest ]]; then
       diagnostics=$(node scripts/ci/run-ios-xcuitest.js diagnostics) || code=1
     else
-      diagnostics=$(node scripts/ci/live-diagnostics.js) || code=1
+      diagnostics=$(node scripts/ci/live-diagnostics.js "$platform") || code=1
     fi
   fi
   if [[ "$platform" = android && -n "$device" ]]; then

@@ -66,6 +66,59 @@ the Hub model/nonce and the actual ADR record using an existing Entra CLI sessio
 It requests no keys and performs no cloud writes. See the
 [simulator guide](../ADR-SIMULATOR.md) for manual use and evidence boundaries.
 
+### Native Home / Explore / Activity implementation (2026-09-19)
+
+Implementation source: `f856e4e3875fdb2300fe03478eeffaac3f52a59a` on
+`feature/adr-onboarding`. This implements the subsequently approved workflow Home,
+not the older Device dashboard or guide-only Home proposal.
+
+One shared runtime owns sensor intent, properties and device callbacks above
+the three destinations. Home explains Phone / DPS / Hub / ADR relationships with
+native panels, actionable attention and actual communication observations.
+Explore retains all four tools, explicit source controls, property direction
+and in-memory drafts across tool navigation. Activity preserves safe diagnostics
+alongside typed observations; local submission is never described as cloud
+receipt. Session generation invalidation, source metadata, storage bounds and
+telemetry-failure coalescing are documented in
+[`src/observation/README.md`](../../src/observation/README.md).
+
+The native drivers now traverse map panels, all tools, unsent draft restoration,
+Activity filters/disclosures and safe log disclosures through ordinary UI.
+Assignment/model, unique proof nonce and actual process-stop cold-restoration
+assertions remain in place. Public native records retain the existing byte
+limit; their fixed target list records only the 16 most recently observed
+distinct selectors, not an exhaustive list of visited screens.
+
+Run [35461767481](https://github.com/HangyiWang/iot-central-paad/actions/runs/35461767481)
+built both binaries from this exact source, but **did not pass connected
+acceptance**. Android stopped at the exact `assigned-device-id` assertion,
+before the fresh proof submission. iOS connected, submitted the fresh proof and
+traversed Home, then stopped at an ambiguous native element during Explore.
+Independent iOS reads matched assignment, model, fresh proof and registry; that
+is partial evidence, not acceptance of Activity or cold restoration.
+Independent Android reads also matched the retained enrollment, DPS assignment
+and Hub identity/model. They do not establish that the app's Details sheet opened
+or that its assigned-identity control was accessible.
+
+Both owned temporary device-input slots were removed after this run completed.
+No new diagnostic capture was enabled. The failed-run Android binary was not
+installed on Windows; the existing installation was relaunched without clearing
+data or re-entering credentials, but its fresh connection/context observation
+was unconfirmed. The September 18 acceptance below remains the working baseline,
+not evidence for the redesigned interface.
+
+Follow-up native diagnostics identify the ambiguous fixed selector and at most
+three native element kinds, without exporting values, labels or hierarchy data.
+Selector readiness now waits a bounded interval for a unique native match before
+requiring that same element to be hittable; persistent duplicates still fail.
+Android derives only fixed presence/comparison categories from the existing
+failure artifact, bound to that failed command and bundle rather than a union
+of captured screens. A completed driver tap is not proof that app Details opened.
+The 4 KiB record bound, 1 MiB log bound and 16-target bound are unchanged.
+Further source-bound native acceptance is still required.
+Physical sensors, BLE/camera/torch, background reliability, native large-text
+and direct-Hub scenarios remain separate from the retained DPS simulator lane.
+
 ### Completed simulator acceptance (2026-09-18)
 
 The foundation's ordinary locked build/startup lanes passed on Android and iOS

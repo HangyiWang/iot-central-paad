@@ -230,6 +230,12 @@ function sanitizeNativeResult(value) {
       (value.nativeIssue !== undefined && !NATIVE_ISSUES.includes(value.nativeIssue)) ||
       (value.nativeOperation !== undefined && !NATIVE_OPERATIONS.includes(value.nativeOperation)) ||
       (value.execution !== undefined && !EXECUTIONS.includes(value.execution))) return undefined;
+  if (value.ambiguousTarget !== undefined || value.ambiguousTypes !== undefined) {
+    if (value.failureCategory !== 'ambiguous-element' ||
+        (!TARGETS.includes(value.ambiguousTarget) && value.ambiguousTarget !== 'bluetooth-heading') ||
+        !Array.isArray(value.ambiguousTypes) || value.ambiguousTypes.length > MAX_RESOLUTION_CANDIDATES ||
+        value.ambiguousTypes.some(type => !['button', 'static-text', 'other'].includes(type))) return undefined;
+  }
   const inputDiagnostics = value.inputDiagnostics === undefined ? undefined
     : sanitizeInputDiagnostics(value.inputDiagnostics);
   if (value.inputDiagnostics !== undefined && (value.mode !== 'smoke' || !inputDiagnostics)) return undefined;
@@ -262,6 +268,9 @@ function sanitizeNativeResult(value) {
     ...(value.failureCategory ? {failureCategory: value.failureCategory} : {}),
     ...(value.nativeIssue ? {nativeIssue: value.nativeIssue} : {}),
     ...(value.nativeOperation ? {nativeOperation: value.nativeOperation} : {}),
+    ...(value.ambiguousTarget ? {
+      ambiguousTarget: value.ambiguousTarget, ambiguousTypes: [...value.ambiguousTypes],
+    } : {}),
     observedTargets: [...new Set(value.observedTargets)].sort(),
     connected: value.connected, nonceSubmitted: value.nonceSubmitted, coldRestored: value.coldRestored,
     ...(value.execution ? {execution: value.execution} : {}),

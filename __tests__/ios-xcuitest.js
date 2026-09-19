@@ -779,7 +779,8 @@ test.each(['smoke', 'live'])('maximum mode-specific %s diagnostics fit the uncha
   const result = {
     ...nativeResult(mode), observedTargets: [...TARGETS].sort((a, b) => b.length - a.length).slice(0, MAX_OBSERVED_TARGETS), outcome: 'failed',
     stage: longest(STAGES), applicationState: longest(APPLICATION_STATES),
-    failureCategory: longest(FAILURE_CATEGORIES), nativeIssue: longest(NATIVE_ISSUES),
+    failureCategory: 'ambiguous-element', nativeIssue: longest(NATIVE_ISSUES),
+    ambiguousTarget: longest(TARGETS), ambiguousTypes: Array(3).fill('static-text'),
     nativeOperation: longest(NATIVE_OPERATIONS),
     permissionActions: Array(MAX_PERMISSION_ACTIONS).fill(longest(PERMISSION_SOURCES)),
     ...(mode === 'smoke' ? {
@@ -824,6 +825,42 @@ test.each(['smoke', 'live'])('maximum mode-specific %s diagnostics fit the uncha
   const line = `${PREFIX}${JSON.stringify(result)}`;
   expect(Buffer.byteLength(line)).toBeLessThan(4096);
   expect(parseNativeLog(line, mode)).toEqual(sanitizeNativeResult(result));
+  const withoutAmbiguity = {
+    ...result, failureCategory: longest(FAILURE_CATEGORIES),
+  };
+  delete withoutAmbiguity.ambiguousTarget;
+  delete withoutAmbiguity.ambiguousTypes;
+  const otherLine = `${PREFIX}${JSON.stringify(withoutAmbiguity)}`;
+  expect(Buffer.byteLength(otherLine)).toBeLessThan(4096);
+  expect(parseNativeLog(otherLine, mode)).toEqual(sanitizeNativeResult(withoutAmbiguity));
+});
+
+test('ambiguous native selectors disclose only a fixed target and three bounded native kinds', () => {
+  const result = {
+    ...nativeResult(), outcome: 'failed', stage: 'explore-traversal',
+    failureCategory: 'ambiguous-element', ambiguousTarget: 'explore-back',
+    ambiguousTypes: ['button', 'other'],
+  };
+  expect(sanitizeNativeResult(result)).toEqual(result);
+  for (const change of [
+    {ambiguousTarget: 'RAW_CANARY'},
+    {ambiguousTypes: ['RAW_CANARY']},
+    {ambiguousTypes: Array(4).fill('button')},
+    {ambiguousTypes: undefined},
+    {ambiguousTarget: undefined},
+    {failureCategory: 'not-hittable'},
+  ]) {
+    expect(sanitizeNativeResult({...result, ...change})).toBeUndefined();
+  }
+  expect(sanitizeNativeResult({...result, ambiguousTarget: 'bluetooth-heading'})).toBeDefined();
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const unique = swift.split('private func requireUnique(')[1].split('private func tapExperience(')[0];
+  expect(unique).toContain('NSPredicate { _, _ in query.count == 1 }');
+  expect(unique).toContain('timeout: Timeout.short');
+  expect(unique).toContain('guard settled == .completed, query.count == 1 else');
+  expect(unique).toContain('0..<min(query.count, Diagnostic.maximumCandidates)');
+  expect(unique).toContain('throw Failure.ambiguousElement');
+  expect(unique).not.toMatch(/\.label\b|\.value\b|debugDescription|screenshot/);
 });
 
 test('native producer keeps synthetic input tracing separate from live Details observations', () => {

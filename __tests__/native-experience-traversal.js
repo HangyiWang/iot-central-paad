@@ -133,8 +133,12 @@ test('Explore opens all four existing tools and Activity retains filters, Latest
     'try inspectDetail(togglePrefix: "activity-toggle-", detailPrefix: "activity-details-")',
   );
   expect(traversal).toContain(
-    'guard query.count == 1 else { throw Failure.ambiguousElement }',
+    'try requireUnique(query, target: target)',
   );
+  expect(traversal).toContain('try requireUnique(nearby)');
+  expect(traversal).toContain('guard settled == .completed, query.count == 1 else {');
+  expect(traversal).toContain('return try hittable(query.element)');
+  expect(traversal).toContain('throw Failure.ambiguousElement');
   expect(traversal).not.toMatch(
     /captureApprovedFailure|screenshot|debugDescription|\.value\b|\.label\b|coordinate|launchArguments|launchEnvironment/,
   );

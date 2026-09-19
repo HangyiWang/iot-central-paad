@@ -360,6 +360,8 @@ final class PaadLiveUITests: XCTestCase {
   /// Recent distinct controls, not a whole-run coverage ledger. Flow completion
   /// depends on the direct assertions and ordered stages, never this diagnostic set.
   private var observed: [String] = []
+  private var ambiguousTarget: String?
+  private var ambiguousTypes: [String] = []
   private var connected = false
   private var nonceSubmitted = false
   private var coldRestored = false
@@ -591,7 +593,7 @@ final class PaadLiveUITests: XCTestCase {
     dismissKnownPermissionAlert()
     let nearby = app.staticTexts.matching(NSPredicate(format: "label == %@", "Nearby devices"))
     guard nearby.firstMatch.waitForExistence(timeout: Timeout.standard) else { throw Failure.missingElement }
-    guard nearby.count == 1 else { throw Failure.ambiguousElement }
+    try requireUnique(nearby)
     _ = try hittable(nearby.element)
     try tapExperience(.exploreBack)
     try requireVisible(.exploreDirectory)
@@ -636,10 +638,32 @@ final class PaadLiveUITests: XCTestCase {
 
   @discardableResult
   private func requireVisible(_ target: Target) throws -> XCUIElement {
-    let found = try hittable(find(target, timeout: Timeout.standard))
+    _ = try find(target, timeout: Timeout.standard)
     let query = app.descendants(matching: .any).matching(identifier: target.rawValue)
-    guard query.count == 1 else { throw Failure.ambiguousElement }
-    return found
+    try requireUnique(query, target: target)
+    return try hittable(query.element)
+  }
+
+  private func requireUnique(_ query: XCUIElementQuery, target: Target? = nil) throws {
+    // Native navigation may briefly retain both outgoing and incoming headers.
+    // Wait for uniqueness; never select an arbitrary match from a duplicate set.
+    let expectation = XCTNSPredicateExpectation(
+      predicate: NSPredicate { _, _ in query.count == 1 }, object: query)
+    let settled = XCTWaiter().wait(for: [expectation], timeout: Timeout.short)
+    guard settled == .completed, query.count == 1 else {
+      ambiguousTarget = target?.rawValue ?? "bluetooth-heading"
+      pendingCategory = .ambiguousElement
+      for index in 0..<min(query.count, Diagnostic.maximumCandidates) {
+        let type: NativeElementType
+        switch query.element(boundBy: index).elementType {
+        case .button: type = .button
+        case .staticText: type = .staticText
+        default: type = .other
+        }
+        ambiguousTypes.append(type.rawValue)
+      }
+      throw Failure.ambiguousElement
+    }
   }
 
   private func tapExperience(_ target: Target) throws {
@@ -1783,6 +1807,10 @@ final class PaadLiveUITests: XCTestCase {
     ]
     if let category = failureCategory {
       record["failureCategory"] = category.rawValue
+    }
+    if let ambiguousTarget = ambiguousTarget {
+      record["ambiguousTarget"] = ambiguousTarget
+      record["ambiguousTypes"] = ambiguousTypes
     }
     if let nativeIssue = nativeIssue {
       record["nativeIssue"] = nativeIssue.rawValue

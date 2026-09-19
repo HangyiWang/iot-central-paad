@@ -1,5 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
+const liveConfig = require('../scripts/ci/live-config');
 const {
   collectLiveDiagnostics, sanitizeDiagnostics, parseCommands, parseHierarchy,
   COMMAND_KINDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS, UI_PRESENCE_IDS,
@@ -426,4 +428,286 @@ test('rejects unknown diagnostic reasons and never exports raw errors', () => {
 test('reports the command limit without inspecting or exposing extra commands', () => {
   mockArtifacts({'results/commands.json': Array(LIMITS.commands + 1).fill(CANARY)});
   expect(collectLiveDiagnostics()).toEqual({availability: 'unavailable', reason: 'command-limit'});
+});
+
+const androidOptions = {platform: 'android', expectedDeviceId: 'Synthetic-Assigned.ID'};
+const androidTree = (text = androidOptions.expectedDeviceId) => node('connection-details-sheet', CANARY, [
+  node('assigned-device-id', text),
+]);
+const androidCommands = (tapStatus = 'COMPLETED') => {
+  const tap = {
+    command: {tapOnElement: {selector: {idRegex: 'connection-details', textRegex: CANARY}}},
+    metadata: {sequenceNumber: 43, status: tapStatus},
+  };
+  const failure = command();
+  failure.metadata.sequenceNumber = 44;
+  failure.command.assertConditionCommand.condition.visible.idRegex = 'assigned-device-id';
+  return [tap, failure];
+};
+
+test('reads the pinned Android document TreeNode root with omitted empty attributes and children', () => {
+  // AndroidDriver.mapHierarchy(document), serialized directly by captureStepHierarchy's
+  // NON_EMPTY bundleWriter. Document and XML hierarchy nodes are children, not envelopes.
+  const documentTree = {
+    children: [{
+      attributes: {ignoreBoundsFiltering: 'false'},
+      children: [{
+        attributes: {
+          'resource-id': 'connection-details-sheet', 'class': 'android.view.ViewGroup',
+          ignoreBoundsFiltering: 'false',
+        },
+        children: [{
+          attributes: {
+            'resource-id': 'assigned-device-id', text: androidOptions.expectedDeviceId,
+            'class': 'android.widget.TextView', 'important-for-accessibility': 'true',
+            accessibilityText: CANARY,
+          },
+          enabled: true, clickable: false,
+        }],
+      }],
+    }],
+  };
+  const parsed = parseHierarchy(documentTree, androidOptions);
+  expect(parsed.androidDetails).toEqual({
+    sheetPresent: true, assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: 'match',
+  });
+  mockArtifacts({
+    'results/flow/commands.json': androidCommands(),
+    'results/flow/screen-hierarchy/step-045-assertCondition.json': documentTree,
+  });
+  const result = collectLiveDiagnostics(androidOptions);
+  expect(result.failedCommands[0].androidDetails).toEqual({
+    detailsTapCompleted: true, ...parsed.androidDetails,
+  });
+  expect(result.ui.observedTargets).toEqual(['assigned-device-id', 'connection-details-sheet']);
+  expect(JSON.stringify(result)).not.toMatch(/SECRET_CANARY|Synthetic|android\.widget/);
+});
+
+test('unknown hierarchy envelopes are not guessed or misreported as missing Android IDs', () => {
+  for (const envelope of [{root: androidTree()}, {roots: [androidTree()]}, {window: androidTree()}]) {
+    expect(parseHierarchy(envelope, androidOptions).androidDetails).toBeUndefined();
+  }
+});
+
+test.each([
+  ['Synthetic-Assigned.ID', 'match'],
+  ['synthetic-assigned.id', 'mismatch'],
+  ['Synthetic-AssignedXID', 'mismatch'],
+  [CANARY, 'mismatch'],
+  ['', 'unavailable'],
+  [undefined, 'unavailable'],
+  [{payload: CANARY}, 'unavailable'],
+  [CANARY.repeat(129), 'unavailable'],
+])('Android compares only bounded tagged text without exporting values (%#)', (text, expected) => {
+  const tree = androidTree();
+  tree.children[0].attributes.text = text;
+  tree.children[0].attributes.accessibilityText = androidOptions.expectedDeviceId;
+  tree.children[0].attributes.hintText = androidOptions.expectedDeviceId;
+  const result = parseHierarchy(tree, androidOptions).androidDetails;
+  expect(result).toEqual({
+    sheetPresent: true, assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: expected,
+  });
+  expect(JSON.stringify(result)).not.toMatch(/SECRET_CANARY|Synthetic/);
+});
+
+test.each([undefined, '', '.*', '^Synthetic-Assigned.ID$', 'Synthetic-Assigned.ID\n',
+  CANARY.repeat(129), true, {text: CANARY}])(
+  'Android does not compare against untrusted or missing expected identity (%#)', expectedDeviceId => {
+    expect(parseHierarchy(androidTree(), {platform: 'android', expectedDeviceId}).androidDetails)
+      .toEqual({sheetPresent: true, assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: 'unavailable'});
+  },
+);
+
+test('Android missing includes omitted/hidden targets, not a claim they are unmounted', () => {
+  // The Android driver omits invisible children; unrelated labels are not target evidence.
+  const tree = node('connection-details', 'assigned-device-id', [
+    node(undefined, androidOptions.expectedDeviceId),
+  ]);
+  expect(parseHierarchy(tree, androidOptions).androidDetails).toEqual({
+    sheetPresent: false, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
+  });
+  tree.children.push(node('connection-details-sheet', CANARY));
+  expect(parseHierarchy(tree, androidOptions).androidDetails).toEqual({
+    sheetPresent: true, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
+  });
+});
+
+test('Android presence never substitutes for visibility and duplicate IDs remain ambiguous', () => {
+  const tree = androidTree();
+  tree.children[0].enabled = false;
+  tree.children[0].attributes['important-for-accessibility'] = 'false';
+  expect(parseHierarchy(tree, androidOptions).androidDetails.assignedDeviceIdPresent).toBe(true);
+  tree.children.push(node('assigned-device-id', CANARY));
+  expect(parseHierarchy(tree, androidOptions).androidDetails.assignedDeviceIdTextMatch).toBe('ambiguous');
+  expect(parseHierarchy({payload: tree}, androidOptions).androidDetails).toBeUndefined();
+  expect(parseHierarchy(androidTree(), {platform: 'ios'}).androidDetails).toBeUndefined();
+});
+
+test('Android rejects malformed hierarchy children and preserves existing parser limits', () => {
+  for (const tree of [{children: CANARY}, {attributes: CANARY}, {children: [null]}]) {
+    expect(() => parseHierarchy(tree, androidOptions)).toThrow('Unavailable');
+  }
+  expect(() => parseHierarchy(node(CANARY, CANARY, Array(LIMITS.nodes).fill({})), androidOptions))
+    .toThrow('Unavailable');
+  let tree = androidTree();
+  for (let i = 0; i <= LIMITS.hierarchyDepth; i++) tree = {children: [tree]};
+  expect(() => parseHierarchy(tree, androidOptions)).toThrow('Unavailable');
+});
+
+test('binds Android booleans and text comparison to the same failure, not accumulated targets', () => {
+  mockArtifacts({
+    'results/session/flow/commands.json': androidCommands(),
+    'results/session/flow/screen-hierarchy/step-043-assertCondition.json': androidTree(),
+    'results/session/flow/screen-hierarchy/step-045-assertCondition.json': node('connection-details', CANARY),
+    'results/other/screen-hierarchy/step-045-assertCondition.json': androidTree(),
+  });
+  const result = collectLiveDiagnostics(androidOptions);
+  expect(result.failedCommands[0].androidDetails).toEqual({
+    detailsTapCompleted: true, sheetPresent: false,
+    assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
+  });
+  expect(result.ui.observedTargets).toContain('assigned-device-id');
+  expect(result.ui.androidDetails).toBeUndefined();
+  expect(JSON.stringify(result)).not.toMatch(/SECRET_CANARY|Synthetic|step-045|session/);
+  expect(sanitizeDiagnostics(result)).toEqual(result);
+});
+
+test.each(['COMPLETED', 'FAILED', 'SKIPPED'])(
+  'reports the exact preceding Details tap outcome without claiming app state (%s)', status => {
+    mockArtifacts({
+      'results/commands.json': androidCommands(status),
+      'results/screen-hierarchy/step-045.json': androidTree(CANARY),
+    });
+    expect(collectLiveDiagnostics(androidOptions).failedCommands.find(item => item.targetId === 'assigned-device-id').androidDetails).toEqual({
+      detailsTapCompleted: status === 'COMPLETED', sheetPresent: true,
+      assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: 'mismatch',
+    });
+  },
+);
+
+test('does not manufacture a request from stale, missing, ambiguous or unrelated commands', () => {
+  for (const update of [
+    commands => { commands[0].metadata.sequenceNumber = 3; },
+    commands => { commands.shift(); },
+    commands => { commands.unshift(commands[0]); },
+    commands => { commands[0].command.tapOnElement.selector.idRegex = CANARY; },
+    commands => { commands[0].command.inputTextCommand = {text: CANARY}; },
+    commands => { commands[0].metadata.status = CANARY; },
+  ]) {
+    const commands = androidCommands();
+    update(commands);
+    mockArtifacts({
+      'results/commands.json': commands,
+      'results/screen-hierarchy/step-045.json': androidTree(),
+    });
+    const details = collectLiveDiagnostics(androidOptions).failedCommands[0].androidDetails;
+    expect(details.detailsTapCompleted).toBeUndefined();
+    expect(details.assignedDeviceIdTextMatch).toBe('match');
+    jest.restoreAllMocks();
+  }
+});
+
+test('missing and duplicate failure snapshots are not replaced with another observed tree', () => {
+  mockArtifacts({'results/commands.json': androidCommands()});
+  expect(collectLiveDiagnostics(androidOptions).failedCommands[0].androidDetails)
+    .toEqual({detailsTapCompleted: true});
+  jest.restoreAllMocks();
+  mockArtifacts({
+    'results/commands.json': androidCommands(),
+    'results/screen-hierarchy/step-045-first.json': androidTree(),
+    'results/screen-hierarchy/step-045-second.json': androidTree(CANARY),
+  });
+  expect(collectLiveDiagnostics(androidOptions).failedCommands[0].androidDetails)
+    .toEqual({detailsTapCompleted: true});
+  jest.restoreAllMocks();
+  const commands = androidCommands();
+  commands.push(commands[1]);
+  mockArtifacts({
+    'results/commands.json': commands,
+    'results/screen-hierarchy/step-045.json': androidTree(),
+  });
+  expect(collectLiveDiagnostics(androidOptions).failedCommands.every(item => !item.androidDetails)).toBe(true);
+});
+
+test('Android keeps oversize files unavailable before opening or comparing any text', () => {
+  const {opened} = mockArtifacts({
+    'results/screen-hierarchy/step-045.json': CANARY.repeat(LIMITS.fileBytes),
+  });
+  expect(collectLiveDiagnostics(androidOptions)).toEqual({availability: 'unavailable', reason: 'byte-limit'});
+  expect(opened).not.toHaveBeenCalled();
+});
+
+test('Android failure report independently strips arbitrary names, payloads and malformed metadata', () => {
+  const failure = {
+    sequenceNumber: 44, commandKind: 'assertConditionCommand', targetId: 'assigned-device-id',
+    androidDetails: {
+      detailsTapCompleted: true, sheetPresent: false, assignedDeviceIdPresent: false,
+      assignedDeviceIdTextMatch: 'missing', actual: CANARY, expected: CANARY,
+      attributes: {payload: CANARY}, arbitraryName: CANARY,
+    },
+  };
+  const result = sanitizeDiagnostics({availability: 'available', failedCommands: [failure]});
+  expect(result.failedCommands[0].androidDetails).toEqual({
+    detailsTapCompleted: true, sheetPresent: false, assignedDeviceIdPresent: false,
+    assignedDeviceIdTextMatch: 'missing',
+  });
+  expect(JSON.stringify(result)).not.toContain(CANARY);
+  for (const bad of [
+    {detailsTapCompleted: CANARY},
+    {sheetPresent: true, assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: CANARY},
+    {sheetPresent: true, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'match'},
+    {sheetPresent: CANARY, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing'},
+    Array(LIMITS.nodes).fill(CANARY),
+  ]) {
+    failure.androidDetails = bad;
+    expect(sanitizeDiagnostics({availability: 'available', failedCommands: [failure]}).failedCommands[0])
+      .not.toHaveProperty('androidDetails');
+  }
+});
+
+test('smoke passes platform only; trusted expected identity stays inside existing sanitize boundary', () => {
+  const smoke = fs.readFileSync('scripts/ci/smoke-live-device.sh', 'utf8');
+  expect(smoke).toContain('diagnostics=$(node scripts/ci/live-diagnostics.js "$platform")');
+  expect(smoke).not.toMatch(/live-diagnostics\.js.*(?:DEVICE_KEY|EXPECTED_DEVICE_ID)/);
+});
+
+test.each(['valid', 'invalid', 'ios'])('CLI sanitizes existing synthetic artifacts with %s configuration', mode => {
+  const source = fs.readFileSync('scripts/ci/live-diagnostics.js', 'utf8');
+  const config = {
+    schemaVersion: 1, provisioningHost: 'global.azure-devices-provisioning.net',
+    scopeId: '0neAABBCCDD', expectedHub: 'synthetic.azure-devices.net',
+    cases: {android: {
+      registrationId: 'synthetic-registration', expectedDeviceId: androidOptions.expectedDeviceId,
+      nonce: 'synthetic_nonce_1234',
+    }},
+  };
+  mockArtifacts({
+    'results/commands.json': androidCommands(),
+    'results/screen-hierarchy/step-045.json': androidTree(),
+  });
+  const entryModule = {exports: {}};
+  const entryRequire = name => name === './live-config' ? liveConfig
+    : require(name.startsWith('./') ? `../scripts/ci/${name.slice(2)}` : name);
+  entryRequire.main = entryModule;
+  const write = jest.fn();
+  const invoke = () => vm.runInNewContext(source, {
+    module: entryModule, require: entryRequire, Buffer,
+    process: {
+      argv: ['node', 'live-diagnostics.js', mode === 'ios' ? 'ios' : 'android'],
+      env: {PAAD_LIVE_CONFIG: mode === 'invalid' ? CANARY : JSON.stringify(config), MAESTRO_DEVICE_KEY: CANARY},
+      stdout: {write},
+    },
+  });
+  if (mode === 'invalid') {
+    expect(invoke).toThrow('Invalid live configuration or invocation');
+    expect(write).not.toHaveBeenCalled();
+    return;
+  }
+  invoke();
+  expect(write).toHaveBeenCalledTimes(1);
+  const output = write.mock.calls[0][0];
+  const details = JSON.parse(output).failedCommands[0].androidDetails;
+  if (mode === 'ios') expect(details).toBeUndefined();
+  else expect(details.assignedDeviceIdTextMatch).toBe('match');
+  expect(output).not.toMatch(/SECRET_CANARY|Synthetic|synthetic-registration/);
 });

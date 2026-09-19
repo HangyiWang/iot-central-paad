@@ -63,6 +63,7 @@ const SYSTEM_DIALOGS = new Map([
   ["IoT PnP isn't responding", 'paad-anr'],
 ]);
 const SYSTEM_DIALOG_CODES = [...new Set(SYSTEM_DIALOGS.values())];
+const ID_TEXT_MATCHES = Object.freeze(['match', 'mismatch', 'missing', 'unavailable', 'ambiguous']);
 const LIMITS = Object.freeze({
   entries: 256, files: 32, fileBytes: 1024 * 1024, totalBytes: 4 * 1024 * 1024,
   directoryDepth: 6, nodes: 4096, hierarchyDepth: 64, commands: 512,
@@ -114,8 +115,15 @@ function parseCommands(value) {
   return failedCommands;
 }
 
-function parseHierarchy(value) {
+// Android-only comparison takes a trusted literal, not source textRegex/environment.
+// The optional androidDetails snapshot is emitted publicly only when bound to its failed command.
+// cli-2.10.0 ArtifactsGenerator.captureStepHierarchy serializes viewHierarchy().root:
+// a TreeNode, not a ViewHierarchy wrapper. AndroidDriver.mapHierarchy(document) keeps
+// document/window nodes under children; TestOutputWriter omits empty attributes/children.
+function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
   if (!object(value)) throw new DiagnosticUnavailable('invalid-metadata');
+  const android = platform === 'android';
+  const identityNodes = [];
   const ui = {};
   const observedTargets = new Set();
   const observedLabels = new Set();
@@ -124,12 +132,20 @@ function parseHierarchy(value) {
     if (++count > LIMITS.nodes || depth > LIMITS.hierarchyDepth) {
       throw new DiagnosticUnavailable('hierarchy-limit');
     }
-    if (!object(node)) return;
+    if (!object(node)) {
+      if (android) throw new DiagnosticUnavailable('invalid-metadata');
+      return;
+    }
     const attributes = node.attributes;
+    if (android && ((attributes !== undefined && !object(attributes)) ||
+        (node.children !== undefined && !Array.isArray(node.children)))) {
+      throw new DiagnosticUnavailable('invalid-metadata');
+    }
     if (object(attributes)) {
       // Android resource-id and iOS accessibility identifier share this attribute.
       const id = attributes['resource-id'];
       if (UI_PRESENCE_IDS.includes(id)) observedTargets.add(id);
+      if (android && id === 'assigned-device-id') identityNodes.push(attributes.text);
       for (const text of [attributes.text, attributes.accessibilityText]) {
         if (!id && UI_LABELS.has(text)) observedLabels.add(UI_LABELS.get(text));
         if (id === 'connection-status' && ['Connected', 'Disconnected'].includes(text)) {
@@ -157,7 +173,37 @@ function parseHierarchy(value) {
   visit(value, 0);
   if (observedTargets.size) ui.observedTargets = [...observedTargets].sort();
   if (observedLabels.size) ui.observedLabels = [...observedLabels].sort();
+  if (android && (object(value.attributes) || Array.isArray(value.children))) {
+    const expectedValid = typeof expectedDeviceId === 'string' && expectedDeviceId.length <= 128 &&
+      !/[\s\x00-\x1f\x7f]/.test(expectedDeviceId) &&
+      /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(expectedDeviceId);
+    const actual = identityNodes[0];
+    // Android omits invisible children; presence is not visibility or app state.
+    // Compare only the tagged value's text, never hints, descendants or labels.
+    ui.androidDetails = {
+      sheetPresent: observedTargets.has('connection-details-sheet'),
+      assignedDeviceIdPresent: identityNodes.length > 0,
+      assignedDeviceIdTextMatch: identityNodes.length === 0 ? 'missing'
+        : identityNodes.length > 1 ? 'ambiguous'
+          : !expectedValid || typeof actual !== 'string' || !actual.length || actual.length > 128
+            ? 'unavailable' : actual === expectedDeviceId ? 'match' : 'mismatch',
+    };
+  }
   return ui;
+}
+
+function sanitizeAndroidDetails(value) {
+  if (!object(value)) return undefined;
+  const safe = {};
+  if (typeof value.detailsTapCompleted === 'boolean') safe.detailsTapCompleted = value.detailsTapCompleted;
+  if (typeof value.sheetPresent === 'boolean' && typeof value.assignedDeviceIdPresent === 'boolean' &&
+      ID_TEXT_MATCHES.includes(value.assignedDeviceIdTextMatch) &&
+      (value.assignedDeviceIdPresent === (value.assignedDeviceIdTextMatch !== 'missing'))) {
+    safe.sheetPresent = value.sheetPresent;
+    safe.assignedDeviceIdPresent = value.assignedDeviceIdPresent;
+    safe.assignedDeviceIdTextMatch = value.assignedDeviceIdTextMatch;
+  }
+  return Object.keys(safe).length ? safe : undefined;
 }
 
 function sanitizeDiagnostics(value) {
@@ -173,6 +219,9 @@ function sanitizeDiagnostics(value) {
         const command = {sequenceNumber: entry.sequenceNumber, commandKind: entry.commandKind};
         if (TARGET_IDS.includes(entry.targetId)) command.targetId = entry.targetId;
         if (FAILURE_CATEGORIES.includes(entry.failureCategory)) command.failureCategory = entry.failureCategory;
+        const androidDetails = entry.targetId === 'assigned-device-id'
+          ? sanitizeAndroidDetails(entry.androidDetails) : undefined;
+        if (androidDetails) command.androidDetails = androidDetails;
         failedCommands.push(command);
       }
     }
@@ -210,7 +259,7 @@ function sanitizeDiagnostics(value) {
   }
 }
 
-function collectLiveDiagnostics() {
+function collectLiveDiagnostics(options = {}) {
   try {
     const root = path.resolve('build/live-device-private');
     const requireDirectory = directory => {
@@ -223,6 +272,8 @@ function collectLiveDiagnostics() {
     let files = 0;
     let bytes = 0;
     const failedCommands = [];
+    const androidCommands = [];
+    const androidHierarchies = new Map();
     const ui = {};
     const observedTargets = new Set();
     const observedLabels = new Set();
@@ -266,7 +317,26 @@ function collectLiveDiagnostics() {
           } finally {
             fs.closeSync(fd);
           }
-          if (commands) failedCommands.push(...parseCommands(value));
+          if (commands) {
+            const parsed = parseCommands(value);
+            failedCommands.push(...parsed);
+            if (options.platform === 'android') {
+              for (const command of parsed) {
+                if (command.targetId !== 'assigned-device-id') continue;
+                if (value.filter(entry => entry?.metadata?.sequenceNumber === command.sequenceNumber).length !== 1) continue;
+                const previous = value.filter(entry => object(entry?.metadata) &&
+                  entry.metadata.sequenceNumber === command.sequenceNumber - 1);
+                if (previous.length === 1 &&
+                    COMMAND_KINDS.filter(kind => object(previous[0].command?.[kind])).length === 1 &&
+                    previous[0].command?.tapOnElement?.selector?.idRegex === 'connection-details' &&
+                    ['COMPLETED', 'FAILED', 'SKIPPED'].includes(previous[0].metadata.status)) {
+                  // A completed driver tap is a request, not proof that app onPress ran.
+                  command.androidDetails = {detailsTapCompleted: previous[0].metadata.status === 'COMPLETED'};
+                }
+                androidCommands.push({filename, command});
+              }
+            }
+          }
           else if (postFailure) {
             if (!object(value) || value.source !== 'post-failure-ios-hierarchy' || !object(value.ui)) {
               throw new DiagnosticUnavailable('invalid-metadata');
@@ -278,7 +348,17 @@ function collectLiveDiagnostics() {
             Object.assign(ui, safe.ui);
           }
           else {
-            const hierarchy = parseHierarchy(value);
+            const hierarchy = parseHierarchy(value, options);
+            if (hierarchy.androidDetails) {
+              // cli-2.10.0 StepArtifactNaming uses sequenceNumber + 1, padded to 3 digits.
+              // Bind only within this commands.json bundle; never union failure snapshots.
+              const step = /^step-([0-9]{3,16})(?:-.{1,40})?\.json$/.exec(entry.name);
+              if (step && integer(Number(step[1]) - 1)) {
+                const key = `${path.join(path.dirname(directory), 'commands.json')}:${Number(step[1]) - 1}`;
+                androidHierarchies.set(key, androidHierarchies.has(key) ? null : hierarchy.androidDetails);
+              }
+              delete hierarchy.androidDetails;
+            }
             hierarchyCaptured = true;
             for (const target of hierarchy.observedTargets ?? []) observedTargets.add(target);
             for (const label of hierarchy.observedLabels ?? []) observedLabels.add(label);
@@ -302,6 +382,10 @@ function collectLiveDiagnostics() {
     // Presence across captured failure hierarchies is not current visibility.
     if (observedTargets.size) ui.observedTargets = [...observedTargets].sort();
     if (observedLabels.size) ui.observedLabels = [...observedLabels].sort();
+    for (const {filename, command} of androidCommands) {
+      const hierarchy = androidHierarchies.get(`${filename}:${command.sequenceNumber}`);
+      if (hierarchy) command.androidDetails = {...command.androidDetails, ...hierarchy};
+    }
     const result = sanitizeDiagnostics({availability: 'available', failedCommands, ui, hierarchyCaptured});
     return result.availability === 'available' ? result : unavailable('no-supported-data');
   } catch (error) {
@@ -314,4 +398,13 @@ module.exports = {
   collectLiveDiagnostics, sanitizeDiagnostics, parseCommands, parseHierarchy,
   COMMAND_KINDS, TARGET_IDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS, UI_PRESENCE_IDS,
 };
-if (require.main === module) process.stdout.write(`${JSON.stringify(collectLiveDiagnostics())}\n`);
+if (require.main === module) {
+  const platform = process.argv[2];
+  let expectedDeviceId;
+  if (platform === 'android') {
+    // The validator throws a fixed, input-free error if the trusted case is unavailable.
+    const {validateLiveConfig} = require('./live-config');
+    expectedDeviceId = validateLiveConfig(process.env.PAAD_LIVE_CONFIG, platform).cases.android.expectedDeviceId;
+  }
+  process.stdout.write(`${JSON.stringify(collectLiveDiagnostics({platform, expectedDeviceId}))}\n`);
+}
