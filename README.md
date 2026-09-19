@@ -9,6 +9,17 @@ develop: [![Build status](https://build.appcenter.ms/v0.1/apps/82ba91a2-c68c-4b4
 ## What is this?
 An useful tool to start playing with Azure IoT Central without using a real IoT device. The smartphone or tablet can send telemetry data from its embedded sensors (accelerometer, gyroscope...) and Bluetooth-LowEnergy (BLE) devices. It can also receive properties and commands to demonstrate basic functionalities.
 
+## Beginner guide and diagrams
+
+No app-development or Azure background is needed for these explanations:
+
+- [PAAD architecture and Azure guide](docs/PAAD-ARCHITECTURE-AND-AZURE-GUIDE.md): frameworks, dependencies, connection steps and troubleshooting.
+- [App architecture diagram](docs/diagrams/paad-app-architecture.html): from source code and native builds to the shared runtime.
+- [Phone-to-Azure diagram](docs/diagrams/paad-phone-to-azure.html): device inputs, DPS assignment, Hub messages and ADR's separate role.
+
+Open the HTML files in a browser for the visual walkthroughs. They work offline
+and illustrate the design, not live device data or acceptance results.
+
 ## Features
 
 The main features of the app are:
