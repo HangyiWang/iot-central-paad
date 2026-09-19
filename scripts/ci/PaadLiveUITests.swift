@@ -362,6 +362,7 @@ final class PaadLiveUITests: XCTestCase {
   /// Recent distinct controls, not a whole-run coverage ledger. Flow completion
   /// depends on the direct assertions and ordered stages, never this diagnostic set.
   private var observed: [String] = []
+  private var missingTarget: Target?
   private var ambiguousTarget: String?
   private var ambiguousTypes: [String] = []
   private var connected = false
@@ -1086,6 +1087,7 @@ final class PaadLiveUITests: XCTestCase {
         return candidate
       }
     }
+    missingTarget = target
     throw Failure.missingElement
   }
 
@@ -1821,6 +1823,9 @@ final class PaadLiveUITests: XCTestCase {
     ]
     if let category = failureCategory {
       record["failureCategory"] = category.rawValue
+    }
+    if outcome == .failed, failureCategory == .missingElement, let missingTarget = missingTarget {
+      record["missingTarget"] = missingTarget.rawValue
     }
     if let ambiguousTarget = ambiguousTarget {
       record["ambiguousTarget"] = ambiguousTarget

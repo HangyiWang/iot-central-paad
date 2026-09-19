@@ -182,6 +182,25 @@ fresh proof was independently observed and no failed APK was installed on
 Windows. The Windows observer bootstrap was repaired independently, but full
 retained-connection/context assertions remain pending actual delivery.
 
+Run [35474589482](https://github.com/HangyiWang/iot-central-paad/actions/runs/35474589482),
+source `797b1b8eaf8e7930c612570bbc2bfb4c3b38a3eb`, built both binaries.
+Android's independent assignment, model, fresh proof and retained registry
+binding matched, but the native flow failed at assertion sequence 168. Its
+existing summary does not identify the target or traversal stage, so full
+traversal and cold restoration are not established.
+
+iOS failed credential-free smoke with `missing-element` at the `welcome`
+milestone, before connected execution. A recent observed control is not the
+missing control. The follow-up harness retains the allowlisted target only when
+its bounded search exhausts, without exporting text or changing navigation,
+timeouts or assertions. Credential-free replay can reuse this run's pre-secret
+Simulator binary to investigate without another live input or app rebuild.
+
+Both temporary inputs were removed at 23:15:14 UTC after terminal completion
+at 23:14:55 UTC, and both slots are empty. No failed APK was installed. The
+unchanged Windows app was relaunched without clearing data or re-entering
+credentials; fresh connection and retained-context confirmation remain pending.
+
 ### Completed simulator acceptance (2026-09-18)
 
 The foundation's ordinary locked build/startup lanes passed on Android and iOS

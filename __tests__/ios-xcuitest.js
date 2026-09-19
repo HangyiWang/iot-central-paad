@@ -833,6 +833,47 @@ test.each(['smoke', 'live'])('maximum mode-specific %s diagnostics fit the uncha
   const otherLine = `${PREFIX}${JSON.stringify(withoutAmbiguity)}`;
   expect(Buffer.byteLength(otherLine)).toBeLessThan(4096);
   expect(parseNativeLog(otherLine, mode)).toEqual(sanitizeNativeResult(withoutAmbiguity));
+  const missing = {
+    ...withoutAmbiguity, failureCategory: 'missing-element', missingTarget: longest(TARGETS),
+  };
+  const missingLine = `${PREFIX}${JSON.stringify(missing)}`;
+  expect(Buffer.byteLength(missingLine)).toBeLessThan(4096);
+  expect(parseNativeLog(missingLine, mode)).toEqual(sanitizeNativeResult(missing));
+});
+
+test.each(['smoke', 'live'])('missing %s control evidence is failure-bound and allowlisted', mode => {
+  const result = {
+    ...nativeResult(mode), outcome: 'failed', stage: 'welcome',
+    failureCategory: 'missing-element', missingTarget: 'connection-registrationId',
+    connected: false, nonceSubmitted: false, coldRestored: false,
+  };
+  expect(parseNativeLog(`${PREFIX}${JSON.stringify(result)}`, mode)).toEqual(result);
+  expect(sanitizeDiagnostics({availability: 'available', nativeUi: result}).nativeUi).toEqual(result);
+  expect(nativeFlowPassed(result, mode)).toBe(false);
+  for (const target of TARGETS) {
+    expect(sanitizeNativeResult({...result, missingTarget: target})?.missingTarget).toBe(target);
+  }
+  for (const change of [
+    {missingTarget: 'RAW_CANARY'}, {missingTarget: 'bluetooth-heading'}, {missingTarget: null},
+    {missingTarget: ['registration-manual']}, {missingTarget: {label: 'RAW_CANARY'}},
+    {failureCategory: 'not-hittable'}, {failureCategory: undefined},
+    {outcome: 'passed'}, {outcome: 'in-progress'},
+  ]) {
+    expect(sanitizeNativeResult({...result, ...change})).toBeUndefined();
+  }
+  const {missingTarget, ...legacy} = result;
+  expect(sanitizeNativeResult(legacy)).toEqual(legacy);
+});
+
+test('missing native target is captured only after the bounded search exhausts', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  const find = swift.split('private func find(')[1].split('private func requireExists(')[0];
+  expect(find.indexOf('missingTarget = target')).toBeGreaterThan(find.indexOf('0..<Scroll.backward'));
+  expect(find).toMatch(/missingTarget = target\s+throw Failure\.missingElement/);
+  const emitter = swift.split('private func emit(outcome:')[1];
+  expect(emitter).toContain('outcome == .failed, failureCategory == .missingElement');
+  expect(emitter).toContain('record["missingTarget"] = missingTarget.rawValue');
+  expect(emitter).not.toMatch(/app\.|\.label\b|\.value\b|debugDescription|screenshot/);
 });
 
 test('ambiguous native selectors disclose only a fixed target and three bounded native kinds', () => {

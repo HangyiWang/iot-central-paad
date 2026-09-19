@@ -230,6 +230,9 @@ function sanitizeNativeResult(value) {
       (value.nativeIssue !== undefined && !NATIVE_ISSUES.includes(value.nativeIssue)) ||
       (value.nativeOperation !== undefined && !NATIVE_OPERATIONS.includes(value.nativeOperation)) ||
       (value.execution !== undefined && !EXECUTIONS.includes(value.execution))) return undefined;
+  if (value.missingTarget !== undefined &&
+      (value.outcome !== 'failed' || value.failureCategory !== 'missing-element' ||
+        !TARGETS.includes(value.missingTarget))) return undefined;
   if (value.ambiguousTarget !== undefined || value.ambiguousTypes !== undefined) {
     if (value.failureCategory !== 'ambiguous-element' ||
         (!TARGETS.includes(value.ambiguousTarget) && value.ambiguousTarget !== 'bluetooth-heading') ||
@@ -268,6 +271,7 @@ function sanitizeNativeResult(value) {
     ...(value.failureCategory ? {failureCategory: value.failureCategory} : {}),
     ...(value.nativeIssue ? {nativeIssue: value.nativeIssue} : {}),
     ...(value.nativeOperation ? {nativeOperation: value.nativeOperation} : {}),
+    ...(value.missingTarget ? {missingTarget: value.missingTarget} : {}),
     ...(value.ambiguousTarget ? {
       ambiguousTarget: value.ambiguousTarget, ambiguousTypes: [...value.ambiguousTypes],
     } : {}),
