@@ -88,6 +88,7 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
       text: '^Connected$'
     timeout: 180000
 # Connected identity and connection-operation completion are separate app states.
+- runFlow: dismiss-android-permissions.yaml
 - extendedWaitUntil:
     notVisible:
       id: app-busy-overlay
@@ -99,6 +100,10 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     timeout: 15000
 - tapOn:
     id: connection-details
+- runFlow:
+    file: dismiss-android-permissions.yaml
+    env:
+      AFTER_DETAILS_TAP: 'true'
 - extendedWaitUntil:
     visible:
       id: connection-details-sheet
@@ -202,6 +207,7 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     notVisible:
       id: registration-manual
     timeout: 180000
+- runFlow: dismiss-android-permissions.yaml
 - extendedWaitUntil:
     notVisible:
       id: app-busy-overlay
@@ -213,6 +219,10 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
     timeout: 15000
 - tapOn:
     id: connection-details
+- runFlow:
+    file: dismiss-android-permissions.yaml
+    env:
+      AFTER_DETAILS_TAP: 'true'
 - extendedWaitUntil:
     visible:
       id: connection-details-sheet

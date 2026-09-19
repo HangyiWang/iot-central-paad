@@ -1174,10 +1174,15 @@ final class PaadLiveUITests: XCTestCase {
     pendingCategory = nil
   }
 
-  private func commitField(_ field: XCUIElement) {
+  private func commitField(_ field: XCUIElement) throws {
     pendingCategory = .notHittable
     field.typeText("\n")
     pendingCategory = nil
+    // blurAndSubmit/Keyboard.dismiss can finish after the Return keystroke.
+    // Do not let that dismissal race the next field's focus.
+    try waitFor(
+      NSPredicate(format: "exists == false"),
+      on: app.keyboards.firstMatch, timeout: Timeout.short, failure: .keyboardUnavailable)
   }
 
   private func typeCharacters(_ text: String, into field: XCUIElement) {
@@ -1199,7 +1204,7 @@ final class PaadLiveUITests: XCTestCase {
     diagnoseInput(field, target: target, phase: .cleared, expected: text)
     typeCharacters(text, into: field)
     diagnoseInput(field, target: target, phase: .typed, expected: text)
-    commitField(field)
+    try commitField(field)
     diagnoseInput(field, target: target, phase: .committed, expected: text)
     do {
       try requireExactValue(on: field, text: text, failure: .valueMismatch)
@@ -1216,7 +1221,7 @@ final class PaadLiveUITests: XCTestCase {
     let field = try focusField(target)
     clearField(field)
     typeCharacters(secret, into: field)
-    commitField(field)
+    try commitField(field)
     try requireMaskedEntry(field, expectedLength: secret.count)
   }
 

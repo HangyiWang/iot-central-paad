@@ -161,6 +161,27 @@ are evidence only, never a claim about which window owns the foreground.
 The two owned temporary inputs were removed at 20:56:52 UTC after completion.
 Neither platform reached accepted cold restoration for this source.
 
+Run [35472470305](https://github.com/HangyiWang/iot-central-paad/actions/runs/35472470305),
+source `2091779b2e3fe4a208758d6379d7ca1dd9487f41`, built both binaries but
+failed acceptance. Android reached the Details tap, then the sheet assertion
+failed with an exact permission-controller dialog signature in the same
+failure snapshot. This is evidence for narrowly handling that permission UI,
+not for dismissing arbitrary system alerts. iOS failed its credential-free
+input smoke with `keyboard-unavailable` before the connected lane, so this run
+did not exercise the new list-scoped disclosure correction.
+
+The follow-up Android flow denies only the two known permission-controller
+deny-button IDs, at most four times per checkpoint. A single Details retry
+requires an actual post-tap permission denial and continued sheet absence;
+unknown dialogs are not dismissed. The iOS input helper now waits for Return's
+keyboard dismissal before focusing another field, preserving exact-value and
+masked-secret assertions rather than bypassing keyboard readiness.
+
+Both temporary inputs were removed at 22:28:21 UTC after completion. Neither
+fresh proof was independently observed and no failed APK was installed on
+Windows. The Windows observer bootstrap was repaired independently, but full
+retained-connection/context assertions remain pending actual delivery.
+
 ### Completed simulator acceptance (2026-09-18)
 
 The foundation's ordinary locked build/startup lanes passed on Android and iOS

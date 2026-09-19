@@ -1,6 +1,7 @@
 const {spawnSync} = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const yaml = require('js-yaml');
 const {
   validateLiveConfig,
@@ -372,6 +373,7 @@ test('both details presentations wait for readiness and sheet before exact ident
   );
   expect(details).toHaveLength(2);
   for (const index of details) {
+    expect(commands[index - 3]).toEqual({runFlow: 'dismiss-android-permissions.yaml'});
     expect(commands[index - 2]).toEqual({
       extendedWaitUntil: {
         notVisible: {id: 'app-busy-overlay'},
@@ -386,12 +388,18 @@ test('both details presentations wait for readiness and sheet before exact ident
     });
     expect(commands[index]).toEqual({tapOn: {id: 'connection-details'}});
     expect(commands[index + 1]).toEqual({
+      runFlow: {
+        file: 'dismiss-android-permissions.yaml',
+        env: {AFTER_DETAILS_TAP: 'true'},
+      },
+    });
+    expect(commands[index + 2]).toEqual({
       extendedWaitUntil: {
         visible: {id: 'connection-details-sheet'},
         timeout: 15000,
       },
     });
-    expect(commands[index + 2]).toEqual({
+    expect(commands[index + 3]).toEqual({
       extendedWaitUntil: {
         visible: {
           id: 'assigned-device-id',
@@ -400,7 +408,7 @@ test('both details presentations wait for readiness and sheet before exact ident
         timeout: 15000,
       },
     });
-    expect(commands[index + 3]).toEqual({
+    expect(commands[index + 4]).toEqual({
       scrollUntilVisible: {
         element: {id: 'assigned-hub'},
         direction: 'DOWN',
@@ -409,6 +417,105 @@ test('both details presentations wait for readiness and sheet before exact ident
     });
   }
   expect(commands.some(command => command.retry || command.waitForAnimationToEnd || command.sleep)).toBe(false);
+  expect(commands.filter(command => command.launchApp).map(command => command.launchApp)).toEqual([
+    {clearState: true, permissions: {all: 'deny'}},
+    {clearState: false, permissions: {all: 'deny'}},
+  ]);
+});
+
+const permissionHelper = () => yaml.loadAll(
+  fs.readFileSync('.maestro/dismiss-android-permissions.yaml', 'utf8'),
+);
+
+test('permission handling is Android-only, four guarded deny taps, then a fail-closed prompt assertion', () => {
+  const [config, flow] = permissionHelper();
+  expect(config.appId).toBe('${MAESTRO_APP_ID}');
+  expect(config.env).toEqual({AFTER_DETAILS_TAP: 'false'});
+  expect(flow).toHaveLength(1);
+  const scope = flow[0].runFlow;
+  expect(scope.when).toEqual({platform: 'Android'});
+  expect(scope.commands[0]).toEqual({evalScript: '${output.androidPermissionDenied = false}'});
+  const repeated = scope.commands[1].repeat;
+  expect(repeated.times).toBe(4);
+  expect(Object.keys(repeated).sort()).toEqual(['commands', 'times']);
+  expect(repeated.commands).toHaveLength(1);
+  const dismissal = repeated.commands[0].runFlow;
+  const denyId = '^com\\.(android|google\\.android)\\.permissioncontroller:id/permission_deny_button$';
+  expect(dismissal.when).toEqual({visible: {id: denyId}});
+  expect(dismissal.commands).toEqual([
+    {tapOn: {id: denyId, retryTapIfNoChange: false}},
+    {evalScript: '${output.androidPermissionDenied = true}'},
+  ]);
+  const remaining = scope.commands[2].assertNotVisible;
+  expect(Object.keys(remaining)).toEqual(['id']);
+  const deny = new RegExp(denyId);
+  const prompt = new RegExp(remaining.id);
+  for (const pkg of ['com.android.permissioncontroller', 'com.google.android.permissioncontroller']) {
+    expect(deny.test(`${pkg}:id/permission_deny_button`)).toBe(true);
+    for (const resource of ['grant_dialog', 'permission_message', 'permission_deny_button',
+      'permission_deny_and_dont_ask_again_button', 'permission_allow_foreground_only_button']) {
+      expect(prompt.test(`${pkg}:id/${resource}`)).toBe(true);
+    }
+    expect(deny.test(`${pkg}:id/permission_allow_button`)).toBe(false);
+    expect(deny.test(`${pkg}:id/permission_deny_and_dont_ask_again_button`)).toBe(false);
+  }
+  for (const resource of ['android:id/button1', 'android:id/aerr_close',
+    'com.android.settings:id/permission_deny_button', 'unrelated:id/permission_deny_button',
+    'com.android.permissioncontroller.evil:id/permission_deny_button']) {
+    expect(deny.test(resource)).toBe(false);
+    expect(prompt.test(resource)).toBe(false);
+  }
+  const flatten = steps => steps.flatMap(step => [
+    step, ...flatten(step.runFlow?.commands ?? step.repeat?.commands ?? []),
+  ]);
+  const all = flatten(flow);
+  expect(all.filter(step => step.repeat)).toHaveLength(1);
+  expect(all.filter(step => step.tapOn).map(step => step.tapOn)).toEqual([
+    {id: denyId, retryTapIfNoChange: false},
+    {id: 'connection-details', retryTapIfNoChange: false},
+  ]);
+  expect(JSON.stringify(all)).not.toMatch(
+    /takeScreenshot|startRecording|"point"|"text"|"optional"|waitForAnimationToEnd|"sleep"|clearState|setPermissions/,
+  );
+});
+
+test('one Details retry requires a fresh post-tap denial and an asynchronous sheet lookup plus absence recheck', () => {
+  const scope = permissionHelper()[1][0].runFlow;
+  const recovery = scope.commands[3].runFlow;
+  expect(scope.commands).toHaveLength(4);
+  expect(recovery.when).toEqual({
+    true: "${AFTER_DETAILS_TAP === 'true' && output.androidPermissionDenied === true}",
+  });
+  const evaluate = (expression, context) => vm.runInNewContext(expression.slice(2, -1), context);
+  for (const [after, denied, expected] of [
+    ['true', true, true], ['false', true, false], ['true', false, false],
+    ['true', undefined, false], ['true', 'true', false], ['unrelated', true, false],
+  ]) {
+    expect(evaluate(recovery.when.true, {AFTER_DETAILS_TAP: after, output: {androidPermissionDenied: denied}}))
+      .toBe(expected);
+  }
+  expect(recovery.commands[0]).toEqual({evalScript: '${output.androidDetailsSheetSeen = false}'});
+  expect(recovery.commands[1]).toEqual({
+    runFlow: {
+      when: {visible: {id: 'connection-details-sheet'}},
+      commands: [{evalScript: '${output.androidDetailsSheetSeen = true}'}],
+    },
+  });
+  const retry = recovery.commands[2].runFlow;
+  expect(recovery.commands).toHaveLength(3);
+  expect(retry.when).toEqual({
+    true: '${output.androidDetailsSheetSeen === false}',
+    notVisible: {id: 'connection-details-sheet'},
+  });
+  expect(evaluate(retry.when.true, {output: {androidDetailsSheetSeen: true}})).toBe(false);
+  expect(evaluate(retry.when.true, {output: {androidDetailsSheetSeen: false}})).toBe(true);
+  expect(retry.commands).toEqual([
+    {extendedWaitUntil: {visible: {id: 'connection-details', enabled: true}, timeout: 15000}},
+    {runFlow: {
+      when: {notVisible: {id: 'connection-details-sheet'}},
+      commands: [{tapOn: {id: 'connection-details', retryTapIfNoChange: false}}],
+    }},
+  ]);
 });
 
 test('identity waits retain exact selectors with bounded sheet presentation', () => {

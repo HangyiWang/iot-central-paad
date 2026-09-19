@@ -123,6 +123,13 @@ test('Explore opens all four existing tools and Activity retains filters, Latest
   expect(flow).toContainEqual({
     assertVisible: {id: 'bluetooth-tool-title', text: '^Nearby devices$'},
   });
+  const bluetooth = flow.findIndex(step => step.tapOn?.id === 'explore-tool-bluetooth');
+  expect(flow.slice(bluetooth + 1, bluetooth + 5)).toEqual([
+    {runFlow: 'dismiss-android-permissions.yaml'},
+    {assertVisible: {id: 'bluetooth-tool-title', text: '^Nearby devices$'}},
+    {tapOn: {id: 'explore-back'}},
+    {assertVisible: {id: 'explore-directory'}},
+  ]);
   expect(read('src/bluetooth/Bluetooth.tsx')).toContain(
     'testID="bluetooth-tool-title"',
   );

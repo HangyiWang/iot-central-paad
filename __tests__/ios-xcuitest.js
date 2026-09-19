@@ -1592,6 +1592,10 @@ test('input diagnosis brackets real keystrokes, leaves exact proof strict, and e
   expect(exact).not.toMatch(/trimmingCharacters|placeholderValue|NSPredicate\(format:/);
   const commit = swift.split('private func commitField(')[1].split('private func enterExactText(')[0];
   expect(commit).toContain('field.typeText("\\n")');
+  expect(commit).toContain('NSPredicate(format: "exists == false")');
+  expect(commit).toContain('on: app.keyboards.firstMatch, timeout: Timeout.short, failure: .keyboardUnavailable');
+  expect(commit.indexOf('field.typeText("\\n")')).toBeLessThan(commit.indexOf('try waitFor('));
+  expect(entry).toContain('try commitField(field)');
   const diagnostic = swift.split('private func diagnoseInput(')[1].split('private func advance(')[0];
   expect(diagnostic).toContain('guard mode == "smoke"');
   expect(diagnostic).toContain('[.formRegistrationId, .formScopeId, .formProvisioningHost].contains(target)');
@@ -1605,6 +1609,7 @@ test('input diagnosis brackets real keystrokes, leaves exact proof strict, and e
   expect(secret).toContain('inputDiagnostics = []');
   expect(secret).not.toContain('diagnoseInput(');
   expect(secret).toContain('typeCharacters(secret, into: field)');
+  expect(secret).toContain('try commitField(field)');
   expect(secret).toContain('requireMaskedEntry(field, expectedLength: secret.count)');
   const typing = swift.split('private func typeCharacters(')[1].split('@discardableResult')[0];
   expect(typing).toContain('for character in text');

@@ -66,6 +66,7 @@ name: Real connected Home Explore Activity traversal without media or diagnostic
     id: explore-directory
 - tapOn:
     id: explore-tool-bluetooth
+- runFlow: dismiss-android-permissions.yaml
 - assertVisible:
     id: bluetooth-tool-title
     text: '^Nearby devices$'
