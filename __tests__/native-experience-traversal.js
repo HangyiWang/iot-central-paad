@@ -132,10 +132,10 @@ test('Explore opens all four existing tools and Activity retains filters, Latest
     .split('private func traverseExperience()')[1]
     .split('private func launchApp()')[0];
   expect(traversal).toContain(
-    'try inspectDetail(togglePrefix: "log-toggle-", detailPrefix: "log-payload-")',
+    'try inspectDetail(in: .logsList, togglePrefix: "log-toggle-", detailPrefix: "log-payload-")',
   );
   expect(traversal).toContain(
-    'try inspectDetail(togglePrefix: "activity-toggle-", detailPrefix: "activity-details-")',
+    'try inspectDetail(in: .activityList, togglePrefix: "activity-toggle-", detailPrefix: "activity-details-")',
   );
   expect(traversal).toContain(
     'try requireUnique(query, target: target)',
@@ -145,6 +145,13 @@ test('Explore opens all four existing tools and Activity retains filters, Latest
     'try requireExactText(.bluetoothTitle, text: "Nearby devices")',
   );
   expect(traversal).not.toContain('app.staticTexts.matching');
+  const disclosure = traversal.split('private func inspectDetail(')[1];
+  expect(disclosure).toContain('let list = try requireVisible(target)');
+  expect(disclosure).toContain('toggles.element(boundBy: count - 1)');
+  expect(disclosure).toContain('hittable(recent, scrolling: list)');
+  expect(disclosure).toContain('hittable(payload, scrolling: list)');
+  expect(disclosure).toContain('hittable(toggle, scrolling: list)');
+  expect(disclosure).not.toMatch(/app\.buttons|app\.descendants|app\.swipe/);
   expect(traversal).toContain('guard settled == .completed, query.count == 1 else {');
   expect(traversal).toContain('return try hittable(query.element)');
   expect(traversal).toContain('throw Failure.ambiguousElement');

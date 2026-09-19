@@ -141,6 +141,26 @@ not installed on Windows; retained data was not cleared, but fresh connection
 and context restoration remain unconfirmed because the bounded observer was
 unavailable.
 
+Run [35467496064](https://github.com/HangyiWang/iot-central-paad/actions/runs/35467496064),
+source `313f9a5b6cde8dabc18df3a71ba409038c3bf699`, built both binaries but
+still failed connected acceptance. iOS passed the corrected Bluetooth check
+and reached Activity, where a control was not hittable during the
+Latest/disclosure portion. The subsequent driver correction selects a recent
+row after Latest and scrolls the actual observation/log list, rather than the
+whole app or the changing, potentially offscreen telemetry header. It still
+requires the matching disclosure to open and close through ordinary UI.
+
+Android failed the enabled Details visibility check before tapping. Its
+failure-bound hierarchy was a nonempty tree, but contained no Details button,
+sheet or assigned-identity control. This does not establish foreground-window
+ownership: the pinned driver drops package attributes and may merge window
+roots, and the earlier presence vocabulary did not include the new Home panels.
+The subsequent fixed diagnostic vocabulary includes those app surfaces and
+exact permission/autofill/ANR resource signatures. Resource-namespace categories
+are evidence only, never a claim about which window owns the foreground.
+The two owned temporary inputs were removed at 20:56:52 UTC after completion.
+Neither platform reached accepted cold restoration for this source.
+
 ### Completed simulator acceptance (2026-09-18)
 
 The foundation's ordinary locked build/startup lanes passed on Android and iOS

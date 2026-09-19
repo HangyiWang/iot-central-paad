@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const liveConfig = require('../scripts/ci/live-config');
 const {
   collectLiveDiagnostics, sanitizeDiagnostics, parseCommands, parseHierarchy,
-  COMMAND_KINDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS, UI_PRESENCE_IDS,
+  COMMAND_KINDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS, UI_PRESENCE_IDS, APP_SURFACE_IDS,
 } = require('../scripts/ci/live-diagnostics');
 
 const CANARY = 'SECRET_CANARY';
@@ -702,6 +702,7 @@ test('attributes a failed Details tap snapshot even if no allowlisted UI text is
     failureCategory: 'element-not-found',
     androidDetails: {
       detailsTapCompleted: false, hierarchyShape: 'tree-node', visitedNodeCount: '2-16',
+      appTargetsPresent: false, appSurfaces: [], resourceNamespaces: [], systemSurfaces: [],
       detailsButtonPresent: false, detailsButtonCount: 'zero',
       sheetPresent: false, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
     },
@@ -722,6 +723,7 @@ test('reports duplicate Details IDs as observed multiplicity, never a guessed fa
     sequenceNumber: 43, commandKind: 'tapOnElement', targetId: 'connection-details',
     androidDetails: {
       detailsTapCompleted: false, hierarchyShape: 'tree-node', visitedNodeCount: '2-16',
+      appTargetsPresent: true, appSurfaces: [], resourceNamespaces: [], systemSurfaces: [],
       detailsButtonPresent: true, detailsButtonCount: 'multiple',
       sheetPresent: true, assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: 'match',
     },
@@ -742,6 +744,7 @@ test.each(['app-busy-overlay', 'connection-details', 'connection-details-sheet']
       sequenceNumber: 42, commandKind: 'assertConditionCommand', targetId,
       androidDetails: {
         hierarchyShape: 'tree-node', visitedNodeCount: 'one',
+        appTargetsPresent: true, appSurfaces: [], resourceNamespaces: [], systemSurfaces: [],
         detailsButtonPresent: true, detailsButtonCount: 'one',
         sheetPresent: false, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
       },
@@ -835,6 +838,173 @@ test('sanitizes root shape and Details-button metadata as fixed consistent categ
     hierarchyShape: 'unsupported-root', visitedNodeCount: 'one',
   });
   expect(JSON.stringify(result)).not.toContain(CANARY);
+});
+
+test.each(APP_SURFACE_IDS)('records the fixed new app surface %s without its values', id => {
+  const details = parseHierarchy(node(id, CANARY), androidOptions).androidDetails;
+  expect(details).toMatchObject({
+    appTargetsPresent: true, appSurfaces: [id], resourceNamespaces: [], systemSurfaces: [],
+    detailsButtonPresent: false, sheetPresent: false, assignedDeviceIdTextMatch: 'missing',
+  });
+  const report = sanitizeDiagnostics({availability: 'available', failedCommands: [{
+    sequenceNumber: 44, commandKind: 'assertConditionCommand', targetId: 'connection-details',
+    androidDetails: details,
+  }]});
+  expect(report.failedCommands[0].androidDetails).toEqual(details);
+  expect(JSON.stringify(report)).not.toContain(CANARY);
+  expect(parseHierarchy(node(id, CANARY), {platform: 'ios'})).toEqual({});
+});
+
+test('new app surface vocabulary is bound to the real Home, tab, directory and tool controls', () => {
+  const home = fs.readFileSync('src/experience/WorkflowHome.tsx', 'utf8');
+  expect(home).toContain('testID={panel ? `home-panel-${panel}` : undefined}');
+  expect(home).toContain('testID={`home-node-${key}`}');
+  expect(home).toContain('testID="home-panel-close"');
+  expect(home).toContain('testID="workflow-home-content"');
+  for (const name of ['phone', 'dps', 'hub', 'adr']) {
+    expect(APP_SURFACE_IDS).toContain(`home-panel-${name}`);
+    expect(APP_SURFACE_IDS).toContain(`home-node-${name}`);
+  }
+  for (const [file, ids] of [
+    ['src/Home.tsx', ['tab-home', 'tab-explore', 'tab-activity', 'explore-back']],
+    ['src/experience/Explore.tsx', ['explore-directory']],
+    ['src/experience/Activity.tsx', ['activity-list']],
+    ['src/CardView.tsx', ['telemetry-tool', 'properties-tool']],
+    ['src/FileUpload.tsx', ['image-upload-card']],
+    ['src/bluetooth/Bluetooth.tsx', ['bluetooth-tool-title']],
+    ['src/Logs.tsx', ['logs-list']],
+  ]) {
+    const source = fs.readFileSync(file, 'utf8');
+    for (const id of ids) {
+      expect(source).toContain(id);
+      expect(APP_SURFACE_IDS).toContain(id);
+    }
+  }
+  expect(UI_PRESENCE_IDS).toHaveLength(17);
+  expect(APP_SURFACE_IDS).toHaveLength(21);
+});
+
+test.each([
+  ['com.iot_pnp.ci:id/content', 'app'],
+  ['com.android.permissioncontroller:id/permission_allow_button', 'permissioncontroller'],
+  ['com.google.android.permissioncontroller:id/permission_allow_one_time_button', 'permissioncontroller'],
+  ['com.android.inputmethod.latin:id/keyboard_view', 'inputmethod'],
+  ['com.google.android.inputmethod.latin:id/keyboard_view', 'inputmethod'],
+  ['com.android.systemui:id/content', 'systemui'],
+  ['com.android.launcher3:id/workspace', 'launcher'],
+  ['com.google.android.apps.nexuslauncher:id/workspace', 'launcher'],
+  ['com.google.android.gms:id/content', 'googleservices'],
+  ['com.android.settings:id/content', 'settings'],
+  ['synthetic.unknown:id/content', 'other'],
+])('exports only the fixed resource-namespace category (%#)', (id, category) => {
+  const details = parseHierarchy(node(id, CANARY), androidOptions).androidDetails;
+  expect(details.resourceNamespaces).toEqual([category]);
+  expect(details.appTargetsPresent).toBe(false);
+  expect(details.appSurfaces).toEqual([]);
+  expect(JSON.stringify(details)).not.toMatch(/SECRET_CANARY|:id\/|com\.|synthetic\.unknown/);
+  expect(details).not.toHaveProperty('windowOwner');
+});
+
+test.each([
+  ['com.android.permissioncontroller:id/grant_dialog', 'permission-dialog'],
+  ['com.google.android.permissioncontroller:id/permission_message', 'permission-dialog'],
+  ['com.android.permissioncontroller:id/permission_allow_foreground_only_button', 'permission-dialog'],
+  ['com.google.android.permissioncontroller:id/permission_deny_button', 'permission-dialog'],
+  ['android:id/autofill_save', 'autofill-save'],
+  ['android:id/autofill_save_yes', 'autofill-save'],
+  ['android:id/autofill_save_no', 'autofill-save'],
+  ['android:id/autofill_dataset_picker', 'autofill-picker'],
+  ['android:id/autofill_dataset_list', 'autofill-picker'],
+  ['android:id/aerr_wait', 'anr-dialog'],
+])('recognizes an exact public permission/autofill/ANR resource signature (%#)', (id, category) => {
+  const details = parseHierarchy(node(id, CANARY), androidOptions).androidDetails;
+  expect(details.systemSurfaces).toEqual([category]);
+  expect(JSON.stringify(details)).not.toContain(id);
+  expect(JSON.stringify(details)).not.toContain(CANARY);
+});
+
+test('does not infer system surfaces from shared IDs, freeform labels, classes or dropped package attributes', () => {
+  const tree = {children: [
+    node('android:id/aerr_close', CANARY), node('android:id/aerr_report', CANARY),
+    node('android:id/button1', CANARY),
+    node('com.android.permissioncontroller.evil:id/grant_dialog', CANARY),
+    node('com.google.android.gms:id/autofill_save', CANARY),
+    node(CANARY, 'com.android.permissioncontroller:id/grant_dialog'),
+    {attributes: {
+      package: 'com.android.permissioncontroller', class: 'com.android.permissioncontroller.GrantPermissionsActivity',
+      text: 'android:id/autofill_save', accessibilityText: 'android:id/aerr_wait',
+    }},
+  ]};
+  const details = parseHierarchy(tree, androidOptions).androidDetails;
+  expect(details.systemSurfaces).toEqual([]);
+  expect(details.resourceNamespaces).toEqual(['googleservices', 'other']);
+  expect(details.appSurfaces).toEqual([]);
+  expect(details.appTargetsPresent).toBe(false);
+  expect(JSON.stringify(details)).not.toMatch(/SECRET_CANARY|:id\/|com\./);
+  expect(parseHierarchy(node(`com.google.android.gms:id/${CANARY.repeat(30)}`, CANARY), androidOptions)
+    .androidDetails.resourceNamespaces).toEqual([]);
+  const malformed = parseHierarchy(node('com.android.permissioncontroller:id/grant_dialog\n', CANARY), androidOptions)
+    .androidDetails;
+  expect(malformed.resourceNamespaces).toEqual([]);
+  expect(malformed.systemSurfaces).toEqual([]);
+});
+
+test('distinguishes a Home modal from an unrelated system snapshot despite empty legacy ui', () => {
+  const [tap] = androidCommands('FAILED');
+  mockArtifacts({
+    'results/flow/commands.json': [tap],
+    'results/flow/screen-hierarchy/step-044.json': node('home-panel-adr', CANARY, [node('home-panel-close', CANARY)]),
+    'results/flow/screen-hierarchy/step-045.json': node('android:id/autofill_save', CANARY),
+    'results/other/screen-hierarchy/step-044.json': node('com.android.permissioncontroller:id/grant_dialog', CANARY),
+  });
+  const result = collectLiveDiagnostics(androidOptions);
+  expect(result.ui).toEqual({});
+  expect(result.failedCommands[0].androidDetails).toMatchObject({
+    appTargetsPresent: true, appSurfaces: ['home-panel-adr', 'home-panel-close'],
+    resourceNamespaces: [], systemSurfaces: [],
+    sheetPresent: false, detailsButtonPresent: false,
+  });
+  expect(JSON.stringify(result)).not.toContain(CANARY);
+});
+
+test('mixed-window app and system evidence is retained without assigning foreground ownership', () => {
+  const details = parseHierarchy({children: [
+    node('tab-home', CANARY), node('activity-list', CANARY),
+    node('com.android.permissioncontroller:id/grant_dialog', CANARY),
+    node('android:id/autofill_save', CANARY),
+  ]}, androidOptions).androidDetails;
+  expect(details).toMatchObject({
+    appTargetsPresent: true, appSurfaces: ['activity-list', 'tab-home'],
+    resourceNamespaces: ['other', 'permissioncontroller'], systemSurfaces: ['autofill-save', 'permission-dialog'],
+  });
+  expect(details).not.toHaveProperty('windowOwner');
+  expect(details).not.toHaveProperty('foreground');
+});
+
+test('new collections reject oversized, sparse and arbitrary data at the report boundary', () => {
+  const sanitize = androidDetails => sanitizeDiagnostics({
+    availability: 'available',
+    failedCommands: [{sequenceNumber: 44, commandKind: 'assertConditionCommand',
+      targetId: 'connection-details', androidDetails}],
+  }).failedCommands[0].androidDetails;
+  const shape = {hierarchyShape: 'tree-node', visitedNodeCount: 'one'};
+  for (const [key, valid, cap] of [
+    ['appSurfaces', 'tab-home', 21],
+    ['resourceNamespaces', 'permissioncontroller', 8],
+    ['systemSurfaces', 'permission-dialog', 4],
+  ]) {
+    for (const invalid of [CANARY, [CANARY], [true], [{payload: CANARY}], Array(1), Array(cap + 1).fill(valid)]) {
+      expect(sanitize({...shape, [key]: invalid, appTargetsPresent: CANARY})).toEqual(shape);
+    }
+    expect(sanitize({...shape, [key]: [valid, valid], raw: CANARY})[key]).toEqual([valid]);
+  }
+  expect(sanitize({...shape, appSurfaces: ['home-panel-phone'], appTargetsPresent: false}))
+    .not.toHaveProperty('appTargetsPresent');
+  for (const hierarchyShape of ['empty-object', 'unsupported-root']) {
+    expect(sanitize({
+      ...shape, hierarchyShape, appTargetsPresent: false, appSurfaces: [], resourceNamespaces: [], systemSurfaces: [],
+    })).toEqual({hierarchyShape, visitedNodeCount: 'one'});
+  }
 });
 
 test('smoke passes platform only; trusted expected identity stays inside existing sanitize boundary', () => {

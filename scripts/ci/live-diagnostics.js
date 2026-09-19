@@ -38,6 +38,42 @@ const UI_PRESENCE_IDS = Object.freeze([
   'registration-close', 'connection-registrationId', 'connection-scopeId',
   'connection-provisioningHost', 'connection-submit', 'connection-error',
 ]);
+// Separate fixed vocabulary: do not expand the legacy observedTargets collection cap.
+const APP_SURFACE_IDS = Object.freeze([
+  'home-panel-phone', 'home-panel-dps', 'home-panel-hub', 'home-panel-adr', 'home-panel-close',
+  'home-node-phone', 'home-node-dps', 'home-node-hub', 'home-node-adr', 'workflow-home-content',
+  'tab-home', 'tab-explore', 'tab-activity', 'explore-directory', 'activity-list',
+  'explore-back', 'telemetry-tool', 'properties-tool', 'image-upload-card', 'bluetooth-tool-title',
+  'logs-list',
+]);
+const RESOURCE_NAMESPACES = new Map([
+  ['com.iot_pnp.ci', 'app'],
+  ['com.android.permissioncontroller', 'permissioncontroller'],
+  ['com.google.android.permissioncontroller', 'permissioncontroller'],
+  ['com.android.inputmethod.latin', 'inputmethod'],
+  ['com.google.android.inputmethod.latin', 'inputmethod'],
+  ['com.android.systemui', 'systemui'],
+  ['com.android.launcher3', 'launcher'],
+  ['com.google.android.apps.nexuslauncher', 'launcher'],
+  ['com.google.android.gms', 'googleservices'],
+  ['com.android.settings', 'settings'],
+]);
+const RESOURCE_NAMESPACE_CODES = Object.freeze([...new Set(RESOURCE_NAMESPACES.values()), 'other']);
+// AOSP android-15.0.0_r1: PermissionController/res/layout/grant_permissions.xml;
+// frameworks/base/core/res/res/layout/{autofill_save,autofill_dataset_picker,app_anr_dialog}.xml.
+const SYSTEM_SURFACE_IDS = new Map([
+  ...['com.android.permissioncontroller', 'com.google.android.permissioncontroller'].flatMap(namespace =>
+    ['grant_dialog', 'permission_message', 'permission_allow_button',
+      'permission_allow_foreground_only_button', 'permission_allow_one_time_button', 'permission_deny_button']
+      .map(id => [`${namespace}:id/${id}`, 'permission-dialog'])),
+  ...['autofill_save', 'autofill_save_yes', 'autofill_save_no']
+    .map(id => [`android:id/${id}`, 'autofill-save']),
+  ...['autofill_dataset_picker', 'autofill_dataset_list']
+    .map(id => [`android:id/${id}`, 'autofill-picker']),
+  // aerr_close/report are shared with crash dialogs; only aerr_wait identifies ANR here.
+  ['android:id/aerr_wait', 'anr-dialog'],
+]);
+const SYSTEM_SURFACE_CODES = Object.freeze([...new Set(SYSTEM_SURFACE_IDS.values())]);
 const UI_LABELS = new Map([
   ['IoT PnP', 'app-root'], ['IoT Plug and Play', 'app-heading'],
   ['Phone as a device', 'app-heading'],
@@ -142,6 +178,9 @@ function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
   const ui = {};
   const observedTargets = new Set();
   const observedLabels = new Set();
+  const appSurfaces = new Set();
+  const resourceNamespaces = new Set();
+  const systemSurfaces = new Set();
   let count = 0;
   let detailsButtonCount = 0;
   function visit(node, depth) {
@@ -163,6 +202,15 @@ function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
       if (UI_PRESENCE_IDS.includes(id)) observedTargets.add(id);
       if (android && id === 'assigned-device-id') identityNodes.push(attributes.text);
       if (android && id === 'connection-details') detailsButtonCount++;
+      if (android) {
+        if (APP_SURFACE_IDS.includes(id)) appSurfaces.add(id);
+        // The pinned mapper drops package/window ownership. A resource namespace is
+        // evidence only, including when several windows coexist in this snapshot.
+        const qualified = typeof id === 'string' && id.length <= 256
+          ? /^([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*):id\/[A-Za-z0-9_]+$/.exec(id) : null;
+        if (qualified && qualified[0] === id) resourceNamespaces.add(RESOURCE_NAMESPACES.get(qualified[1]) ?? 'other');
+        if (SYSTEM_SURFACE_IDS.has(id)) systemSurfaces.add(SYSTEM_SURFACE_IDS.get(id));
+      }
       for (const text of [attributes.text, attributes.accessibilityText]) {
         if (!id && UI_LABELS.has(text)) observedLabels.add(UI_LABELS.get(text));
         if (id === 'connection-status' && ['Connected', 'Disconnected'].includes(text)) {
@@ -207,6 +255,10 @@ function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
     // Compare only the tagged value's text, never hints, descendants or labels.
     ui.androidDetails = {
       ...ui.androidDetails,
+      appTargetsPresent: observedTargets.size > 0 || appSurfaces.size > 0,
+      appSurfaces: [...appSurfaces].sort(),
+      resourceNamespaces: [...resourceNamespaces].sort(),
+      systemSurfaces: [...systemSurfaces].sort(),
       detailsButtonPresent: detailsButtonCount > 0,
       detailsButtonCount: detailsButtonCount === 0 ? 'zero' : detailsButtonCount === 1 ? 'one' : 'multiple',
       sheetPresent: observedTargets.has('connection-details-sheet'),
@@ -220,6 +272,11 @@ function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
   return ui;
 }
 
+function fixedCollection(value, vocabulary) {
+  return Array.isArray(value) && value.length <= vocabulary.length && Array.from(value).every(item => vocabulary.includes(item))
+    ? [...new Set(value)].sort() : undefined;
+}
+
 function sanitizeAndroidDetails(value) {
   if (!object(value)) return undefined;
   const safe = {};
@@ -229,6 +286,20 @@ function sanitizeAndroidDetails(value) {
     safe.visitedNodeCount = value.visitedNodeCount;
   }
   if (safe.hierarchyShape && safe.hierarchyShape !== 'tree-node') return safe;
+  if (safe.hierarchyShape === 'tree-node') {
+    for (const [key, vocabulary] of [
+      ['appSurfaces', APP_SURFACE_IDS],
+      ['resourceNamespaces', RESOURCE_NAMESPACE_CODES],
+      ['systemSurfaces', SYSTEM_SURFACE_CODES],
+    ]) {
+      const collection = fixedCollection(value[key], vocabulary);
+      if (collection) safe[key] = collection;
+    }
+    if (safe.appSurfaces && typeof value.appTargetsPresent === 'boolean' &&
+        (value.appTargetsPresent || safe.appSurfaces.length === 0)) {
+      safe.appTargetsPresent = value.appTargetsPresent;
+    }
+  }
   if (typeof value.detailsButtonPresent === 'boolean' && TARGET_COUNT_BUCKETS.includes(value.detailsButtonCount) &&
       value.detailsButtonPresent === (value.detailsButtonCount !== 'zero')) {
     safe.detailsButtonPresent = value.detailsButtonPresent;
@@ -444,7 +515,7 @@ function collectLiveDiagnostics(options = {}) {
 
 module.exports = {
   collectLiveDiagnostics, sanitizeDiagnostics, parseCommands, parseHierarchy,
-  COMMAND_KINDS, TARGET_IDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS, UI_PRESENCE_IDS,
+  COMMAND_KINDS, TARGET_IDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS, UI_PRESENCE_IDS, APP_SURFACE_IDS,
 };
 if (require.main === module) {
   const platform = process.argv[2];

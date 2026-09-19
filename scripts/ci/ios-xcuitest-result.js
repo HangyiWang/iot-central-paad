@@ -37,7 +37,7 @@ const TARGETS = Object.freeze([
   'telemetry-tool', 'sensor-toggle-accelerometer',
   'properties-tool', 'property-input-readOnlyProp', 'property-technical-readOnlyProp',
   'property-name-readOnlyProp', 'image-upload-card', 'bluetooth-tool-title',
-  'activity-filter-all', 'activity-filter-issues', 'activity-latest',
+  'activity-filter-all', 'activity-filter-issues', 'activity-latest', 'activity-list',
   'activity-diagnostics', 'activity-observations',
   'logs-filter-all', 'logs-filter-issues', 'logs-latest', 'logs-list',
 ]);

@@ -125,6 +125,7 @@ private enum Target: String, CaseIterable {
   case activityAll = "activity-filter-all"
   case activityIssues = "activity-filter-issues"
   case activityLatest = "activity-latest"
+  case activityList = "activity-list"
   case activityDiagnostics = "activity-diagnostics"
   case activityObservations = "activity-observations"
   case logsAll = "logs-filter-all"
@@ -601,14 +602,15 @@ final class PaadLiveUITests: XCTestCase {
     try tapExperience(.tabActivity)
     try tapExperience(.activityIssues)
     try tapExperience(.activityAll)
+    try requireExactText(.connectionStatus, text: AppLabel.connected)
     try tapExperience(.activityLatest)
-    try inspectDetail(togglePrefix: "activity-toggle-", detailPrefix: "activity-details-")
+    try inspectDetail(in: .activityList, togglePrefix: "activity-toggle-", detailPrefix: "activity-details-")
     try tapExperience(.activityDiagnostics)
     try requireVisible(.logsList)
     try tapExperience(.logsIssues)
     try tapExperience(.logsAll)
     try tapExperience(.logsLatest)
-    try inspectDetail(togglePrefix: "log-toggle-", detailPrefix: "log-payload-")
+    try inspectDetail(in: .logsList, togglePrefix: "log-toggle-", detailPrefix: "log-payload-")
     try tapExperience(.activityObservations)
     try requireVisible(.activityAll)
     try tapExperience(.tabHome)
@@ -673,22 +675,27 @@ final class PaadLiveUITests: XCTestCase {
     pendingCategory = nil
   }
 
-  private func inspectDetail(togglePrefix: String, detailPrefix: String) throws {
-    let toggles = app.buttons.matching(NSPredicate(
+  private func inspectDetail(in target: Target, togglePrefix: String, detailPrefix: String) throws {
+    let list = try requireVisible(target)
+    let toggles = list.descendants(matching: .button).matching(NSPredicate(
       format: "identifier MATCHES %@", "^" + togglePrefix + "[0-9]+$"))
-    let first = toggles.firstMatch
-    guard first.waitForExistence(timeout: Timeout.standard) else { throw Failure.missingElement }
-    _ = try hittable(first)
-    let toggle = app.buttons.matching(identifier: first.identifier).element
+    guard toggles.firstMatch.waitForExistence(timeout: Timeout.standard) else { throw Failure.missingElement }
+    let count = toggles.count
+    guard count > 0 else { throw Failure.missingElement }
+    // Latest has moved to the end. Inspect a recent row, not the offscreen
+    // telemetry header whose identifier changes with every submission.
+    let recent = toggles.element(boundBy: count - 1)
+    _ = try hittable(recent, scrolling: list)
+    let toggle = list.descendants(matching: .button).matching(identifier: recent.identifier).element
     let suffix = String(toggle.identifier.dropFirst(togglePrefix.count))
-    let payload = app.descendants(matching: .any).matching(identifier: detailPrefix + suffix).firstMatch
+    let payload = list.descendants(matching: .any).matching(identifier: detailPrefix + suffix).element
     pendingCategory = .notHittable
     toggle.tap()
     pendingCategory = nil
     guard payload.waitForExistence(timeout: Timeout.short) else { throw Failure.missingElement }
-    _ = try hittable(payload)
+    _ = try hittable(payload, scrolling: list)
     // Only presence is inspected. Never read or export diagnostic text.
-    _ = try hittable(toggle)
+    _ = try hittable(toggle, scrolling: list)
     pendingCategory = .notHittable
     toggle.tap()
     pendingCategory = nil
@@ -1087,18 +1094,21 @@ final class PaadLiveUITests: XCTestCase {
     return try find(target, timeout: timeout)
   }
 
-  private func hittable(_ candidate: XCUIElement) throws -> XCUIElement {
+  private func hittable(
+    _ candidate: XCUIElement, scrolling container: XCUIElement? = nil
+  ) throws -> XCUIElement {
+    let scroll: XCUIElement = container ?? app
     if candidate.isHittable {
       return candidate
     }
     for _ in 0..<Scroll.forward {
-      app.swipeUp()
+      scroll.swipeUp()
       if candidate.isHittable {
         return candidate
       }
     }
     for _ in 0..<Scroll.backward {
-      app.swipeDown()
+      scroll.swipeDown()
       if candidate.isHittable {
         return candidate
       }
