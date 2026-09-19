@@ -1,13 +1,24 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const yaml = require('js-yaml');
 const liveConfig = require('../scripts/ci/live-config');
+const {TARGETS: NATIVE_TARGET_IDS} = require('../scripts/ci/ios-xcuitest-result');
 const {
   collectLiveDiagnostics, sanitizeDiagnostics, parseCommands, parseHierarchy,
-  COMMAND_KINDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS, UI_PRESENCE_IDS, APP_SURFACE_IDS,
+  COMMAND_KINDS, TARGET_IDS, ERROR_CODES, LIMITS, UNAVAILABLE_REASONS, UI_PRESENCE_IDS, APP_SURFACE_IDS,
 } = require('../scripts/ci/live-diagnostics');
 
 const CANARY = 'SECRET_CANARY';
+const permissionAbsenceSelector = yaml.loadAll(
+  fs.readFileSync('.maestro/dismiss-android-permissions.yaml', 'utf8'),
+)[1][0].runFlow.commands[2].assertNotVisible.id;
+const rowCategories = new Map([
+  ['activity-toggle-[0-9]+', 'activity-row-toggle'],
+  ['activity-details-[0-9]+', 'activity-row-details'],
+  ['log-toggle-[0-9]+', 'log-row-toggle'],
+  ['log-payload-[0-9]+', 'log-row-payload'],
+]);
 const command = (kind = 'assertConditionCommand') => ({
   command: {
     [kind]: {
@@ -40,6 +51,19 @@ const hierarchy = () => node(CANARY, CANARY, [
   node('connection-service-code', '401002'),
   node('proof-status', 'Submitted locally'),
 ]);
+const permissionAbsenceCommand = () => ({
+  command: {
+    assertConditionCommand: {
+      condition: {notVisible: {idRegex: permissionAbsenceSelector, optional: false}},
+      optional: false, payload: CANARY,
+    },
+  },
+  metadata: {
+    status: 'FAILED', sequenceNumber: 168,
+    error: {message: `Assertion is false: ${CANARY}`, debugMessage: CANARY},
+    artifacts: [{path: CANARY}], payload: CANARY,
+  },
+});
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -119,6 +143,178 @@ test('never exports selector textRegex even for a known UI target', () => {
   expect(parseCommands([input])).toEqual([{
     sequenceNumber: 42, commandKind: 'tapOnElement', targetId: 'connection-deviceKey',
   }]);
+});
+
+test('every selector in both real experience flows has fixed target attribution', () => {
+  const seenPatterns = new Set();
+  const seenLiterals = new Set();
+  const shapes = [
+    ['tapOn', 'tapOnElement', selector => ({selector})],
+    ['assertVisible', 'assertConditionCommand', selector => ({condition: {visible: selector}})],
+    ['assertNotVisible', 'assertConditionCommand', selector => ({condition: {notVisible: selector}})],
+  ];
+  const selectorIds = value => value && typeof value === 'object'
+    ? [
+      ...(typeof value.id === 'string' ? [value.id] : []),
+      ...Object.values(value).flatMap(selectorIds),
+    ] : [];
+  for (const file of ['experience-home.yaml', 'experience-live.yaml']) {
+    const flow = yaml.loadAll(fs.readFileSync(`.maestro/${file}`, 'utf8'))[1];
+    for (const step of flow) {
+      const shape = shapes.find(([name]) => typeof step[name]?.id === 'string');
+      if (!shape) {
+        expect(selectorIds(step)).toEqual([]);
+        continue;
+      }
+      const [name, kind, serialize] = shape;
+      const selector = step[name];
+      // Pinned ElementSelector has optional=false and a nullable String index;
+      // Condition serializes visible/notVisible, with null alternatives omitted.
+      const raw = command(kind);
+      raw.command[kind] = serialize({
+        idRegex: selector.id, optional: false, textRegex: CANARY,
+        ...(selector.index !== undefined ? {index: String(selector.index)} : {}),
+      });
+      const category = rowCategories.get(selector.id);
+      if (category) seenPatterns.add(selector.id);
+      else {
+        seenLiterals.add(selector.id);
+        expect(NATIVE_TARGET_IDS).toContain(selector.id);
+      }
+      const expected = {
+        sequenceNumber: 42, commandKind: kind,
+        ...(category ? {targetCategory: category} : {targetId: selector.id}),
+      };
+      const parsed = parseCommands([raw]);
+      expect(parsed).toEqual([expected]);
+      const report = sanitizeDiagnostics({availability: 'available', failedCommands: parsed});
+      expect(report.failedCommands).toEqual([expected]);
+      expect(JSON.stringify(report)).not.toMatch(/SECRET_CANARY|\[0-9\]|textRegex|idRegex|\.yaml/);
+    }
+  }
+  expect([...seenPatterns].sort()).toEqual([...rowCategories.keys()].sort());
+  expect(seenLiterals.has('bluetooth-tool-title')).toBe(true);
+  expect(seenLiterals.has('property-input-readOnlyProp')).toBe(true);
+  expect(TARGET_IDS).toEqual(expect.arrayContaining(NATIVE_TARGET_IDS));
+  expect(UI_PRESENCE_IDS).toHaveLength(17);
+  expect(parseHierarchy(node('property-input-readOnlyProp', CANARY))).toEqual({});
+});
+
+test.each([...rowCategories])('maps only the exact row pattern %s to its bounded category', (pattern, category) => {
+  for (const [kind, fields] of [
+    ['tapOnElement', {selector: {idRegex: pattern, optional: false, index: '123456789', textRegex: CANARY}}],
+    ['assertConditionCommand', {condition: {visible: {idRegex: pattern, optional: false}}}],
+    ['assertConditionCommand', {condition: {notVisible: {idRegex: pattern, optional: false}}}],
+  ]) {
+    const input = command(kind);
+    input.command[kind] = fields;
+    input.metadata.evaluatedCommand = {selector: {idRegex: 'activity-toggle-123456789'}};
+    const result = parseCommands([input]);
+    expect(result).toEqual([{sequenceNumber: 42, commandKind: kind, targetCategory: category}]);
+    expect(JSON.stringify(result)).not.toMatch(/SECRET_CANARY|123456789|\[0-9\]|idRegex|index/);
+  }
+});
+
+test.each([...rowCategories.keys()])('unknown or poisoned variants of %s remain unknown', pattern => {
+  for (const value of [
+    `${pattern}|.*`, `^${pattern}$`, `${pattern}\n`, `${pattern}${CANARY}`,
+    pattern.replace('[0-9]+', '123456789'), pattern.replace('[0-9]+', '.*'),
+    pattern.replace('[0-9]+', '\\d+'), CANARY, {idRegex: pattern},
+  ]) {
+    const input = command('tapOnElement');
+    input.command.tapOnElement = {selector: {idRegex: value, textRegex: pattern}};
+    input.metadata.evaluatedCommand = {tapOnElement: {selector: {idRegex: pattern}}};
+    input.metadata.error = {message: `Assertion is false: ${pattern} ${CANARY}`};
+    const result = parseCommands([input]);
+    expect(result).toEqual([{
+      sequenceNumber: 42, commandKind: 'tapOnElement', failureCategory: 'assertion-failed',
+    }]);
+    expect(JSON.stringify(result)).not.toMatch(/SECRET_CANARY|123456789|\[0-9\]|idRegex/);
+  }
+});
+
+test('report target categories cannot export patterns, row identities or arbitrary fields', () => {
+  const base = {sequenceNumber: 42, commandKind: 'assertConditionCommand'};
+  for (const targetCategory of [
+    'activity-toggle-[0-9]+', 'activity-toggle-123456789', CANARY, {value: 'activity-row-toggle'},
+  ]) {
+    const result = sanitizeDiagnostics({
+      availability: 'available', failedCommands: [{
+        ...base, targetId: 'activity-toggle-123456789', targetCategory, selector: {idRegex: CANARY},
+      }],
+    });
+    expect(result.failedCommands).toEqual([base]);
+  }
+  const result = sanitizeDiagnostics({
+    availability: 'available', failedCommands: [{
+      ...base, targetCategory: 'log-row-payload', targetId: 'log-payload-123456789',
+      index: '123456789', text: CANARY,
+    }],
+  });
+  expect(result.failedCommands).toEqual([{...base, targetCategory: 'log-row-payload'}]);
+  expect(JSON.stringify(result)).not.toMatch(/SECRET_CANARY|123456789|\[0-9\]/);
+  expect(sanitizeDiagnostics({
+    availability: 'available', failedCommands: [{
+      ...base, targetId: 'bluetooth-tool-title', targetCategory: 'log-row-payload',
+    }],
+  }).failedCommands).toEqual([{...base, targetId: 'bluetooth-tool-title'}]);
+  expect(sanitizeDiagnostics({
+    availability: 'available',
+    failedCommands: Array(LIMITS.commands + 1).fill({...base, targetCategory: 'log-row-payload'}),
+  })).toEqual({availability: 'unavailable'});
+});
+
+test.each([false, undefined])('classifies only the exact published permission-absence assertion (%#)', optional => {
+  const input = permissionAbsenceCommand();
+  if (optional === undefined) delete input.command.assertConditionCommand.condition.notVisible.optional;
+  const result = parseCommands([input]);
+  expect(result).toEqual([{
+    sequenceNumber: 168, commandKind: 'assertConditionCommand',
+    assertionCategory: 'android-permission-absence', failureCategory: 'assertion-failed',
+  }]);
+  const report = sanitizeDiagnostics({availability: 'available', failedCommands: result});
+  expect(report.failedCommands).toEqual(result);
+  expect(JSON.stringify(report)).not.toMatch(/SECRET_CANARY|permissioncontroller:id|grant_dialog|\.yaml/);
+});
+
+test('unknown, broadened, differently constrained and poisoned assertions remain unknown', () => {
+  for (const poison of [
+    input => { input.command.assertConditionCommand.condition.notVisible.idRegex += '|.*'; },
+    input => { input.command.assertConditionCommand.condition.notVisible.idRegex += '\n'; },
+    input => { input.command.assertConditionCommand.condition.notVisible.idRegex = CANARY; },
+    input => { input.command.assertConditionCommand.condition.notVisible.textRegex = CANARY; },
+    input => { input.command.assertConditionCommand.condition.notVisible.index = '0'; },
+    input => { input.command.assertConditionCommand.condition.notVisible.optional = true; },
+    input => { input.command.assertConditionCommand.condition.notVisible.payload = CANARY; },
+    input => { input.command.assertConditionCommand.condition.visible = {idRegex: 'connection-details'}; },
+    input => { input.command.assertConditionCommand.condition.scriptCondition = 'true'; },
+    input => { input.command.assertConditionCommand.condition.label = CANARY; },
+    input => {
+      const condition = input.command.assertConditionCommand.condition;
+      condition.visible = condition.notVisible;
+      delete condition.notVisible;
+    },
+    input => {
+      input.command.runFlowCommand = input.command.assertConditionCommand;
+      delete input.command.assertConditionCommand;
+    },
+    input => {
+      input.metadata.evaluatedCommand = input.command;
+      input.command = {assertConditionCommand: {condition: {notVisible: {idRegex: CANARY}}}};
+    },
+  ]) {
+    const input = permissionAbsenceCommand();
+    poison(input);
+    input.assertionCategory = 'android-permission-absence';
+    input.metadata.error.message = `Assertion is false: ${permissionAbsenceSelector} ${CANARY}`;
+    const result = parseCommands([input]);
+    expect(result).toHaveLength(1);
+    expect(result[0]).not.toHaveProperty('assertionCategory');
+    expect(JSON.stringify(result)).not.toMatch(/SECRET_CANARY|permissioncontroller:id|grant_dialog/);
+  }
+  const completed = permissionAbsenceCommand();
+  completed.metadata.status = 'COMPLETED';
+  expect(parseCommands([completed])).toEqual([]);
 });
 
 test('reads only safe status IDs and literals from private hierarchy', () => {
@@ -703,6 +899,7 @@ test('attributes a failed Details tap snapshot even if no allowlisted UI text is
     androidDetails: {
       detailsTapCompleted: false, hierarchyShape: 'tree-node', visitedNodeCount: '2-16',
       appTargetsPresent: false, appSurfaces: [], resourceNamespaces: [], systemSurfaces: [],
+      permissionDenyControls: [],
       detailsButtonPresent: false, detailsButtonCount: 'zero',
       sheetPresent: false, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
     },
@@ -724,6 +921,7 @@ test('reports duplicate Details IDs as observed multiplicity, never a guessed fa
     androidDetails: {
       detailsTapCompleted: false, hierarchyShape: 'tree-node', visitedNodeCount: '2-16',
       appTargetsPresent: true, appSurfaces: [], resourceNamespaces: [], systemSurfaces: [],
+      permissionDenyControls: [],
       detailsButtonPresent: true, detailsButtonCount: 'multiple',
       sheetPresent: true, assignedDeviceIdPresent: true, assignedDeviceIdTextMatch: 'match',
     },
@@ -745,6 +943,7 @@ test.each(['app-busy-overlay', 'connection-details', 'connection-details-sheet']
       androidDetails: {
         hierarchyShape: 'tree-node', visitedNodeCount: 'one',
         appTargetsPresent: true, appSurfaces: [], resourceNamespaces: [], systemSurfaces: [],
+        permissionDenyControls: [],
         detailsButtonPresent: true, detailsButtonCount: 'one',
         sheetPresent: false, assignedDeviceIdPresent: false, assignedDeviceIdTextMatch: 'missing',
       },
@@ -992,6 +1191,7 @@ test('new collections reject oversized, sparse and arbitrary data at the report 
     ['appSurfaces', 'tab-home', 21],
     ['resourceNamespaces', 'permissioncontroller', 8],
     ['systemSurfaces', 'permission-dialog', 4],
+    ['permissionDenyControls', 'deny', 2],
   ]) {
     for (const invalid of [CANARY, [CANARY], [true], [{payload: CANARY}], Array(1), Array(cap + 1).fill(valid)]) {
       expect(sanitize({...shape, [key]: invalid, appTargetsPresent: CANARY})).toEqual(shape);
@@ -1005,6 +1205,130 @@ test('new collections reject oversized, sparse and arbitrary data at the report 
       ...shape, hierarchyShape, appTargetsPresent: false, appSurfaces: [], resourceNamespaces: [], systemSurfaces: [],
     })).toEqual({hierarchyShape, visitedNodeCount: 'one'});
   }
+});
+
+test('binds deny-control evidence only to the exact assertion command and its bundle snapshot', () => {
+  mockArtifacts({
+    'results/flow/commands.json': [
+      {command: {runFlowCommand: {path: CANARY}}, metadata: {status: 'FAILED', sequenceNumber: 159}},
+      permissionAbsenceCommand(),
+    ],
+    'results/flow/screen-hierarchy/step-168.json': node('com.android.permissioncontroller:id/permission_deny_button', CANARY),
+    'results/flow/screen-hierarchy/step-169-assertCondition.json':
+      node('com.google.android.permissioncontroller:id/permission_deny_and_dont_ask_again_button', CANARY),
+    'results/other/screen-hierarchy/step-169.json': node('com.android.permissioncontroller:id/permission_deny_button', CANARY),
+  });
+  const result = collectLiveDiagnostics(androidOptions);
+  expect(result.failedCommands[0]).toEqual({sequenceNumber: 159, commandKind: 'runFlowCommand'});
+  expect(result.failedCommands[1]).toMatchObject({
+    sequenceNumber: 168, commandKind: 'assertConditionCommand',
+    assertionCategory: 'android-permission-absence', failureCategory: 'assertion-failed',
+    androidDetails: {
+      hierarchyShape: 'tree-node', visitedNodeCount: 'one',
+      resourceNamespaces: ['permissioncontroller'], systemSurfaces: ['permission-dialog'],
+      permissionDenyControls: ['deny-and-dont-ask-again'],
+    },
+  });
+  expect(result.failedCommands[1]).not.toHaveProperty('targetId');
+  expect(sanitizeDiagnostics(result)).toEqual(result);
+  expect(JSON.stringify(result)).not.toMatch(/SECRET_CANARY|permissioncontroller:id|permission_deny_|\.json|\.yaml/);
+});
+
+test('permission classification cannot authorize a snapshot for unknown assertions or duplicate bindings', () => {
+  const failure = permissionAbsenceCommand();
+  for (const contents of [
+    {
+      'results/flow/commands.json': [failure],
+      'results/other/screen-hierarchy/step-169.json': node('com.android.permissioncontroller:id/permission_deny_button', CANARY),
+    },
+    {
+      'results/flow/commands.json': [failure],
+      'results/flow/screen-hierarchy/step-169-first.json': node('com.android.permissioncontroller:id/permission_deny_button', CANARY),
+      'results/flow/screen-hierarchy/step-169-second.json': node('com.android.permissioncontroller:id/permission_deny_and_dont_ask_again_button', CANARY),
+    },
+    {
+      'results/flow/commands.json': [failure, failure],
+      'results/flow/screen-hierarchy/step-169.json': node('com.android.permissioncontroller:id/permission_deny_button', CANARY),
+    },
+  ]) {
+    mockArtifacts(contents);
+    expect(collectLiveDiagnostics(androidOptions).failedCommands.every(item => !item.androidDetails)).toBe(true);
+    jest.restoreAllMocks();
+  }
+  failure.command.assertConditionCommand.condition.notVisible.idRegex = CANARY;
+  mockArtifacts({
+    'results/commands.json': [failure],
+    'results/screen-hierarchy/step-169.json': node('com.android.permissioncontroller:id/permission_deny_button', CANARY),
+  });
+  const result = collectLiveDiagnostics(androidOptions).failedCommands[0];
+  expect(result).not.toHaveProperty('assertionCategory');
+  expect(result).not.toHaveProperty('androidDetails');
+});
+
+test('deny-control categories use exact fixed resource IDs, never arbitrary text or IDs', () => {
+  for (const namespace of ['com.android.permissioncontroller', 'com.google.android.permissioncontroller']) {
+    const details = parseHierarchy({children: [
+      node(`${namespace}:id/permission_deny_button`, CANARY),
+      node(`${namespace}:id/permission_deny_and_dont_ask_again_button`, CANARY),
+      node(`${namespace}:id/permission_deny_button`, CANARY),
+    ]}, androidOptions).androidDetails;
+    expect(details.permissionDenyControls).toEqual(['deny', 'deny-and-dont-ask-again']);
+    expect(details.systemSurfaces).toEqual(['permission-dialog']);
+    expect(JSON.stringify(details)).not.toMatch(/SECRET_CANARY|permission_deny_|com\./);
+  }
+  const details = parseHierarchy({children: [
+    node('unrelated:id/permission_deny_and_dont_ask_again_button', CANARY),
+    node('com.android.permissioncontroller:id/permission_deny_and_dont_ask_again_button\n', CANARY),
+    node('com.android.permissioncontroller:id/permission_allow_button', CANARY),
+    node(CANARY, 'com.android.permissioncontroller:id/permission_deny_and_dont_ask_again_button'),
+  ]}, androidOptions).androidDetails;
+  expect(details.permissionDenyControls).toEqual([]);
+});
+
+test('permission evidence remains unavailable for unsupported roots and unchanged byte limits', () => {
+  mockArtifacts({
+    'results/commands.json': [permissionAbsenceCommand()],
+    'results/screen-hierarchy/step-169.json': {root: node('com.android.permissioncontroller:id/permission_deny_button', CANARY)},
+  });
+  expect(collectLiveDiagnostics(androidOptions).failedCommands[0].androidDetails).toEqual({
+    hierarchyShape: 'unsupported-root', visitedNodeCount: 'one',
+  });
+  jest.restoreAllMocks();
+  const {opened} = mockArtifacts({
+    'results/screen-hierarchy/step-169.json': CANARY.repeat(LIMITS.fileBytes),
+  });
+  expect(collectLiveDiagnostics(androidOptions)).toEqual({availability: 'unavailable', reason: 'byte-limit'});
+  expect(opened).not.toHaveBeenCalled();
+});
+
+test('report boundary accepts only the fixed assertion category on an assertion command', () => {
+  for (const [commandKind, assertionCategory] of [
+    ['assertConditionCommand', CANARY], ['runFlowCommand', 'android-permission-absence'],
+    ['tapOnElement', 'android-permission-absence'],
+  ]) {
+    const result = sanitizeDiagnostics({
+      availability: 'available', failedCommands: [{
+        sequenceNumber: 168, commandKind, assertionCategory,
+        androidDetails: {hierarchyShape: 'tree-node', visitedNodeCount: 'one', permissionDenyControls: ['deny']},
+      }],
+    });
+    expect(result.failedCommands).toEqual([{sequenceNumber: 168, commandKind}]);
+  }
+  const result = sanitizeDiagnostics({
+    availability: 'available', failedCommands: [{
+      sequenceNumber: 168, commandKind: 'assertConditionCommand', assertionCategory: 'android-permission-absence',
+      selector: {idRegex: permissionAbsenceSelector}, path: CANARY, payload: CANARY,
+      androidDetails: {
+        hierarchyShape: 'tree-node', visitedNodeCount: 'one',
+        permissionDenyControls: [CANARY], actual: CANARY,
+      },
+    }],
+  });
+  expect(result.failedCommands[0]).toEqual({
+    sequenceNumber: 168, commandKind: 'assertConditionCommand', assertionCategory: 'android-permission-absence',
+    androidDetails: {hierarchyShape: 'tree-node', visitedNodeCount: 'one'},
+  });
+  expect(JSON.stringify(result)).not.toMatch(/SECRET_CANARY|permissioncontroller:id|grant_dialog/);
 });
 
 test('smoke passes platform only; trusted expected identity stays inside existing sanitize boundary', () => {

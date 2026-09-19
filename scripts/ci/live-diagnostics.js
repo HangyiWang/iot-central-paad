@@ -3,7 +3,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const {sanitizeNativeResult} = require('./ios-xcuitest-result');
+const {sanitizeNativeResult, TARGETS: NATIVE_TARGET_IDS} = require('./ios-xcuitest-result');
 
 // cli-2.10.0 TestOutputWriter / TreeNode schema. Never copy source objects.
 const COMMAND_KINDS = Object.freeze([
@@ -14,14 +14,17 @@ const COMMAND_KINDS = Object.freeze([
   'runFlowCommand', 'repeatCommand', 'evalScriptCommand',
 ]);
 const TARGET_IDS = Object.freeze([
-  'registration-manual', 'registration-back', 'connection-registrationId', 'connection-scopeId',
-  'connection-provisioningHost', 'connection-deviceKey', 'connection-submit',
-  'connection-status', 'assigned-device-id', 'assigned-hub', 'connection-details',
-  'connection-details-sheet', 'connection-details-close',
-  'model-id', 'registration-id', 'registry-status', 'proof-nonce', 'proof-send',
-  'proof-status', 'connection-error-code', 'connection-service-code', 'connection-http-status',
-  'app-busy-overlay',
+  ...NATIVE_TARGET_IDS,
+  'connection-error-code', 'connection-service-code', 'connection-http-status',
 ]);
+// Compare source patterns literally; never match or export row instance identifiers.
+const ROW_SELECTOR_CATEGORIES = new Map([
+  ['activity-toggle-[0-9]+', 'activity-row-toggle'],
+  ['activity-details-[0-9]+', 'activity-row-details'],
+  ['log-toggle-[0-9]+', 'log-row-toggle'],
+  ['log-payload-[0-9]+', 'log-row-payload'],
+]);
+const ROW_TARGET_CATEGORIES = Object.freeze([...ROW_SELECTOR_CATEGORIES.values()]);
 const ERROR_CODES = Object.freeze([
   'INVALID_CREDENTIALS', 'UNSAFE_ENDPOINT', 'CANCELLED', 'TIMEOUT',
   'AUTHENTICATION_FAILED', 'PROVISIONING_FAILED', 'INVALID_RESPONSE',
@@ -74,6 +77,17 @@ const SYSTEM_SURFACE_IDS = new Map([
   ['android:id/aerr_wait', 'anr-dialog'],
 ]);
 const SYSTEM_SURFACE_CODES = Object.freeze([...new Set(SYSTEM_SURFACE_IDS.values())]);
+// Presence evidence only; the UI helper still permits ordinary denial only.
+const PERMISSION_DENY_CONTROLS = new Map(
+  ['com.android.permissioncontroller', 'com.google.android.permissioncontroller'].flatMap(namespace => [
+    [`${namespace}:id/permission_deny_button`, 'deny'],
+    [`${namespace}:id/permission_deny_and_dont_ask_again_button`, 'deny-and-dont-ask-again'],
+  ]),
+);
+const PERMISSION_DENY_CODES = Object.freeze([...new Set(PERMISSION_DENY_CONTROLS.values())]);
+// Exact source selector in dismiss-android-permissions.yaml; never evaluate or export it.
+const PERMISSION_ABSENCE_SELECTOR = String.raw`^com\.(android|google\.android)\.permissioncontroller:id/(grant_dialog|permission_message|permission_deny_button|permission_deny_and_dont_ask_again_button|permission_allow_button|permission_allow_foreground_only_button|permission_allow_one_time_button)$`;
+const PERMISSION_ABSENCE_CATEGORY = 'android-permission-absence';
 const UI_LABELS = new Map([
   ['IoT PnP', 'app-root'], ['IoT Plug and Play', 'app-heading'],
   ['Phone as a device', 'app-heading'],
@@ -136,6 +150,16 @@ class DiagnosticUnavailable extends Error {
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 const object = value => value && typeof value === 'object' && !Array.isArray(value);
 
+function isPermissionAbsence(commandKind, command) {
+  const condition = command.condition;
+  const selector = condition?.notVisible;
+  return commandKind === 'assertConditionCommand' && object(condition) && object(selector) &&
+    Object.keys(condition).every(key => key === 'notVisible') &&
+    selector.idRegex === PERMISSION_ABSENCE_SELECTOR &&
+    // cli-2.10.0 ElementSelector serializes its default optional=false.
+    Object.keys(selector).every(key => key === 'idRegex' || (key === 'optional' && selector.optional === false));
+}
+
 function parseCommands(value) {
   if (!Array.isArray(value)) throw new DiagnosticUnavailable('invalid-metadata');
   if (value.length > LIMITS.commands) throw new DiagnosticUnavailable('command-limit');
@@ -149,6 +173,7 @@ function parseCommands(value) {
     const commandKind = kinds[0];
     const command = entry.command[commandKind];
     const result = {sequenceNumber, commandKind};
+    if (isPermissionAbsence(commandKind, command)) result.assertionCategory = PERMISSION_ABSENCE_CATEGORY;
     const message = object(entry.metadata.error) ? entry.metadata.error.message : undefined;
     if (typeof message === 'string') {
       const failure = FAILURE_PREFIXES.find(([prefix]) => message.startsWith(prefix));
@@ -156,8 +181,14 @@ function parseCommands(value) {
     }
     for (const selector of [command.selector, command.visible, command.notVisible,
       command.condition?.visible, command.condition?.notVisible]) {
-      if (object(selector) && TARGET_IDS.includes(selector.idRegex)) {
+      if (!object(selector)) continue;
+      if (TARGET_IDS.includes(selector.idRegex)) {
         result.targetId = selector.idRegex;
+        break;
+      }
+      const category = ROW_SELECTOR_CATEGORIES.get(selector.idRegex);
+      if (category) {
+        result.targetCategory = category;
         break;
       }
     }
@@ -181,6 +212,7 @@ function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
   const appSurfaces = new Set();
   const resourceNamespaces = new Set();
   const systemSurfaces = new Set();
+  const permissionDenyControls = new Set();
   let count = 0;
   let detailsButtonCount = 0;
   function visit(node, depth) {
@@ -210,6 +242,10 @@ function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
           ? /^([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*):id\/[A-Za-z0-9_]+$/.exec(id) : null;
         if (qualified && qualified[0] === id) resourceNamespaces.add(RESOURCE_NAMESPACES.get(qualified[1]) ?? 'other');
         if (SYSTEM_SURFACE_IDS.has(id)) systemSurfaces.add(SYSTEM_SURFACE_IDS.get(id));
+        if (PERMISSION_DENY_CONTROLS.has(id)) {
+          permissionDenyControls.add(PERMISSION_DENY_CONTROLS.get(id));
+          systemSurfaces.add('permission-dialog');
+        }
       }
       for (const text of [attributes.text, attributes.accessibilityText]) {
         if (!id && UI_LABELS.has(text)) observedLabels.add(UI_LABELS.get(text));
@@ -259,6 +295,7 @@ function parseHierarchy(value, {platform, expectedDeviceId} = {}) {
       appSurfaces: [...appSurfaces].sort(),
       resourceNamespaces: [...resourceNamespaces].sort(),
       systemSurfaces: [...systemSurfaces].sort(),
+      permissionDenyControls: [...permissionDenyControls].sort(),
       detailsButtonPresent: detailsButtonCount > 0,
       detailsButtonCount: detailsButtonCount === 0 ? 'zero' : detailsButtonCount === 1 ? 'one' : 'multiple',
       sheetPresent: observedTargets.has('connection-details-sheet'),
@@ -291,6 +328,7 @@ function sanitizeAndroidDetails(value) {
       ['appSurfaces', APP_SURFACE_IDS],
       ['resourceNamespaces', RESOURCE_NAMESPACE_CODES],
       ['systemSurfaces', SYSTEM_SURFACE_CODES],
+      ['permissionDenyControls', PERMISSION_DENY_CODES],
     ]) {
       const collection = fixedCollection(value[key], vocabulary);
       if (collection) safe[key] = collection;
@@ -327,8 +365,12 @@ function sanitizeDiagnostics(value) {
         if (!object(entry) || !integer(entry.sequenceNumber) || !COMMAND_KINDS.includes(entry.commandKind)) continue;
         const command = {sequenceNumber: entry.sequenceNumber, commandKind: entry.commandKind};
         if (TARGET_IDS.includes(entry.targetId)) command.targetId = entry.targetId;
+        else if (ROW_TARGET_CATEGORIES.includes(entry.targetCategory)) command.targetCategory = entry.targetCategory;
         if (FAILURE_CATEGORIES.includes(entry.failureCategory)) command.failureCategory = entry.failureCategory;
-        const androidDetails = ANDROID_DETAILS_TARGETS.includes(entry.targetId)
+        if (entry.commandKind === 'assertConditionCommand' && entry.assertionCategory === PERMISSION_ABSENCE_CATEGORY) {
+          command.assertionCategory = PERMISSION_ABSENCE_CATEGORY;
+        }
+        const androidDetails = ANDROID_DETAILS_TARGETS.includes(command.targetId) || command.assertionCategory === PERMISSION_ABSENCE_CATEGORY
           ? sanitizeAndroidDetails(entry.androidDetails) : undefined;
         if (androidDetails) command.androidDetails = androidDetails;
         failedCommands.push(command);
@@ -431,7 +473,7 @@ function collectLiveDiagnostics(options = {}) {
             failedCommands.push(...parsed);
             if (options.platform === 'android') {
               for (const command of parsed) {
-                if (!ANDROID_DETAILS_TARGETS.includes(command.targetId)) continue;
+                if (!ANDROID_DETAILS_TARGETS.includes(command.targetId) && command.assertionCategory !== PERMISSION_ABSENCE_CATEGORY) continue;
                 if (value.filter(entry => entry?.metadata?.sequenceNumber === command.sequenceNumber).length !== 1) continue;
                 let previous = value.filter(entry => object(entry?.metadata) &&
                   entry.metadata.sequenceNumber === command.sequenceNumber - 1);

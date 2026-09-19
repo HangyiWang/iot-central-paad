@@ -189,6 +189,13 @@ binding matched, but the native flow failed at assertion sequence 168. Its
 existing summary does not identify the target or traversal stage, so full
 traversal and cold restoration are not established.
 
+The follow-up Android sanitizer attributes fixed experience controls and exact
+known assertion patterns without exporting dynamic row IDs or selector text.
+For the known permission-absence assertion, only its existing same-bundle,
+same-sequence hierarchy can supply fixed permission-control categories. Unknown
+conditions remain unknown. This improves future diagnosis; it neither proves
+the earlier failure's cause nor broadens permission dismissal.
+
 iOS failed credential-free smoke with `missing-element` at the `welcome`
 milestone, before connected execution. A recent observed control is not the
 missing control. The follow-up harness retains the allowlisted target only when
