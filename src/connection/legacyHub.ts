@@ -184,7 +184,7 @@ export function createLegacyHub(
   vendor.fetchTwin = async () => {
     fetchTwin();
   };
-  const dispatchProperties = (value: unknown) => {
+  const dispatchProperties = (value: unknown, source: 'twin' | 'patch') => {
     const desired = record(value);
     const version = desired.$version;
     if (typeof version !== 'number' || !Number.isSafeInteger(version)) {
@@ -209,6 +209,7 @@ export function createLegacyHub(
           name,
           value: propertyValue,
           version,
+          source,
           ack: async (message = 'Property applied') => {
             const acknowledgement = (item: JsonValue): JsonObject => ({
               value: item,
@@ -243,11 +244,11 @@ export function createLegacyHub(
     try {
       const {destinationName: topic, payloadString: payload} = message;
       if (topic.startsWith('$iothub/twin/PATCH/properties/desired/')) {
-        dispatchProperties(JSON.parse(payload));
+        dispatchProperties(JSON.parse(payload), 'patch');
       } else if (topic.startsWith('$iothub/twin/res/200/')) {
         const twin = record(JSON.parse(payload));
         if (twin.desired) {
-          dispatchProperties(twin.desired);
+          dispatchProperties(twin.desired, 'twin');
         }
       } else {
         const match =

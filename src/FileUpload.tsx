@@ -36,6 +36,7 @@ import {CircleSnail} from 'react-native-progress';
 import {Literal, StyleDefinition} from 'types';
 import {acquireCamera} from './tools/Torch';
 import {palette} from './theme/palette';
+import {getObservationStore} from './observation';
 
 export default function FileUpload() {
   const {colors, dark} = useTheme();
@@ -53,6 +54,23 @@ export default function FileUpload() {
   const [fileSize, setFileSize] = useState('');
   const busy = useRef(false);
   const mounted = useRef(true);
+  const operation = useRef(0);
+  const latest = useRef({client, simulated});
+  if (
+    latest.current.client !== client ||
+    latest.current.simulated !== simulated
+  ) {
+    latest.current = {client, simulated};
+  }
+  useEffect(() => {
+    operation.current++;
+    busy.current = false;
+    setShowSelector.False();
+    setUploading.False();
+    setuploadStatus(undefined);
+    setFileName('');
+    setFileSize('');
+  }, [client, simulated, setShowSelector, setUploading]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -114,18 +132,43 @@ export default function FileUpload() {
         return;
       }
       busy.current = true;
+      const attempt = ++operation.current;
+      const session = latest.current;
+      const observedSession = getObservationStore(client)?.capture();
+      const active = () =>
+        mounted.current &&
+        operation.current === attempt &&
+        latest.current === session &&
+        (observedSession?.() ?? true);
       setShowSelector.False();
       let release: (() => void) | undefined;
       try {
-        if (!client || simulated) {
+        if (simulated) {
           Alert.alert(Strings.FileUpload.NotAvailable);
+          return;
+        }
+        if (
+          !client ||
+          !client.isConnected() ||
+          (observedSession && !observedSession())
+        ) {
+          Alert.alert(
+            Strings.FileUpload.NotAvailable,
+            Strings.FileUpload.Reconnect,
+          );
           return;
         }
         if (source === 'camera') {
           release = acquireCamera('photo');
           let permission = await ImagePicker.getCameraPermissionsAsync();
+          if (!active()) {
+            return;
+          }
           if (!permission.granted && permission.canAskAgain) {
             permission = await ImagePicker.requestCameraPermissionsAsync();
+          }
+          if (!active()) {
+            return;
           }
           if (!permission.granted) {
             Alert.alert(
@@ -135,7 +178,7 @@ export default function FileUpload() {
             return;
           }
         }
-        if (!mounted.current) {
+        if (!active()) {
           return;
         }
         // The system photo picker grants access only to the selected image;
@@ -149,7 +192,7 @@ export default function FileUpload() {
         });
         release?.();
         release = undefined;
-        if (response.canceled || !mounted.current) {
+        if (response.canceled || !active()) {
           return;
         }
         const asset = response.assets[0];
@@ -171,6 +214,9 @@ export default function FileUpload() {
           asset.base64,
           'base64',
         );
+        if (!active()) {
+          return;
+        }
         const succeeded =
           !!result && result.status >= 200 && result.status < 300;
         append({
@@ -179,15 +225,13 @@ export default function FileUpload() {
             ? 'Image upload completed'
             : 'Image upload failed',
         });
-        if (mounted.current) {
-          setuploadStatus(succeeded);
-        }
+        setuploadStatus(succeeded);
       } catch {
-        append({
-          eventName: 'FILE UPLOAD',
-          eventData: 'Image selection or upload failed',
-        });
-        if (mounted.current) {
+        if (active()) {
+          append({
+            eventName: 'FILE UPLOAD',
+            eventData: 'Image selection or upload failed',
+          });
           setuploadStatus(false);
           Alert.alert(
             Strings.FileUpload.NotAvailable,
@@ -196,7 +240,20 @@ export default function FileUpload() {
         }
       } finally {
         release?.();
-        busy.current = false;
+        if (operation.current === attempt) {
+          busy.current = false;
+          if (
+            mounted.current &&
+            latest.current === session &&
+            observedSession &&
+            !observedSession()
+          ) {
+            setUploading.False();
+            setuploadStatus(undefined);
+            setFileName('');
+            setFileSize('');
+          }
+        }
       }
     },
     [setShowSelector, setUploading, append, client, simulated],

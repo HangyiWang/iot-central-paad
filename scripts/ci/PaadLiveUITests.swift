@@ -28,6 +28,9 @@ private enum Stage: String {
   case identity
   case nonce
   case submitting
+  case homeTraversal = "home-traversal"
+  case exploreTraversal = "explore-traversal"
+  case activityTraversal = "activity-traversal"
   case terminating
   case restoring
   case restoredIdentity = "restored-identity"
@@ -93,6 +96,40 @@ private enum Target: String, CaseIterable {
   case proofNonce = "proof-nonce"
   case proofSend = "proof-send"
   case proofStatus = "proof-status"
+  case tabHome = "tab-home"
+  case tabExplore = "tab-explore"
+  case tabActivity = "tab-activity"
+  case homeNodePhone = "home-node-phone"
+  case homeNodeDps = "home-node-dps"
+  case homeNodeHub = "home-node-hub"
+  case homeNodeAdr = "home-node-adr"
+  case homePanelPhone = "home-panel-phone"
+  case homePanelDps = "home-panel-dps"
+  case homePanelHub = "home-panel-hub"
+  case homePanelAdr = "home-panel-adr"
+  case homePanelClose = "home-panel-close"
+  case exploreDirectory = "explore-directory"
+  case exploreTelemetry = "explore-tool-telemetry"
+  case exploreProperties = "explore-tool-properties"
+  case exploreImage = "explore-tool-image"
+  case exploreBluetooth = "explore-tool-bluetooth"
+  case exploreBack = "explore-back"
+  case telemetryTool = "telemetry-tool"
+  case sensorToggleAccelerometer = "sensor-toggle-accelerometer"
+  case propertiesTool = "properties-tool"
+  case propertyInput = "property-input-readOnlyProp"
+  case propertyTechnical = "property-technical-readOnlyProp"
+  case propertyName = "property-name-readOnlyProp"
+  case imageUploadCard = "image-upload-card"
+  case activityAll = "activity-filter-all"
+  case activityIssues = "activity-filter-issues"
+  case activityLatest = "activity-latest"
+  case activityDiagnostics = "activity-diagnostics"
+  case activityObservations = "activity-observations"
+  case logsAll = "logs-filter-all"
+  case logsIssues = "logs-filter-issues"
+  case logsLatest = "logs-latest"
+  case logsList = "logs-list"
 }
 
 /// Fixed English application status text the user sees. Only status values that
@@ -310,6 +347,7 @@ final class PaadLiveUITests: XCTestCase {
 
   private enum Diagnostic {
     static let maximumCandidates = 3
+    static let maximumObservedTargets = 16
   }
 
   private var app: XCUIApplication!
@@ -319,6 +357,8 @@ final class PaadLiveUITests: XCTestCase {
   private var stage: Stage = .starting
   private var failureCategory: Failure?
   private var recordedFailure = false
+  /// Recent distinct controls, not a whole-run coverage ledger. Flow completion
+  /// depends on the direct assertions and ordered stages, never this diagnostic set.
   private var observed: [String] = []
   private var connected = false
   private var nonceSubmitted = false
@@ -479,6 +519,9 @@ final class PaadLiveUITests: XCTestCase {
       timeout: Timeout.short, failure: .registryChanged)
     advance(to: .submitting)
 
+    try tap(.connectionDetailsClose)
+    try traverseExperience()
+
     try terminateApp()
     try relaunchApp()
 
@@ -496,12 +539,140 @@ final class PaadLiveUITests: XCTestCase {
     try requireIdentity(config)
     advance(to: .restoredIdentity)
 
+    try tap(.connectionDetailsClose)
+    try traverseHome()
+
     try terminateApp()
     advance(to: .finished, queryingState: false)
     emitFinalResult()
   }
 
   // MARK: Flow steps
+
+  private func traverseExperience() throws {
+    try traverseHome()
+    advance(to: .exploreTraversal)
+    try tapExperience(.tabExplore)
+    try requireVisible(.exploreDirectory)
+    for tool in [Target.exploreTelemetry, .exploreProperties, .exploreImage, .exploreBluetooth] {
+      try requireVisible(tool)
+    }
+
+    try tapExperience(.exploreTelemetry)
+    try requireVisible(.telemetryTool)
+    // Inspect the real enable control without changing the phone's sensor intent.
+    try requireVisible(.sensorToggleAccelerometer)
+    try tapExperience(.exploreBack)
+    try requireVisible(.exploreDirectory)
+
+    try tapExperience(.exploreProperties)
+    try requireVisible(.propertiesTool)
+    try requireVisible(.propertyInput)
+    try tapExperience(.propertyTechnical)
+    try requireExactText(.propertyName, text: "readOnlyProp")
+    try tapExperience(.propertyTechnical)
+    let propertyDraft = "paad-unsent-draft"
+    try enterExactText(.propertyInput, text: propertyDraft)
+    try tapExperience(.exploreBack)
+    try requireVisible(.exploreDirectory)
+
+    try tapExperience(.exploreImage)
+    // Do not open personal media or start an upload in the traversal.
+    try requireVisible(.imageUploadCard)
+    try tapExperience(.exploreBack)
+    try requireVisible(.exploreDirectory)
+
+    try tapExperience(.exploreProperties)
+    try requireExactText(.propertyInput, text: propertyDraft)
+    try tapExperience(.exploreBack)
+    try requireVisible(.exploreDirectory)
+
+    try tapExperience(.exploreBluetooth)
+    dismissKnownPermissionAlert()
+    let nearby = app.staticTexts.matching(NSPredicate(format: "label == %@", "Nearby devices"))
+    guard nearby.firstMatch.waitForExistence(timeout: Timeout.standard) else { throw Failure.missingElement }
+    guard nearby.count == 1 else { throw Failure.ambiguousElement }
+    _ = try hittable(nearby.element)
+    try tapExperience(.exploreBack)
+    try requireVisible(.exploreDirectory)
+
+    advance(to: .activityTraversal)
+    try tapExperience(.tabActivity)
+    try tapExperience(.activityIssues)
+    try tapExperience(.activityAll)
+    try tapExperience(.activityLatest)
+    try inspectDetail(togglePrefix: "activity-toggle-", detailPrefix: "activity-details-")
+    try tapExperience(.activityDiagnostics)
+    try requireVisible(.logsList)
+    try tapExperience(.logsIssues)
+    try tapExperience(.logsAll)
+    try tapExperience(.logsLatest)
+    try inspectDetail(togglePrefix: "log-toggle-", detailPrefix: "log-payload-")
+    try tapExperience(.activityObservations)
+    try requireVisible(.activityAll)
+    try tapExperience(.tabHome)
+    try requireVisible(.homeNodePhone)
+    try requireExactText(.connectionStatus, text: AppLabel.connected)
+  }
+
+  private func traverseHome() throws {
+    advance(to: .homeTraversal)
+    try tapExperience(.tabHome)
+    let nodes: [(Target, Target)] = [
+      (.homeNodePhone, .homePanelPhone), (.homeNodeDps, .homePanelDps),
+      (.homeNodeHub, .homePanelHub), (.homeNodeAdr, .homePanelAdr),
+    ]
+    for (node, panel) in nodes {
+      try tapExperience(node)
+      try requireVisible(panel)
+      try requireVisible(.homePanelClose)
+      try tapExperience(.homePanelClose)
+      try waitFor(
+        NSPredicate(format: "exists == false"), on: element(.homePanelClose),
+        timeout: Timeout.short, failure: .unexpectedIssue)
+      try requireVisible(node)
+    }
+  }
+
+  @discardableResult
+  private func requireVisible(_ target: Target) throws -> XCUIElement {
+    let found = try hittable(find(target, timeout: Timeout.standard))
+    let query = app.descendants(matching: .any).matching(identifier: target.rawValue)
+    guard query.count == 1 else { throw Failure.ambiguousElement }
+    return found
+  }
+
+  private func tapExperience(_ target: Target) throws {
+    let control = try requireVisible(target)
+    guard control.isEnabled else { throw Failure.notHittable }
+    pendingCategory = .notHittable
+    control.tap()
+    pendingCategory = nil
+  }
+
+  private func inspectDetail(togglePrefix: String, detailPrefix: String) throws {
+    let toggles = app.buttons.matching(NSPredicate(
+      format: "identifier MATCHES %@", "^" + togglePrefix + "[0-9]+$"))
+    let first = toggles.firstMatch
+    guard first.waitForExistence(timeout: Timeout.standard) else { throw Failure.missingElement }
+    _ = try hittable(first)
+    let toggle = app.buttons.matching(identifier: first.identifier).element
+    let suffix = String(toggle.identifier.dropFirst(togglePrefix.count))
+    let payload = app.descendants(matching: .any).matching(identifier: detailPrefix + suffix).firstMatch
+    pendingCategory = .notHittable
+    toggle.tap()
+    pendingCategory = nil
+    guard payload.waitForExistence(timeout: Timeout.short) else { throw Failure.missingElement }
+    _ = try hittable(payload)
+    // Only presence is inspected. Never read or export diagnostic text.
+    _ = try hittable(toggle)
+    pendingCategory = .notHittable
+    toggle.tap()
+    pendingCategory = nil
+    try waitFor(
+      NSPredicate(format: "exists == false"), on: payload,
+      timeout: Timeout.short, failure: .unexpectedIssue)
+  }
 
   private func launchApp() throws {
     // The runner's environment is never forwarded to the application: it must
@@ -841,8 +1012,14 @@ final class PaadLiveUITests: XCTestCase {
   }
 
   private func observe(_ target: Target) {
-    if !observed.contains(target.rawValue) {
-      observed.append(target.rawValue)
+    // Earlier milestones are already emitted. Keep the current record bounded
+    // as traversal grows, without dropping proof or restoration assertions.
+    if let index = observed.firstIndex(of: target.rawValue) {
+      observed.remove(at: index)
+    }
+    observed.append(target.rawValue)
+    if observed.count > Diagnostic.maximumObservedTargets {
+      observed.removeFirst()
     }
   }
 
@@ -1306,7 +1483,7 @@ final class PaadLiveUITests: XCTestCase {
       "capture": capture.rawValue,
       "details": InteractionElement.unavailable.rawValue,
       "settings": InteractionElement.unavailable.rawValue,
-      "telemetry": InteractionElement.unavailable.rawValue,
+      "home": InteractionElement.unavailable.rawValue,
       "navigation": InteractionElement.unavailable.rawValue,
       "applicationState": ApplicationState.unknown.rawValue,
       "systemApplicationState": ApplicationState.unknown.rawValue,
@@ -1320,13 +1497,11 @@ final class PaadLiveUITests: XCTestCase {
     let springBoard = XCUIApplication(bundleIdentifier: Self.springBoardBundleIdentifier)
     detailsControlComparisons[index]["systemApplicationState"] =
       observedApplicationState(springBoard).rawValue
-    // The fixed tab label locates an optional comparator, not a flow assertion.
-    // Header Settings sits outside the stack screen; Telemetry sits inside it.
+    // Header Settings sits outside the stack screen; Home sits inside it.
     let queries: [(String, XCUIElementQuery)] = [
       ("details", app.buttons.matching(identifier: Target.connectionDetails.rawValue)),
       ("settings", app.buttons.matching(identifier: Target.appSettings.rawValue)),
-      ("telemetry", app.buttons.matching(
-        NSPredicate(format: "label == %@", "Telemetry, tab, 1 of 5"))),
+      ("home", app.buttons.matching(identifier: Target.tabHome.rawValue)),
       ("navigation", app.otherElements.matching(identifier: Target.navigationContent.rawValue)),
       ("systemDenial", springBoard.buttons.matching(
         NSPredicate(format: "label IN %@", argumentArray: [Self.permissionDenyLabels]))),

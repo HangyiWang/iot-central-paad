@@ -340,6 +340,7 @@ const Strings = {
       Url: 'https://aka.ms/iot-paad-fileupload',
     },
     NotAvailable: 'File upload is not available.',
+    Reconnect: 'Reconnect in Connection details before selecting an image.',
     Uploaded: 'Successfully uploaded {{0}}',
     UploadFailed: 'Failed to upload {{0}}',
     Modes: {

@@ -40,7 +40,7 @@ const Logs = React.memo(() => {
             accessibilityRole="button"
             accessibilityState={{disabled: !entries.length}}
             disabled={!entries.length}
-            onPress={() => list.current?.scrollToEnd({animated: true})}
+            onPress={() => list.current?.scrollToEnd({animated: false})}
             hitSlop={8}
             style={styles.textAction}>
             <Text

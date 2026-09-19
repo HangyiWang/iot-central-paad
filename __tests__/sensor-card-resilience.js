@@ -1,7 +1,7 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import {Card} from '../src/components/card';
-import {StyleSheet, TouchableOpacity} from 'react-native';
+import {StyleSheet, TouchableOpacity, Pressable} from 'react-native';
 import {Properties} from '../src/properties';
 
 jest.mock('../src/hooks', () => ({
@@ -49,14 +49,111 @@ it('does not show a disabled sensor value as live', () => {
 });
 
 it('lets long readings grow instead of clipping them into a fixed-height tile', () => {
-  render({value: {x: 12.5, y: -100.125, altitude: null}, dataType: 'object'});
+  render({
+    accentKey: 'location',
+    value: {x: 12.5, y: -100.125, altitude: null},
+    dataType: 'object',
+  });
   const style = StyleSheet.flatten(
-    view.root.findByType(TouchableOpacity).props.style,
+    view.root.findByProps({testID: 'card-location'}).props.style,
   );
   expect(style.height).toBeUndefined();
   expect(style.minHeight).toBeGreaterThanOrEqual(140);
   expect(text()).toContain('altitude');
   expect(text()).toContain('N/A');
+});
+
+it('exposes the enable action separately from chart navigation and the long-press shortcut', () => {
+  const onToggle = jest.fn();
+  const onPress = jest.fn();
+  const onLongPress = jest.fn();
+  render({
+    accentKey: 'location',
+    availability: 'unavailable',
+    onToggle,
+    onPress,
+    onLongPress,
+  });
+  const toggle = view.root.findByProps({testID: 'sensor-toggle-location'});
+  expect(toggle.props.accessibilityRole).toBe('switch');
+  expect(toggle.props.accessibilityState).toEqual({checked: true});
+  expect(toggle.props.accessibilityLabel).toBe('Disable sensor: Location');
+  expect(
+    StyleSheet.flatten(toggle.props.style).minHeight,
+  ).toBeGreaterThanOrEqual(48);
+  const card = view.root.findByType(TouchableOpacity);
+  expect(card.findAllByType(Pressable)).toHaveLength(0);
+  act(() => toggle.props.onPress());
+  expect(onToggle).toHaveBeenCalledTimes(1);
+  expect(onPress).not.toHaveBeenCalled();
+  expect(onLongPress).not.toHaveBeenCalled();
+  act(() => card.props.onLongPress());
+  expect(onLongPress).toHaveBeenCalledTimes(1);
+  act(() => card.props.onPress());
+  expect(onPress).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  [
+    true,
+    'checking',
+    undefined,
+    'Enabled',
+    'Availability: ',
+    'No reading observed yet',
+  ],
+  [true, 'available', 0, 'Enabled', 'Availability: ', 'Observed by this phone'],
+  [
+    true,
+    'available',
+    undefined,
+    'Enabled',
+    'Availability: ',
+    'No reading observed yet',
+  ],
+  [true, 'unavailable', 123, 'Enabled', 'Availability: ', 'No current reading'],
+  [
+    false,
+    'available',
+    123,
+    'Disabled',
+    'Last checked availability: ',
+    'Paused while disabled',
+  ],
+])(
+  'separates enabled intent, availability and reading (%#)',
+  (enabled, availability, value, intent, prefix, reading) => {
+    render({
+      accentKey: 'location',
+      enabled,
+      availability,
+      value,
+      onToggle: jest.fn(),
+    });
+    const content = id => view.root.findByProps({testID: id}).props.children;
+    expect(content('sensor-enabled-location')).toBe(intent);
+    expect(content('sensor-availability-location').join('')).toContain(
+      prefix.trim(),
+    );
+    expect(content('sensor-reading-location').join('')).toContain(reading);
+    if (enabled && availability === 'available' && value === 0) {
+      expect(view.root.findByType('Headline').props.children).toBe('0');
+    } else {
+      expect(view.root.findAllByType('Headline')).toHaveLength(0);
+    }
+    if (!enabled) {
+      expect(
+        view.root.findByProps({testID: 'sensor-toggle-location'}).props
+          .accessibilityState,
+      ).toEqual({checked: false});
+    }
+  },
+);
+
+it('does not infer a permission denial from unavailable hardware', () => {
+  render({availability: 'unavailable', onToggle: jest.fn()});
+  expect(text()).toContain('The app has not determined the cause');
+  expect(text()).not.toContain('permission denial');
 });
 
 it('shows a purposeful cloud empty state instead of an unavailable-value abbreviation', () => {

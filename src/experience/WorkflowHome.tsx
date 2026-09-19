@@ -1,0 +1,819 @@
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import Svg, {Path} from 'react-native-svg';
+import {Icon} from '@rneui/themed';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {IoTCContext} from '../contexts/iotc';
+import {StorageContext} from '../contexts/storage';
+import {useTheme} from '../hooks';
+import {ItemProps} from '../types';
+import {PHONE_MODEL_ID} from '../connection/types';
+import {matchesAzureContext} from '../onboarding/azureContext';
+import {Text} from '../components/typography';
+import DetailsAction from '../components/detailsAction';
+import {palette} from '../theme/palette';
+import {detailStyles} from '../theme/detailStyles';
+import {projectSetup} from './setupProjection';
+import {ExperienceStrings} from './strings';
+
+export type WorkflowHomeProps = {
+  sensors: ItemProps[];
+  onDetails(): void;
+  onTelemetry(): void;
+  onActivity(): void;
+  communication?: React.ReactNode;
+};
+
+type Node = 'phone' | 'dps' | 'hub' | 'adr';
+const text = ExperienceStrings.Home;
+const MAP_BORDER = 1;
+const MAP_PADDING = 5;
+const SERVICE_GAP = 30;
+const PHONE_WIDTH_PERCENT = 42;
+
+function focus(target: View | null | undefined) {
+  const handle = target ? findNodeHandle(target) : null;
+  if (handle !== null) AccessibilityInfo.setAccessibilityFocus(handle);
+}
+
+export default function WorkflowHome({
+  sensors,
+  onDetails,
+  onTelemetry,
+  onActivity,
+  communication,
+}: WorkflowHomeProps) {
+  const {client, error, connecting} = useContext(IoTCContext);
+  const {credentials, simulated, azureContext, azureContextError} =
+    useContext(StorageContext);
+  const {dark} = useTheme();
+  const colors = palette(dark);
+  const insets = useSafeAreaInsets();
+  const {width, fontScale} = useWindowDimensions();
+  const [mapWidth, setMapWidth] = useState<number | null>(null);
+  const measuredWidth =
+    mapWidth ?? Math.min(440, width - insets.left - insets.right - 62);
+  const stacked = fontScale > 1.2 || measuredWidth < 320;
+  const stackedHeader =
+    fontScale > 1.45 || width - insets.left - insets.right < 360;
+  // Match the native service row's inset and gap in each SVG's own coordinate space.
+  const serviceWidth = measuredWidth - 2 * (MAP_BORDER + MAP_PADDING);
+  const dpsLinkX = (serviceWidth - SERVICE_GAP) / 4;
+  const hubLinkX = serviceWidth - dpsLinkX;
+  const dpsPhoneX = MAP_BORDER + MAP_PADDING + dpsLinkX;
+  const hubPhoneX = measuredWidth - dpsPhoneX;
+  const phoneLeftX = measuredWidth * (0.5 - PHONE_WIDTH_PERCENT / 400);
+  const phoneRightX = measuredWidth * (0.5 + PHONE_WIDTH_PERCENT / 400);
+  const [panel, setPanel] = useState<Node | null>(null);
+  const openers = useRef<Partial<Record<Node, View | null>>>({});
+  const opener = useRef<Node | null>(null);
+  const closeControl = useRef<View>(null);
+  const afterClose = useRef<(() => void) | null>(null);
+  const projection = projectSetup(
+    credentials,
+    client?.identity ?? null,
+    simulated,
+  );
+  const identity = !simulated ? client?.identity : null;
+  const snapshot =
+    identity && azureContext && matchesAzureContext(azureContext, identity)
+      ? azureContext
+      : null;
+  const connectionAttention = Boolean(error && !connecting && !simulated);
+  const sensorAttention = sensors.some(
+    sensor => sensor.enabled && sensor.availability === 'unavailable',
+  );
+
+  const finishClose = useCallback(() => {
+    const action = afterClose.current;
+    afterClose.current = null;
+    const node = opener.current;
+    opener.current = null;
+    if (action) action();
+    else if (node) focus(openers.current[node]);
+  }, []);
+  const close = (action?: () => void) => {
+    afterClose.current = action ?? null;
+    setPanel(null);
+  };
+  useEffect(() => {
+    // Android has no Modal.onDismiss callback. With no animation, restore after commit.
+    if (panel !== null || Platform.OS === 'ios') return;
+    const frame = requestAnimationFrame(finishClose);
+    return () => cancelAnimationFrame(frame);
+  }, [panel, finishClose]);
+
+  const node = (key: Node) => (
+    <Pressable
+      ref={element => {
+        openers.current[key] = element;
+      }}
+      testID={`home-node-${key}`}
+      accessibilityRole="button"
+      accessibilityLabel={`${text.Nodes[key].Title}. ${
+        key === 'dps' && projection.mode === 'hub'
+          ? text.DpsNotUsed
+          : text.Nodes[key].Subtitle
+      }`}
+      accessibilityHint={text.OpenPanel}
+      accessibilityState={{expanded: panel === key}}
+      onPress={() => {
+        opener.current = key;
+        setPanel(key);
+      }}
+      style={({pressed}) => [
+        styles.node,
+        stacked && styles.stackedNode,
+        key === 'phone' && styles.phoneNode,
+        key === 'adr' && !stacked && styles.namespaceNode,
+        {
+          backgroundColor: pressed
+            ? colors.border
+            : key === 'phone'
+            ? colors.tints[0]
+            : colors.surface,
+          borderColor: key === 'phone' ? colors.primary : colors.controlBorder,
+        },
+      ]}>
+      <Text style={[styles.nodeTitle, {color: colors.text}]}>
+        {text.Nodes[key].Title}
+      </Text>
+      <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+        {key === 'dps' && projection.mode === 'hub'
+          ? text.DpsNotUsed
+          : text.Nodes[key].Subtitle}
+      </Text>
+    </Pressable>
+  );
+  const note = (value: string) => (
+    <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+      {value}
+    </Text>
+  );
+  const attentionRow = (
+    id: string,
+    label: string,
+    supporting: string,
+    onPress: () => void,
+  ) => (
+    <Pressable
+      testID={id}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={supporting}
+      onPress={onPress}
+      style={({pressed}) => [
+        styles.attentionRow,
+        {
+          backgroundColor: pressed ? colors.border : colors.tints[2],
+          borderColor: colors.controlBorder,
+        },
+      ]}>
+      <View
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants">
+        <Icon
+          name="alert-outline"
+          type="material-community"
+          size={22}
+          color={colors.text}
+        />
+      </View>
+      <View style={styles.attentionBody}>
+        <Text style={[detailStyles.actionLabel, {color: colors.text}]}>
+          {label}
+        </Text>
+        <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+          {supporting}
+        </Text>
+      </View>
+      <View
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants">
+        <Icon
+          name="chevron-right"
+          type="material-community"
+          size={22}
+          color={colors.muted}
+        />
+      </View>
+    </Pressable>
+  );
+  const fact = (
+    label: string,
+    value: string | undefined,
+    source: string,
+    supporting?: string,
+    selectable = true,
+  ) => (
+    <View
+      key={label}
+      style={[
+        detailStyles.row,
+        detailStyles.divided,
+        {borderTopColor: colors.border},
+      ]}>
+      <Text style={[detailStyles.label, {color: colors.muted}]}>{label}</Text>
+      <Text
+        selectable={selectable}
+        style={[detailStyles.value, {color: colors.text}]}>
+        {value ?? text.Unknown}
+      </Text>
+      <Text style={[detailStyles.status, {color: colors.primary}]}>
+        {source}
+      </Text>
+      {supporting && note(supporting)}
+    </View>
+  );
+  const credentialLabel =
+    projection.credentialKind === 'connectionString'
+      ? text.Fields.ConnectionString
+      : projection.credentialKind === 'group'
+      ? text.Fields.GroupKey
+      : text.Fields.IndividualKey;
+  const credential = () =>
+    fact(
+      credentialLabel,
+      projection.credentialPresent ? text.Hidden : text.NotConfigured,
+      text.Sources.Setup,
+      projection.credentialKind === 'group'
+        ? `${text.PresenceOnly} ${text.GroupNote}`
+        : text.PresenceOnly,
+      false,
+    );
+  const setupRows = () => (
+    <>
+      {fact(
+        text.Fields.Endpoint,
+        projection.provisioningHost,
+        text.Sources.Setup,
+        text.EndpointNote,
+      )}
+      {fact(text.Fields.Scope, projection.scopeId, text.Sources.Setup)}
+      {fact(
+        text.Fields.Registration,
+        projection.registrationId,
+        text.Sources.Setup,
+        text.RegistrationNote,
+      )}
+    </>
+  );
+  const assignment = projection.assignment;
+  const assignmentSource =
+    (assignment?.source ?? (projection.mode === 'dps' ? 'dps' : 'setup')) ===
+    'dps'
+      ? text.Sources.Dps
+      : text.Sources.Setup;
+  const panelBody = () => {
+    switch (panel) {
+      case 'phone':
+        return (
+          <>
+            {projection.mode === 'dps' && setupRows()}
+            {projection.mode === 'hub' && (
+              <>
+                {fact(
+                  text.Fields.Hub,
+                  projection.configuredHub,
+                  text.Sources.Setup,
+                  text.DirectIdentity,
+                )}
+                {fact(
+                  text.Fields.Device,
+                  projection.configuredDeviceId,
+                  text.Sources.Setup,
+                )}
+              </>
+            )}
+            {projection.mode !== 'unconfigured' && credential()}
+            {fact(
+              text.Fields.Model,
+              PHONE_MODEL_ID,
+              text.Sources.App,
+              text.ModelNote,
+            )}
+            {note(text.CredentialMaintenance)}
+          </>
+        );
+      case 'dps':
+        return projection.mode === 'hub' ? (
+          <Text style={[detailStyles.value, {color: colors.text}]}>
+            {text.DpsNotUsed}
+          </Text>
+        ) : (
+          <>
+            {setupRows()}
+            {projection.mode !== 'unconfigured' && credential()}
+            {fact(
+              text.Fields.Authentication,
+              projection.credentialKind === 'group'
+                ? text.GroupAuthentication
+                : text.DpsAuthentication,
+              text.Sources.Generated,
+              text.AuthenticationNote,
+              false,
+            )}
+            {fact(
+              text.Fields.AssignedHub,
+              assignment?.source === 'dps' ? assignment.hub : undefined,
+              text.Sources.Dps,
+            )}
+            {fact(
+              text.Fields.AssignedDevice,
+              assignment?.source === 'dps' ? assignment.deviceId : undefined,
+              text.Sources.Dps,
+              text.RegistrationNote,
+            )}
+            {!assignment &&
+              note(simulated ? text.SimulationIdentity : text.NoAssignment)}
+          </>
+        );
+      case 'hub':
+        return (
+          <>
+            {fact(
+              text.Fields.Hub,
+              assignment?.hub ?? projection.configuredHub,
+              assignmentSource,
+            )}
+            {fact(
+              text.Fields.Device,
+              assignment?.deviceId ?? projection.configuredDeviceId,
+              assignmentSource,
+            )}
+            {!assignment &&
+              note(
+                simulated
+                  ? text.SimulationIdentity
+                  : projection.mode === 'hub'
+                  ? text.DirectIdentity
+                  : text.NoAssignment,
+              )}
+            {fact(
+              text.Fields.Authentication,
+              text.HubAuthentication,
+              text.Sources.Generated,
+              text.AuthenticationNote,
+              false,
+            )}
+            {fact(
+              text.PhoneToHub,
+              text.Outbound,
+              text.Sources.App,
+              undefined,
+              false,
+            )}
+            {fact(
+              text.HubToPhone,
+              text.Inbound,
+              text.Sources.App,
+              undefined,
+              false,
+            )}
+            {note(text.NoAdminKey)}
+          </>
+        );
+      case 'adr':
+        return (
+          <>
+            {snapshot ? (
+              <>
+                {fact(
+                  text.Fields.Namespace,
+                  snapshot.namespace.name,
+                  text.Sources.Snapshot,
+                  text.SnapshotNote,
+                )}
+                {fact(
+                  text.Fields.Captured,
+                  snapshot.capturedAt,
+                  text.Sources.Snapshot,
+                )}
+                {snapshot.registryDevice &&
+                  fact(
+                    text.Fields.HistoricalInventory,
+                    snapshot.registryDevice.name,
+                    text.Sources.Snapshot,
+                    text.RegistryNote,
+                  )}
+              </>
+            ) : (
+              note(
+                azureContextError
+                  ? text.SnapshotUnavailable
+                  : azureContext && identity
+                  ? text.SnapshotOtherDevice
+                  : text.NoSnapshot,
+              )
+            )}
+            {fact(
+              text.Fields.Links,
+              text.NotChecked,
+              text.Sources.Azure,
+              text.ManagedNote,
+              false,
+            )}
+            {fact(
+              text.Fields.EligibleHubs,
+              text.NotChecked,
+              text.Sources.Azure,
+              text.RegistryNote,
+              false,
+            )}
+            {fact(
+              text.Fields.Inventory,
+              text.NotChecked,
+              text.Sources.Azure,
+              text.RegistryNote,
+              false,
+            )}
+            {fact(
+              text.Fields.Access,
+              text.ManagedAccess,
+              text.Sources.Azure,
+              text.ManagedNote,
+              false,
+            )}
+            {note(text.NoManagement)}
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <View style={[styles.root, {backgroundColor: colors.background}]}>
+      <ScrollView
+        testID="workflow-home-content"
+        accessibilityElementsHidden={panel !== null}
+        importantForAccessibility={
+          panel !== null ? 'no-hide-descendants' : 'auto'
+        }
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingLeft: 16 + insets.left,
+            paddingRight: 16 + insets.right,
+            paddingBottom: 16 + insets.bottom,
+          },
+        ]}>
+        {simulated && (
+          <Text
+            testID="home-simulation"
+            style={[detailStyles.status, {color: colors.primary}]}>
+            {text.Simulation}
+          </Text>
+        )}
+        <View
+          testID="home-map"
+          style={[
+            styles.card,
+            {backgroundColor: colors.surface, borderColor: colors.border},
+          ]}>
+          <Text
+            accessibilityRole="header"
+            style={[detailStyles.sectionTitle, {color: colors.text}]}>
+            {text.Map}
+          </Text>
+          <View
+            testID={stacked ? 'home-map-stacked' : 'home-map-compact'}
+            onLayout={event => setMapWidth(event.nativeEvent.layout.width)}
+            style={styles.map}>
+            <View
+              testID="home-map-azure"
+              style={[
+                styles.azure,
+                {
+                  borderColor: colors.controlBorder,
+                  backgroundColor: colors.inset,
+                },
+              ]}>
+              {node('adr')}
+              {stacked ? (
+                note(text.NamespaceLinks)
+              ) : (
+                <Svg
+                  testID="home-map-namespace-lines"
+                  height={24}
+                  width="100%"
+                  viewBox={`0 0 ${serviceWidth} 24`}
+                  preserveAspectRatio="none"
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants">
+                  <Path
+                    testID="home-map-namespace-path"
+                    d={`M${
+                      serviceWidth / 2
+                    } 0V12M${dpsLinkX} 24V12H${hubLinkX}V24`}
+                    stroke={colors.controlBorder}
+                    strokeDasharray="4 3"
+                    fill="none"
+                    strokeWidth={1.5}
+                  />
+                </Svg>
+              )}
+              <View
+                testID="home-map-services"
+                style={[styles.services, stacked && styles.stackedServices]}>
+                {node('dps')}
+                {node('hub')}
+              </View>
+            </View>
+            {!stacked && (
+              <Svg
+                testID="home-map-phone-lines"
+                height={28}
+                width="100%"
+                viewBox={`0 0 ${measuredWidth} 28`}
+                preserveAspectRatio="none"
+                accessible={false}
+                importantForAccessibility="no-hide-descendants">
+                {projection.mode !== 'hub' && (
+                  <Path
+                    testID="home-map-phone-dps-path"
+                    d={`M${dpsPhoneX} 0V14H${phoneLeftX}V28M${
+                      dpsPhoneX - 4
+                    } 5L${dpsPhoneX} 0L${dpsPhoneX + 4} 5M${
+                      phoneLeftX - 4
+                    } 23L${phoneLeftX} 28L${phoneLeftX + 4} 23`}
+                    stroke={colors.primary}
+                    fill="none"
+                    strokeWidth={1.5}
+                  />
+                )}
+                <Path
+                  testID="home-map-phone-hub-path"
+                  d={`M${hubPhoneX} 0V14H${phoneRightX}V28M${
+                    hubPhoneX - 4
+                  } 5L${hubPhoneX} 0L${hubPhoneX + 4} 5M${
+                    phoneRightX - 4
+                  } 23L${phoneRightX} 28L${phoneRightX + 4} 23`}
+                  stroke={colors.primary}
+                  fill="none"
+                  strokeWidth={1.5}
+                />
+              </Svg>
+            )}
+            {stacked && (
+              <View
+                style={[styles.stackedPaths, {borderColor: colors.primary}]}>
+                {projection.mode !== 'hub' && note(text.PhoneDpsPath)}
+                {note(text.PhoneHubPath)}
+              </View>
+            )}
+            <View
+              testID="home-map-phone"
+              style={[styles.phone, stacked && styles.stackedPhone]}>
+              {node('phone')}
+            </View>
+          </View>
+          <Text
+            accessibilityLabel={`${text.NamespaceLinks}. ${
+              projection.mode === 'hub' ? text.DpsNotUsed : text.PhoneDpsPath
+            }. ${text.PhoneHubPath}. ${text.MapAuthority}`}
+            style={[detailStyles.supporting, {color: colors.muted}]}>
+            {text.MapLegend}
+          </Text>
+          {note(text.MapHint)}
+        </View>
+        {(connectionAttention || sensorAttention) && (
+          <View testID="home-attention" style={styles.attention}>
+            <Text
+              accessibilityRole="header"
+              style={[detailStyles.sectionTitle, {color: colors.text}]}>
+              {text.Attention}
+            </Text>
+            {connectionAttention &&
+              attentionRow(
+                'home-attention-connection',
+                text.ConnectionAttention,
+                text.ConnectionAttentionHint,
+                onDetails,
+              )}
+            {sensorAttention &&
+              attentionRow(
+                'home-attention-sensors',
+                text.SensorAttention,
+                text.SensorAttentionHint,
+                onTelemetry,
+              )}
+          </View>
+        )}
+        <View
+          testID="home-communication"
+          style={[
+            styles.card,
+            {backgroundColor: colors.surface, borderColor: colors.border},
+          ]}>
+          <Text
+            accessibilityRole="header"
+            style={[detailStyles.sectionTitle, {color: colors.text}]}>
+            {text.Communication}
+          </Text>
+          {communication ?? note(text.CommunicationEmpty)}
+          <DetailsAction
+            id="home-activity"
+            label={text.Activity}
+            icon="pulse"
+            onPress={onActivity}
+          />
+        </View>
+      </ScrollView>
+      <Modal
+        visible={panel !== null}
+        animationType="none"
+        presentationStyle="pageSheet"
+        allowSwipeDismissal={Platform.OS === 'ios'}
+        onRequestClose={() => close()}
+        onShow={() => focus(closeControl.current)}
+        onDismiss={finishClose}>
+        <View
+          testID={panel ? `home-panel-${panel}` : undefined}
+          accessibilityViewIsModal
+          onAccessibilityEscape={() => close()}
+          style={[
+            styles.root,
+            {
+              backgroundColor: colors.surface,
+              paddingTop: insets.top,
+              paddingBottom: insets.bottom,
+              paddingLeft: insets.left,
+              paddingRight: insets.right,
+            },
+          ]}>
+          <View
+            testID="home-panel-header"
+            style={[
+              styles.panelHeader,
+              stackedHeader && styles.stackedHeader,
+              {borderColor: colors.border},
+            ]}>
+            {panel && (
+              <View
+                style={[
+                  styles.panelHeading,
+                  stackedHeader && styles.stackedHeading,
+                ]}>
+                <Text style={[detailStyles.label, {color: colors.primary}]}>
+                  {panel === 'dps' && projection.mode === 'hub'
+                    ? text.DpsNotUsed
+                    : text.Nodes[panel].Eyebrow}
+                </Text>
+                <Text
+                  testID="home-panel-title"
+                  accessibilityRole="header"
+                  style={[detailStyles.sectionTitle, {color: colors.text}]}>
+                  {text.Nodes[panel].Panel}
+                </Text>
+                {simulated && (
+                  <Text
+                    testID="home-panel-simulation"
+                    style={[detailStyles.supporting, {color: colors.primary}]}>
+                    {text.Simulation}
+                  </Text>
+                )}
+              </View>
+            )}
+            <Pressable
+              ref={closeControl}
+              testID="home-panel-close"
+              accessibilityRole="button"
+              accessibilityLabel={text.Close}
+              onPress={() => close()}
+              style={({pressed}) => [
+                detailStyles.action,
+                styles.close,
+                stackedHeader && styles.stackedClose,
+                {
+                  borderColor: colors.controlBorder,
+                  backgroundColor: pressed ? colors.border : colors.inset,
+                },
+              ]}>
+              <Text style={[detailStyles.actionLabel, {color: colors.primary}]}>
+                {text.Close}
+              </Text>
+            </Pressable>
+          </View>
+          <ScrollView
+            testID="home-panel-body"
+            contentContainerStyle={styles.panelContent}>
+            {panel && (
+              <>
+                <Text style={[detailStyles.value, {color: colors.text}]}>
+                  {panel === 'dps' && projection.mode === 'hub'
+                    ? text.DirectRole
+                    : text.Nodes[panel].Role}
+                </Text>
+                {panel !== 'adr' && (
+                  <>
+                    {projection.mode === 'unconfigured' && note(text.NoSetup)}
+                    {projection.invalidSetup && note(text.InvalidSetup)}
+                    {projection.invalidIdentity && note(text.InvalidIdentity)}
+                  </>
+                )}
+                {panelBody()}
+                {note(text.MapAuthority)}
+                <DetailsAction
+                  id="home-panel-details"
+                  label={text.Details}
+                  icon="information-outline"
+                  onPress={() => close(onDetails)}
+                />
+                {note(text.DetailsHint)}
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {flex: 1},
+  content: {paddingTop: 16, gap: 12},
+  card: {borderRadius: 20, borderWidth: 1, padding: 14, gap: 10},
+  map: {width: '100%', maxWidth: 440, alignSelf: 'center'},
+  azure: {
+    borderWidth: MAP_BORDER,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    padding: MAP_PADDING,
+    gap: 0,
+  },
+  node: {
+    minHeight: 52,
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    justifyContent: 'center',
+  },
+  stackedNode: {flex: 0},
+  nodeTitle: {fontSize: 15, lineHeight: 20, fontWeight: '600'},
+  namespaceNode: {width: '76%', alignSelf: 'center', flex: 0},
+  phoneNode: {flex: 0},
+  services: {flexDirection: 'row', gap: SERVICE_GAP},
+  stackedServices: {flexDirection: 'column', gap: 12, marginTop: 12},
+  phone: {width: `${PHONE_WIDTH_PERCENT}%`, alignSelf: 'center'},
+  stackedPhone: {width: '100%'},
+  stackedPaths: {
+    marginHorizontal: 12,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    padding: 12,
+    gap: 8,
+  },
+  attention: {gap: 8},
+  attentionRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  attentionBody: {flex: 1, minWidth: 0, gap: 3},
+  panelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  stackedHeader: {flexDirection: 'column', alignItems: 'stretch'},
+  panelHeading: {flex: 1, minWidth: 0, gap: 3},
+  stackedHeading: {flex: 0},
+  close: {
+    alignSelf: 'center',
+    flexShrink: 0,
+    borderWidth: 1,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  stackedClose: {alignSelf: 'flex-end'},
+  panelContent: {padding: 20, gap: 12},
+});

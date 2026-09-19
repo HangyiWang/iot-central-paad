@@ -1,13 +1,14 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import React, {useState, useEffect, useMemo} from 'react';
+import React, {useState, useMemo} from 'react';
 import {CardProps, IconProps, Icon, Input} from '@rneui/themed';
 import {
   View,
   TouchableOpacity,
   TouchableOpacityProps,
   StyleSheet,
+  Pressable,
 } from 'react-native';
 import {Button} from 'components';
 import {Text, Headline, bytesToSize} from './typography';
@@ -15,6 +16,10 @@ import {DataType, ItemProps, StyleDefinition} from 'types';
 import {useTheme} from 'hooks';
 import Strings from 'strings';
 import {cardTint, palette} from '../theme/palette';
+import {detailStyles} from '../theme/detailStyles';
+import DetailsAction from './detailsAction';
+import ToolStrings from '../experience/toolStrings';
+import {usePropertyDraft} from '../runtime/propertyDrafts';
 
 type EditCallback = (value: any) => void | Promise<void>;
 
@@ -22,7 +27,7 @@ export function Card(
   props: CardProps &
     TouchableOpacityProps & {
       title?: string;
-      onToggle?: () => void;
+      onToggle?: () => void | Promise<void>;
       enabled: boolean;
       value?: any | React.FC;
       dataType?: DataType;
@@ -34,6 +39,7 @@ export function Card(
       simulated?: boolean;
       accentKey?: string;
       presentation?: ItemProps['presentation'];
+      technicalName?: string;
     },
 ) {
   const {
@@ -51,12 +57,127 @@ export function Card(
     simulated,
     accentKey,
     presentation,
+    technicalName,
+    onToggle,
     ...otherProps
   } = props;
+  const [technicalVisible, setTechnicalVisible] = useState(false);
   const {dark} = useTheme();
   const colors = palette(dark);
   const textColor = enabled ? colors.text : colors.muted;
   const tint = cardTint(accentKey ?? props.title ?? '', dark);
+  const sensor = availability !== undefined || onToggle !== undefined;
+  const sensorText = ToolStrings.Sensors;
+  const hasReading = value !== undefined && value !== null && value !== '';
+  const content = (
+    <View style={stylesForContent.content}>
+      {icon && (
+        <View
+          style={[stylesForContent.icon, {backgroundColor: colors.surface}]}
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants">
+          <Icon name={icon.name} type={icon.type} size={22} color={textColor} />
+        </View>
+      )}
+      <View style={stylesForContent.body}>
+        <Text
+          testID="card-label"
+          accessibilityRole="header"
+          style={[stylesForContent.label, {color: colors.muted}]}>
+          {otherProps.title}
+        </Text>
+        {simulated && (
+          <Text style={[detailStyles.status, {color: colors.primary}]}>
+            {Strings.Sensors.Simulated}
+          </Text>
+        )}
+        {sensor && (
+          <View style={stylesForContent.statuses}>
+            <Text
+              testID={`sensor-enabled-${accentKey}`}
+              style={[detailStyles.supporting, {color: colors.muted}]}>
+              {enabled ? sensorText.Enabled : Strings.Sensors.Disabled}
+            </Text>
+            <Text
+              testID={`sensor-availability-${accentKey}`}
+              style={[detailStyles.supporting, {color: colors.muted}]}>
+              {enabled ? sensorText.Availability : sensorText.LastAvailability}:{' '}
+              {availability === 'available'
+                ? sensorText.Available
+                : availability === 'checking'
+                ? sensorText.Checking
+                : availability === 'unavailable'
+                ? sensorText.Unavailable
+                : sensorText.NotChecked}
+            </Text>
+            <Text
+              testID={`sensor-reading-${accentKey}`}
+              style={[detailStyles.supporting, {color: colors.muted}]}>
+              {sensorText.Reading}:{' '}
+              {!enabled
+                ? sensorText.Paused
+                : availability === 'unavailable'
+                ? sensorText.ReadingUnavailable
+                : availability === 'checking' || !hasReading
+                ? sensorText.NoReading
+                : simulated
+                ? sensorText.SimulatedReading
+                : sensorText.LocalReading}
+            </Text>
+            {enabled && availability === 'unavailable' && (
+              <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+                {sensorText.UnavailableDetail}
+              </Text>
+            )}
+          </View>
+        )}
+        {!enabled ? (
+          !sensor && (
+            <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+              {Strings.Sensors.Disabled}
+            </Text>
+          )
+        ) : availability === 'unavailable' ||
+          availability === 'checking' ? null : typeof value === 'function' ? (
+          value()
+        ) : sensor && !hasReading ? null : (
+          <View style={stylesForContent.values}>
+            <Value
+              value={value}
+              enabled
+              type={dataType}
+              editable={editable}
+              onEdit={onEdit}
+              textColor={textColor}
+              presentation={presentation}
+              label={otherProps.title}
+              id={accentKey}
+            />
+            {unit && (
+              <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+                {unit}
+              </Text>
+            )}
+          </View>
+        )}
+        {presentation?.description && (
+          <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+            {presentation.description}
+          </Text>
+        )}
+      </View>
+      {onPress && (
+        <Icon
+          name="chevron-forward"
+          type="ionicon"
+          size={18}
+          color={colors.muted}
+          accessible={false}
+        />
+      )}
+    </View>
+  );
   const styles = useMemo<StyleDefinition>(
     () => ({
       container: {
@@ -71,104 +192,115 @@ export function Card(
         borderWidth: 1,
         borderColor: enabled ? tint : colors.border,
       },
-      content: {flexDirection: 'row', alignItems: 'flex-start', gap: 16},
-      icon: {
-        width: 42,
-        height: 42,
-        borderRadius: 16,
-        backgroundColor: colors.surface,
-        justifyContent: 'center',
-        alignItems: 'center',
-      },
-      cardBody: {flex: 1, minWidth: 0, gap: 8},
-      cardValues: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        alignItems: 'baseline',
-        gap: 6,
-      },
-      unit: {color: colors.muted, fontSize: 13, fontWeight: '400'},
-      status: {fontSize: 13, color: colors.muted},
-      label: {fontSize: 14, fontWeight: '600', color: colors.muted},
-      description: {fontSize: 13, lineHeight: 19, color: colors.muted},
-      simulated: {fontSize: 12, fontWeight: '600', color: colors.primary},
     }),
     [colors, enabled, tint],
   );
 
   return (
-    <TouchableOpacity
+    <View
+      testID={accentKey ? `card-${accentKey}` : undefined}
       style={[styles.container, containerStyle]}
-      {...otherProps}
-      disabled={!onPress && !onLongPress}
-      onPress={onPress}
-      onLongPress={onLongPress}>
-      <View style={styles.content}>
-        {icon && (
-          <View
-            style={styles.icon}
-            accessible={false}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants">
-            <Icon
-              name={icon.name}
-              type={icon.type}
-              size={22}
-              color={textColor}
-            />
-          </View>
-        )}
-        <View style={styles.cardBody}>
-          <Text
-            testID="card-label"
-            accessibilityRole="header"
-            style={styles.label}>
-            {otherProps.title}
-          </Text>
-          {simulated && (
-            <Text style={styles.simulated}>{Strings.Sensors.Simulated}</Text>
-          )}
-          {!enabled ? (
-            <Text style={styles.status}>{Strings.Sensors.Disabled}</Text>
-          ) : availability === 'unavailable' ? (
-            <Text style={styles.status}>{Strings.Sensors.Unavailable}</Text>
-          ) : availability === 'checking' ? (
-            <Text style={styles.status}>{Strings.Sensors.Checking}</Text>
-          ) : typeof value === 'function' ? (
-            value()
-          ) : (
-            <View style={styles.cardValues}>
-              <Value
-                value={value}
-                enabled
-                type={dataType}
-                editable={editable}
-                onEdit={onEdit}
-                textColor={textColor}
-                presentation={presentation}
-                label={otherProps.title}
-                id={accentKey}
-              />
-              {unit && enabled && <Text style={styles.unit}>{unit}</Text>}
-            </View>
-          )}
-          {presentation?.description && (
-            <Text style={styles.description}>{presentation.description}</Text>
-          )}
-        </View>
-        {onPress && (
+      accessible={false}>
+      {onPress || onLongPress ? (
+        <TouchableOpacity
+          {...otherProps}
+          accessibilityRole="button"
+          accessibilityHint={onLongPress ? sensorText.Shortcut : undefined}
+          onPress={onPress}
+          onLongPress={onLongPress}>
+          {content}
+        </TouchableOpacity>
+      ) : (
+        content
+      )}
+      {onToggle && (
+        <Pressable
+          testID={`sensor-toggle-${accentKey}`}
+          accessibilityRole="switch"
+          accessibilityLabel={`${
+            enabled ? Strings.Core.DisableSensor : Strings.Core.EnableSensor
+          }: ${otherProps.title}`}
+          accessibilityState={{checked: enabled}}
+          onPress={onToggle}
+          style={[
+            detailStyles.action,
+            stylesForContent.toggle,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.controlBorder,
+            },
+          ]}>
           <Icon
-            name="chevron-forward"
-            type="ionicon"
-            size={18}
-            color={colors.muted}
+            name={enabled ? 'toggle-switch' : 'toggle-switch-off-outline'}
+            type="material-community"
+            color={colors.primary}
+            size={28}
             accessible={false}
           />
-        )}
-      </View>
-    </TouchableOpacity>
+          <Text
+            style={[
+              detailStyles.actionLabel,
+              stylesForContent.actionLabel,
+              {color: colors.primary},
+            ]}>
+            {enabled ? Strings.Core.DisableSensor : Strings.Core.EnableSensor}
+          </Text>
+        </Pressable>
+      )}
+      {technicalName && (
+        <View style={stylesForContent.technical}>
+          <DetailsAction
+            id={`property-technical-${accentKey}`}
+            label={
+              technicalVisible
+                ? ToolStrings.Properties.TechnicalHide
+                : ToolStrings.Properties.TechnicalShow
+            }
+            expanded={technicalVisible}
+            onPress={() => setTechnicalVisible(current => !current)}
+          />
+          {technicalVisible && (
+            <Text
+              testID={`property-name-${accentKey}`}
+              selectable
+              style={[detailStyles.value, {color: colors.text}]}>
+              {technicalName}
+            </Text>
+          )}
+        </View>
+      )}
+    </View>
   );
 }
+
+const stylesForContent = StyleSheet.create({
+  content: {flexDirection: 'row', alignItems: 'flex-start', gap: 16},
+  icon: {
+    width: 42,
+    height: 42,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  body: {flex: 1, minWidth: 0, gap: 8},
+  values: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  statuses: {gap: 2},
+  label: {fontSize: 14, fontWeight: '600'},
+  actionLabel: {flexShrink: 1},
+  toggle: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+  },
+  technical: {marginTop: 12, gap: 8},
+});
 
 const Value = React.memo<{
   value: any;
@@ -192,7 +324,7 @@ const Value = React.memo<{
     label,
     id,
   }) => {
-    const [edited, setEdited] = useState(value);
+    const [edited, setEdited] = usePropertyDraft(id, value);
     const {dark} = useTheme();
     const colors = palette(dark);
     const styles: StyleDefinition = {
@@ -213,10 +345,6 @@ const Value = React.memo<{
         fontVariant: ['tabular-nums'],
       },
     };
-
-    useEffect(() => {
-      setEdited(value);
-    }, [value]);
 
     if (!enabled) {
       return null;

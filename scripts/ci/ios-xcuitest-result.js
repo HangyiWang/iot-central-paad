@@ -2,10 +2,13 @@
 
 const PREFIX = 'PAAD_XCTEST_RESULT:';
 const MAX_LOG_BYTES = 1024 * 1024;
+// Recent distinct control presence, not an accumulated whole-run coverage ledger.
+const MAX_OBSERVED_TARGETS = 16;
 const STAGES = Object.freeze([
   'starting', 'welcome', 'manual-navigation', 'registration-input', 'scope-input',
   'host-input', 'key-input', 'connecting', 'details', 'identity', 'nonce',
-  'submitting', 'terminating', 'restoring', 'restored-identity', 'finished',
+  'submitting', 'home-traversal', 'explore-traversal', 'activity-traversal',
+  'terminating', 'restoring', 'restored-identity', 'finished',
 ]);
 const APPLICATION_STATES = Object.freeze([
   'unknown', 'not-running', 'running-background-suspended', 'running-background', 'running-foreground',
@@ -26,6 +29,17 @@ const TARGETS = Object.freeze([
   'connection-details-close', 'assigned-device-id', 'assigned-hub', 'model-id',
   'registration-id', 'registry-status', 'proof-nonce', 'proof-send', 'proof-status',
   'app-busy-overlay', 'navigation-content', 'connection-error', 'connection-status-capsule', 'app-settings',
+  'tab-home', 'tab-explore', 'tab-activity',
+  'home-node-phone', 'home-node-dps', 'home-node-hub', 'home-node-adr',
+  'home-panel-phone', 'home-panel-dps', 'home-panel-hub', 'home-panel-adr', 'home-panel-close',
+  'explore-directory', 'explore-tool-telemetry', 'explore-tool-properties',
+  'explore-tool-image', 'explore-tool-bluetooth', 'explore-back',
+  'telemetry-tool', 'sensor-toggle-accelerometer',
+  'properties-tool', 'property-input-readOnlyProp', 'property-technical-readOnlyProp',
+  'property-name-readOnlyProp', 'image-upload-card',
+  'activity-filter-all', 'activity-filter-issues', 'activity-latest',
+  'activity-diagnostics', 'activity-observations',
+  'logs-filter-all', 'logs-filter-issues', 'logs-latest', 'logs-list',
 ]);
 const INPUT_TARGETS = Object.freeze([
   'connection-registrationId', 'connection-scopeId', 'connection-provisioningHost',
@@ -73,7 +87,7 @@ const ELEMENT_PRESENCES = Object.freeze(['unavailable', 'missing', 'present']);
 const DETAILS_PRESENTATIONS = Object.freeze(['unavailable', 'closed', 'opening', 'shown', 'unknown']);
 const CAPSULE_CONTAINMENTS = Object.freeze(['unavailable', 'invalid', 'empty', 'outside', 'partial', 'inside']);
 const TOUCH_TARGET_SIZES = Object.freeze(['unavailable', 'below-minimum', 'meets-minimum']);
-const CONTROL_COMPARATORS = Object.freeze(['details', 'settings', 'telemetry', 'navigation']);
+const CONTROL_COMPARATORS = Object.freeze(['details', 'settings', 'home', 'navigation']);
 const PERMISSION_SOURCES = Object.freeze(['alert', 'system-control']);
 const MAX_PERMISSION_ACTIONS = 4;
 const PASSWORD_SAVE_PROMPTS = Object.freeze(['declining', 'dismissed']);
@@ -210,7 +224,7 @@ function sanitizeNativeResult(value) {
       !['in-progress', 'passed', 'failed'].includes(value.outcome) ||
       !STAGES.includes(value.stage) || !APPLICATION_STATES.includes(value.applicationState) ||
       !['connected', 'nonceSubmitted', 'coldRestored'].every(key => typeof value[key] === 'boolean') ||
-      !Array.isArray(value.observedTargets) || value.observedTargets.length > TARGETS.length ||
+      !Array.isArray(value.observedTargets) || value.observedTargets.length > MAX_OBSERVED_TARGETS ||
       value.observedTargets.some(id => !TARGETS.includes(id)) ||
       (value.failureCategory !== undefined && !FAILURE_CATEGORIES.includes(value.failureCategory)) ||
       (value.nativeIssue !== undefined && !NATIVE_ISSUES.includes(value.nativeIssue)) ||
@@ -290,7 +304,7 @@ function nativeFlowPassed(result, mode) {
 }
 
 module.exports = {
-  PREFIX, MAX_LOG_BYTES, STAGES, APPLICATION_STATES, FAILURE_CATEGORIES, EXECUTIONS, TARGETS,
+  PREFIX, MAX_LOG_BYTES, MAX_OBSERVED_TARGETS, STAGES, APPLICATION_STATES, FAILURE_CATEGORIES, EXECUTIONS, TARGETS,
   INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
   INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,

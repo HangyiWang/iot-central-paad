@@ -20,6 +20,8 @@ The main features of the app are:
 - Bluetooth Gateway (see [Bluetooth.md](./docs/Bluetooth.md) for documentation/implementation details)
 - Individual-key DPS onboarding, including operator-configured ADR namespace links.
 - Assigned device/Hub details, safe diagnostics, and local proof-marker submission.
+- Native Home / Explore / Activity navigation, with an explanatory connection
+  map, discoverable tools and session-scoped device-side observations.
 
 You can read more about all features with instructions [here](./docs/Features.md).
 For the new onboarding flow, Windows emulator installation and independent Azure

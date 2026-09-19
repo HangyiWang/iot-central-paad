@@ -58,6 +58,7 @@ export interface IIoTCProperty {
   name: string;
   value: JsonValue;
   version: number;
+  source?: 'twin' | 'patch';
   ack(message?: string): Promise<SubmissionResult>;
 }
 export type CommandCallback = (command: IIoTCCommand) => void | Promise<void>;

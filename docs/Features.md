@@ -1,5 +1,21 @@
 # Application features
 
+## Find your way around
+
+**Home** explains this phone's connection using inspectable Phone, DPS, IoT Hub
+and ADR panels. Dashed namespace links describe Azure-managed relationships,
+not a live deployment audit. Direct-Hub connections bypass DPS. Credentials are
+shown only by category and presence, never as keys or connection strings.
+
+**Explore** lists Telemetry, Properties, Image upload and Bluetooth. Each opens
+its existing native tool. **Activity** shows typed device-side observations with
+All / Issues, expandable details and an explicit Latest action. Its Diagnostics
+view preserves the existing safe logs.
+
+The header's **Details** action remains the authoritative connection and recovery
+surface. **Settings** still owns appearance, delivery interval and Registration.
+Screenshots below show earlier versions of the interface.
+
 ## Connect
 
 You can connect to an IoT Central application by scanning a QR code in IoT Central.
@@ -8,7 +24,11 @@ To learn more, see [Connect the app](#connect-the-app) later in this guide.
 
 ## Telemetry
 
-The app collects data from sensors on the phone to send as telemetry to the IoT service you're using. Sensor data is aggregated every five seconds by default, but you can change this on the app settings page:
+Open **Explore > Telemetry** for the phone's measurements and charts. Explicit
+source controls enable or disable each sensor; enabled, available and having a
+reading are separate states. The existing startup policy still initializes
+enabled sensors. The default delivery interval is five seconds and is adjustable
+in Settings; it is not a writable model property.
 
 ![Telemetry](./media/telemetry.png)
 
@@ -28,6 +48,10 @@ no sample value is submitted as if you had entered it. Enter a value and select
 **Submit value** to send it through the connected device client. Local submission
 is not independent confirmation that a downstream cloud application received it.
 The property IDs and Plug and Play payloads are unchanged.
+The phone-reported sample is `readOnlyProp` (read-only to the cloud, editable by
+the phone); `writeableProp` is requested by the cloud. Device information remains
+read-only. OS system version is not the app version; storage and memory are total
+capacity, not free or used capacity.
 
 ![Properties (earlier UI)](./media/properties.png)
 
@@ -37,6 +61,9 @@ The following screenshot shows the writable property in IoT Central after the pr
 
 ## Image upload
 Both IoT Central and IoT Hub enable file upload to Azure storage from a device. The smartphone app lets you upload an image from the device.
+Open **Explore > Image Upload**. Selecting an image starts its upload; there is
+no separate review-before-send step. Image bytes travel over the storage upload
+channel, not as a telemetry payload.
 
 To learn more about configuring your service to support file uploads from a device, see:
 
@@ -46,8 +73,25 @@ To learn more about configuring your service to support file uploads from a devi
 
 ![Upload](./media/image-upload.png)
 
-## Logs
-The smartphone app writes events to a local log file that you can view from within the app. Use the log file to troubleshoot and better understand what the app is doing:
+## Activity and diagnostics
+
+**Activity** records safe, bounded observations in memory for the connection
+session: at most 120 history rows, 64 KiB including latest channel facts, and
+4 KiB per record. Successful periodic telemetry keeps only its latest fact;
+repeated failures are coalesced without erasing the original failure timestamp.
+Local MQTT submission is not broker acknowledgement or cloud receipt.
+Initial twin values are distinguished from desired-property updates; command
+handler outcomes are separate from response submission. Uploads retain their
+HTTP outcome rather than being described as telemetry delivery. Simulation is
+explicitly labelled and cannot establish a live-cloud result.
+
+Home summarizes actual facts by channel so periodic telemetry does not replace
+deliberate property or command interactions. Reconnecting, changing identity or
+switching simulation invalidates the previous session. Missing ADR context or
+an unchecked registry is not a connection warning.
+
+Open **Activity > Diagnostics** for the original redacted, bounded log viewer.
+Neither view exports raw device payloads, credentials, image data or coordinates.
 
 ![Logs](./media/logs.png)
 
@@ -93,7 +137,9 @@ After you register the device in IoT Central, you can connect the smartphone app
 
 2. On the welcome page, select **Scan QR code**. Point the phone's camera at the QR code. Then wait for a few seconds while the connection is established.
 
-3. On the telemetry page in the app, you can see the data the app is sending to IoT Central. On the logs page, you can see the device connecting and several initialization messages.
+3. Open **Explore > Telemetry** for local measurements, and **Activity** for
+   device-side communication observations. **Activity > Diagnostics** retains
+   connection and initialization messages.
 
 4. On the **Settings > Registration** page, you can see the device ID and ID scope that the app used to connect to IoT Central.
 

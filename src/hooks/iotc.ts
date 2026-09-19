@@ -14,6 +14,7 @@ import {StorageContext, IoTCContext} from 'contexts';
 import {CommonCallback} from 'types';
 import {createSimulatedClient} from '../mocks/iotcMock';
 import {secureWebSocket} from '../platform';
+import {getObservationStore, observeClient} from '../observation';
 
 export function useIoTCentralClient(
   onConnectionRefresh?: (client: DeviceClient) => void | Promise<void>,
@@ -30,6 +31,7 @@ export function useIoTCentralClient(
     if (!client || !onConnectionRefresh) {
       return;
     }
+    let active = true;
     let refreshing = false;
     const id = setInterval(async () => {
       const connected = client.isConnected();
@@ -39,7 +41,9 @@ export function useIoTCentralClient(
         try {
           await onConnectionRefresh(client);
         } catch (error) {
-          setError(safeError(error));
+          if (active) {
+            setError(safeError(error));
+          }
         } finally {
           refreshing = false;
         }
@@ -47,7 +51,10 @@ export function useIoTCentralClient(
         previous.current = connected;
       }
     }, 3000);
-    return () => clearInterval(id);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
   }, [client, onConnectionRefresh, setError]);
   return [client, credentials, clear];
 }
@@ -106,19 +113,25 @@ export function useConnectIoTCentralClient() {
           await client.disconnect();
           setClient(null);
         }
-        const candidate = simulated
-          ? createSimulatedClient(credentials)
-          : createDeviceClient(credentials, {
-              secureWebSocket,
-              onStage(next, failure) {
-                if (!attempt.controller.signal.aborted) {
-                  setStage(next);
-                  if (failure) {
-                    setError(failure);
+        const candidate = observeClient(
+          simulated
+            ? createSimulatedClient(credentials)
+            : createDeviceClient(credentials, {
+                secureWebSocket,
+                onStage(next, failure) {
+                  if (!attempt.controller.signal.aborted) {
+                    if (next === 'error') {
+                      getObservationStore(attempt.client)?.invalidate();
+                    }
+                    setStage(next);
+                    if (failure) {
+                      setError(failure);
+                    }
                   }
-                }
-              },
-            });
+                },
+              }),
+          simulated,
+        );
         attempt.client = candidate;
         await candidate.connect({
           signal: attempt.controller.signal,

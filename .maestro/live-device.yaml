@@ -167,6 +167,9 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
 - assertVisible:
     id: registry-status
     text: '^Not checked$'
+- tapOn:
+    id: connection-details-close
+- runFlow: experience-live.yaml
 - stopApp
 - launchApp:
     clearState: false
@@ -226,4 +229,7 @@ name: Dedicated-device real DPS assignment, local proof and cold restore
 - assertVisible:
     id: registry-status
     text: '^Not checked$'
+- tapOn:
+    id: connection-details-close
+- runFlow: experience-home.yaml
 - stopApp

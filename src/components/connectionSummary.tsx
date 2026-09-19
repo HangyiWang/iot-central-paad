@@ -36,8 +36,10 @@ import DetailsRow from './detailsRow';
 
 export default function ConnectionSummary({
   onManualConnection,
+  detailsRequest = 0,
 }: {
   onManualConnection(): void;
+  detailsRequest?: number;
 }) {
   const [connect, cancel, clear, {client, loading, error, stage}] =
     useConnectIoTCentralClient();
@@ -56,6 +58,11 @@ export default function ConnectionSummary({
   const openDetails = () =>
     setDetailsPhase(phase => (phase === 'closed' ? 'opening' : phase));
   const closeDetails = () => setDetailsPhase('closed');
+  useEffect(() => {
+    if (detailsRequest > 0) {
+      setDetailsPhase(phase => (phase === 'closed' ? 'opening' : phase));
+    }
+  }, [detailsRequest]);
   const [shareFailed, setShareFailed] = useState(false);
   const [forgetting, setForgetting] = useState(false);
   const mounted = useRef(true);

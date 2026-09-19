@@ -114,6 +114,30 @@ it('opens scrollable details with value-only IDs and local-only destructive forg
   alert.mockRestore();
   share.mockRestore();
 });
+it('opens the single authoritative sheet from Home attention without reconnecting', () => {
+  act(() => {
+    view = renderer.create(
+      <ConnectionSummary onManualConnection={manual} detailsRequest={0} />,
+    );
+  });
+  expect(view.root.findAllByType(Modal)).toHaveLength(0);
+  act(() => {
+    view.update(
+      <ConnectionSummary onManualConnection={manual} detailsRequest={1} />,
+    );
+  });
+  expect(view.root.findAllByType(Modal)).toHaveLength(1);
+  expect(view.root.findByType(Modal).props.visible).toBe(true);
+  expect(connect).not.toHaveBeenCalled();
+  expect(cancel).not.toHaveBeenCalled();
+  act(() => view.root.findByType(Modal).props.onRequestClose());
+  act(() => {
+    view.update(
+      <ConnectionSummary onManualConnection={manual} detailsRequest={2} />,
+    );
+  });
+  expect(view.root.findByType(Modal).props.visible).toBe(true);
+});
 it('announces requested versus presented Details without changing navigation or visuals', () => {
   act(() => {
     view = renderer.create(<ConnectionSummary onManualConnection={manual} />);

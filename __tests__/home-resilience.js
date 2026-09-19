@@ -1,6 +1,9 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import Home, {executeCommand} from '../src/Home';
+import {
+  DeviceRuntimeProvider as Home,
+  executeCommand,
+} from '../src/runtime/DeviceRuntime';
 import {playTorch} from '../src/tools/Torch';
 import {IIoTCCommandResponse, IOTC_EVENTS} from '../src/connection';
 import {
@@ -54,15 +57,18 @@ it('only replies success after torch completion and preserves a zero delay', asy
     duration: 1,
     delay: 0,
   });
-  const pending = executeCommand(request, [], jest.fn());
+  const observed = jest.fn();
+  const pending = executeCommand(request, [], jest.fn(), observed);
   expect(playTorch).toHaveBeenCalledWith(1, 1, 0);
   expect(request.reply).not.toHaveBeenCalled();
+  expect(observed).not.toHaveBeenCalled();
   finish();
   await pending;
   expect(request.reply).toHaveBeenCalledWith(
     IIoTCCommandResponse.SUCCESS,
     '{"execution":"completed"}',
   );
+  expect(observed).toHaveBeenCalledWith('completed');
 });
 
 it('handles hardware failure and reply failure without leaking errors or payload', async () => {
@@ -74,11 +80,33 @@ it('handles hardware failure and reply failure without leaking errors or payload
   });
   request.reply.mockRejectedValueOnce(new Error('private-fixture'));
   const append = jest.fn();
-  await expect(executeCommand(request, [], append)).resolves.toBeUndefined();
+  const observed = jest.fn();
+  await expect(
+    executeCommand(request, [], append, observed),
+  ).resolves.toBeUndefined();
   expect(request.reply.mock.calls[0][0]).toBe(IIoTCCommandResponse.ERROR);
+  expect(observed).toHaveBeenCalledWith('rejected');
   expect(
     JSON.stringify([request.reply.mock.calls, append.mock.calls]),
   ).not.toContain('private-fixture');
+});
+
+it('records requested sensor intent separately from a failed response submission', async () => {
+  const item = sensor();
+  const request = command(SET_FREQUENCY_COMMAND, {
+    sensor: item.id,
+    interval: 2,
+  });
+  request.reply.mockRejectedValueOnce(new Error('private-fixture'));
+  const observed = jest.fn();
+  const append = jest.fn();
+  await executeCommand(request, [item], append, observed);
+  expect(item.sendInterval).toHaveBeenCalledWith(2000);
+  expect(observed).toHaveBeenCalledWith('requested');
+  expect(append).toHaveBeenCalledWith({
+    eventName: 'ERROR',
+    eventData: 'Command response could not be submitted.',
+  });
 });
 
 it.each([
@@ -167,6 +195,15 @@ it('unsubscribes client handlers on replacement/unmount and handles initial twin
     IOTC_EVENTS.Commands,
     IOTC_EVENTS.Properties,
   ]);
+  expect(first.fetchTwin).toHaveBeenCalledTimes(1);
+  expect(add).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    view.update(<Home navigation={{route: 'Explore'}} />);
+    view.update(<Home navigation={{route: 'Activity'}} />);
+  });
+  expect(first.fetchTwin).toHaveBeenCalledTimes(1);
+  expect(first.on).toHaveBeenCalledTimes(2);
+  expect(add).toHaveBeenCalledTimes(1);
   expect(append).toHaveBeenCalledWith({
     eventName: 'ERROR',
     eventData: 'Device twin could not be requested.',
@@ -176,6 +213,8 @@ it('unsubscribes client handlers on replacement/unmount and handles initial twin
     sendProperty: jest.fn(async () => ({})),
   };
   await hooks.useIoTCentralClient.mock.calls[0][0](refreshed);
+  expect(refreshed.fetchTwin).toHaveBeenCalledTimes(1);
+  expect(refreshed.sendProperty).toHaveBeenCalledTimes(1);
   expect(refreshed.sendProperty).toHaveBeenCalledWith({
     device_info: {__t: 'c', model: 'phone'},
   });

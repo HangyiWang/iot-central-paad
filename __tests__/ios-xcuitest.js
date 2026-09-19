@@ -11,7 +11,7 @@ const {
   sanitizeNativeResult,
   parseNativeLog,
   nativeFlowPassed,
-  STAGES, APPLICATION_STATES, FAILURE_CATEGORIES, TARGETS,
+  STAGES, APPLICATION_STATES, FAILURE_CATEGORIES, TARGETS, MAX_OBSERVED_TARGETS,
   INPUT_TARGETS, INPUT_PHASES, INPUT_ELEMENTS, INPUT_VALUES, INPUT_FLAGS,
   INTERACTION_TARGETS, INTERACTION_PHASES, INTERACTION_ELEMENTS, PERMISSION_ALERTS, INTERACTION_FLAGS,
   MATCH_COUNTS, NATIVE_ELEMENT_TYPES, FRAME_VISIBILITIES, RESOLUTION_COUNTS, MAX_RESOLUTION_CANDIDATES,
@@ -103,7 +103,7 @@ const tapDiagnostic = (attempt = 'initial') => ({
 });
 const controlComparison = (capture = 'initial') => ({
   capture, details: 'not-hittable', settings: 'hittable',
-  telemetry: 'not-hittable', navigation: 'not-hittable',
+  home: 'not-hittable', navigation: 'not-hittable',
   applicationState: 'running-foreground', systemApplicationState: 'running-background',
   systemDenial: 'missing',
   polls: capture === 'initial' ? 'zero' : 'one',
@@ -777,7 +777,7 @@ test.each(['smoke', 'live'])('maximum mode-specific %s diagnostics fit the uncha
     target: geometry, containment: longest(CAPSULE_CONTAINMENTS), size: longest(TOUCH_TARGET_SIZES),
   };
   const result = {
-    ...nativeResult(mode), observedTargets: TARGETS, outcome: 'failed',
+    ...nativeResult(mode), observedTargets: [...TARGETS].sort((a, b) => b.length - a.length).slice(0, MAX_OBSERVED_TARGETS), outcome: 'failed',
     stage: longest(STAGES), applicationState: longest(APPLICATION_STATES),
     failureCategory: longest(FAILURE_CATEGORIES), nativeIssue: longest(NATIVE_ISSUES),
     nativeOperation: longest(NATIVE_OPERATIONS),
@@ -832,6 +832,44 @@ test('native producer keeps synthetic input tracing separate from live Details o
   const input = swift.split('private func diagnoseInput(')[1].split('private func advance(')[0];
   expect(smoke).not.toMatch(/openDetails|compareDetailsControls|prepareDetailsForeground/);
   expect(input).toContain('guard mode == "smoke"');
+});
+
+test('native traversal retains only a bounded recent set of fixed controls without changing proof requirements', () => {
+  const swift = fs.readFileSync('scripts/ci/PaadLiveUITests.swift', 'utf8');
+  expect(MAX_OBSERVED_TARGETS).toBe(16);
+  expect(swift).toContain(`static let maximumObservedTargets = ${MAX_OBSERVED_TARGETS}`);
+  const observe = swift.split('private func observe(')[1].split('private func waitFor(')[0];
+  expect(observe).toContain('observed.firstIndex(of: target.rawValue)');
+  expect(observe).toContain('observed.count > Diagnostic.maximumObservedTargets');
+  expect(observe).toContain('observed.removeFirst()');
+  expect(sanitizeNativeResult({...nativeResult(), observedTargets: TARGETS.slice(0, MAX_OBSERVED_TARGETS + 1)})).toBeUndefined();
+  expect(nativeFlowPassed({...nativeResult(), nonceSubmitted: false}, 'live')).toBe(false);
+  expect(nativeFlowPassed({...nativeResult(), coldRestored: false}, 'live')).toBe(false);
+});
+
+test.each(['home-traversal', 'explore-traversal', 'activity-traversal'])(
+  'accepts fixed traversal stage %s without treating navigation as completed proof',
+  stage => {
+    const record = {...nativeResult(), outcome: 'in-progress', stage};
+    expect(parseNativeLog(`${PREFIX}${JSON.stringify(record)}`, 'live')).toEqual(record);
+    expect(nativeFlowPassed(record, 'live')).toBe(false);
+  },
+);
+
+test('expanded native selector vocabulary stays fixed and bounded rather than exporting dynamic row identifiers', () => {
+  const observedTargets = TARGETS.slice(0, MAX_OBSERVED_TARGETS);
+  const record = {...nativeResult(), observedTargets};
+  expect(sanitizeNativeResult(record)?.observedTargets).toEqual([...observedTargets].sort());
+  for (const id of TARGETS) {
+    expect(sanitizeNativeResult({...nativeResult(), observedTargets: [id]})?.observedTargets).toEqual([id]);
+  }
+  for (const id of ['activity-toggle-123', 'log-payload-123', 'RAW_CANARY', 'home-node-secret']) {
+    expect(sanitizeNativeResult({...nativeResult(), observedTargets: [id]})).toBeUndefined();
+  }
+  expect(sanitizeNativeResult({
+    ...nativeResult(), observedTargets: Array(MAX_OBSERVED_TARGETS + 1).fill('tab-home'),
+  })).toBeUndefined();
+  expect(CONTROL_COMPARATORS).toEqual(['details', 'settings', 'home', 'navigation']);
 });
 
 test.each([
@@ -1362,7 +1400,8 @@ test('control comparisons are bounded read-only observations, not readiness or n
   expect(comparison).toContain('count == 1 ? interactionState(query.element) : .unavailable');
   expect(comparison).toContain('Target.appSettings.rawValue');
   expect(comparison).toContain('Target.navigationContent.rawValue');
-  expect(comparison).toContain('"Telemetry, tab, 1 of 5"');
+  expect(comparison).toContain('Target.tabHome.rawValue');
+  expect(comparison).not.toContain('Telemetry, tab, 1 of 5');
   expect(comparison).toContain('refreshApplicationState()');
   expect(comparison).toContain('observedApplicationState(springBoard).rawValue');
   expect(comparison).toContain('NSPredicate(format: "label IN %@", argumentArray: [Self.permissionDenyLabels])');

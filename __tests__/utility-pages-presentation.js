@@ -100,7 +100,9 @@ test('upload content scrolls instead of sizing against the entire screen and pre
         finish = resolve;
       }),
   );
-  hooks.useIoTCentralClient.mockReturnValue([{uploadFile}]);
+  hooks.useIoTCentralClient.mockReturnValue([
+    {isConnected: () => true, uploadFile},
+  ]);
   picker.launchImageLibraryAsync.mockResolvedValue({
     canceled: false,
     assets: [{base64: 'AQID', fileName: 'photo.png'}],

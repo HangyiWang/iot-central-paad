@@ -3,6 +3,7 @@
 
 import {ItemProps} from 'types';
 import Strings from 'strings';
+import ToolStrings from '../experience/toolStrings';
 import {AVAILABLE_PROPERTIES} from './internal';
 
 export const PROPERTY_CHANGED = 'PROPERTY_CHANGED';
@@ -43,7 +44,7 @@ export const Properties: PropertyProps[] = [
   },
   {
     id: AVAILABLE_PROPERTIES.SW_VERSION,
-    name: 'Software version',
+    name: ToolStrings.Properties.SystemVersion,
     editable: false,
   },
   {

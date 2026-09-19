@@ -4,8 +4,15 @@ import * as Keychain from 'react-native-keychain';
 import StorageProvider, {StorageContext} from '../src/contexts/storage';
 import IoTCProvider, {IoTCContext} from '../src/contexts/iotc';
 import {useConnectIoTCentralClient, useSimulation} from '../src/hooks/iotc';
-import {createDeviceClient, ConnectionError} from '../src/connection';
+import {
+  createDeviceClient,
+  ConnectionError,
+  IOTC_EVENTS,
+  IIoTCCommandResponse,
+  PHONE_MODEL_ID,
+} from '../src/connection';
 import App from '../src/App';
+import {getObservationStore} from '../src/observation';
 
 jest.mock('../src/connection/client', () => ({
   createDeviceClient: jest.fn(),
@@ -31,6 +38,12 @@ const credentials = {
   deviceId: 'connection-lifecycle',
   deviceKey: Buffer.alloc(32, 2).toString('base64'),
 };
+const assignedIdentity = Object.freeze({
+  assignedHub: 'lifecycle.azure-devices.net',
+  deviceId: 'assigned-lifecycle-phone',
+  registrationId: credentials.deviceId,
+  modelId: PHONE_MODEL_ID,
+});
 const deferred = () => {
   let resolve;
   let reject;
@@ -40,12 +53,85 @@ const deferred = () => {
   });
   return {promise, resolve, reject};
 };
-const candidate = gate => ({
-  connect: jest.fn(() => gate?.promise ?? Promise.resolve()),
-  disconnect: jest.fn(async () => {}),
-  cancel: jest.fn(),
-  isConnected: jest.fn(() => true),
-});
+const candidate = gate => {
+  let connected = false;
+  let identity = null;
+  const commands = new Set();
+  const properties = new Set();
+  const submission = Object.freeze({delivery: 'submitted'});
+  const upload = Object.freeze({delivery: 'acknowledged', status: 201});
+  const ensureConnected = () => {
+    if (!connected) {
+      throw new ConnectionError('NOT_CONNECTED');
+    }
+  };
+  const submit = async () => {
+    ensureConnected();
+    return submission;
+  };
+  return {
+    get id() {
+      return identity?.deviceId ?? credentials.deviceId;
+    },
+    get identity() {
+      return identity;
+    },
+    connect: jest.fn(async ({signal} = {}) => {
+      const assigned = gate ? await gate.promise : assignedIdentity;
+      if (signal?.aborted) {
+        throw new ConnectionError('CANCELLED');
+      }
+      identity = assigned;
+      connected = true;
+      return identity;
+    }),
+    disconnect: jest.fn(async () => {
+      connected = false;
+    }),
+    cancel: jest.fn(() => {
+      connected = false;
+    }),
+    isConnected: jest.fn(() => connected),
+    sendTelemetry: jest.fn(submit),
+    sendProperty: jest.fn(submit),
+    fetchTwin: jest.fn(submit),
+    uploadFile: jest.fn(async () => {
+      ensureConnected();
+      return upload;
+    }),
+    on: jest.fn((event, callback) => {
+      let listeners;
+      if (event === IOTC_EVENTS.Commands || event === 'Commands') {
+        listeners = commands;
+      } else if (event === IOTC_EVENTS.Properties || event === 'Properties') {
+        listeners = properties;
+      } else {
+        throw new ConnectionError('OPERATION_FAILED');
+      }
+      listeners.add(callback);
+      return jest.fn(() => {
+        listeners.delete(callback);
+      });
+    }),
+  };
+};
+const expectObserved = (client, original) => {
+  expect(client).not.toBe(original);
+  expect(getObservationStore(original)).toBeNull();
+  expect(original.identity).toBe(assignedIdentity);
+  expect(client.identity).toBe(original.identity);
+  expect(client.id).toBe(assignedIdentity.deviceId);
+  expect(client.isConnected()).toBe(true);
+  expect(getObservationStore(client).getSnapshot()).toMatchObject({
+    active: true,
+    simulated: false,
+    identity: {
+      assignedHub: assignedIdentity.assignedHub,
+      deviceId: assignedIdentity.deviceId,
+      modelId: assignedIdentity.modelId,
+    },
+  });
+};
 
 describe('connection lifecycle through real providers', () => {
   let tree;
@@ -137,7 +223,8 @@ describe('connection lifecycle through real providers', () => {
       cleanSession: true,
       timeoutMs: 90000,
     });
-    await act(async () => connection.resolve());
+    await act(async () => connection.resolve(assignedIdentity));
+    expect(await device.connect.mock.results[0].value).toBe(assignedIdentity);
     expect(Keychain.setGenericPassword).toHaveBeenCalledTimes(1);
     expect(Keychain.setGenericPassword.mock.calls[0][0]).toBe(
       'IOTC_PAD_CLIENT',
@@ -148,8 +235,8 @@ describe('connection lifecycle through real providers', () => {
       write.resolve(true);
       expect(await first.result).toEqual({ok: true});
     });
-    expect(status().client === device).toBe(true);
-    expect(status(1).client === device).toBe(true);
+    expectObserved(status().client, device);
+    expect(status(1).client).toBe(status().client);
     expect(status()).toMatchObject({
       loading: false,
       stage: 'connected',
@@ -158,6 +245,166 @@ describe('connection lifecycle through real providers', () => {
     expect(consumers[0].storage.credentials.deviceId).toBe(
       credentials.deviceId,
     );
+  });
+
+  it('publishes the real observation wrapper and delegates all operation and listener boundaries', async () => {
+    const device = candidate();
+    createDeviceClient.mockReturnValue(device);
+    expect(device.identity).toBeNull();
+    expect(device.isConnected()).toBe(false);
+    await mount();
+    const attempt = await start();
+    expect(await attempt.result).toEqual({ok: true});
+    const client = status().client;
+    const store = getObservationStore(client);
+    expectObserved(client, device);
+    expect(status(1).client).toBe(client);
+    expect(device.connect).toHaveBeenCalledTimes(1);
+    expect(await device.connect.mock.results[0].value).toBe(assignedIdentity);
+    expect(device.on).not.toHaveBeenCalled();
+    expect(device.sendTelemetry).not.toHaveBeenCalled();
+    expect(device.sendProperty).not.toHaveBeenCalled();
+    expect(device.fetchTwin).not.toHaveBeenCalled();
+
+    const telemetry = {battery: 50};
+    const attributes = {'$.sub': 'sensors'};
+    const reported = {readOnlyProp: 'sample'};
+    expect(await client.sendTelemetry(telemetry, attributes)).toBe(
+      await device.sendTelemetry.mock.results[0].value,
+    );
+    expect(await client.sendProperty(reported)).toBe(
+      await device.sendProperty.mock.results[0].value,
+    );
+    expect(await client.fetchTwin()).toBe(
+      await device.fetchTwin.mock.results[0].value,
+    );
+    expect(
+      await client.uploadFile('sample.jpg', 'image/jpeg', 'AQID', 'base64'),
+    ).toBe(await device.uploadFile.mock.results[0].value);
+    expect(device.sendTelemetry).toHaveBeenCalledWith(telemetry, attributes);
+    expect(device.sendProperty).toHaveBeenCalledWith(reported);
+    expect(device.fetchTwin).toHaveBeenCalledTimes(1);
+    expect(device.uploadFile).toHaveBeenCalledWith(
+      'sample.jpg',
+      'image/jpeg',
+      'AQID',
+      'base64',
+    );
+
+    const commands = jest.fn();
+    const properties = jest.fn();
+    const offCommand = client.on(IOTC_EVENTS.Commands, commands);
+    const offProperty = client.on(IOTC_EVENTS.Properties, properties);
+    expect(device.on).toHaveBeenCalledTimes(2);
+    expect(offCommand).toBe(device.on.mock.results[0].value);
+    expect(offProperty).toBe(device.on.mock.results[1].value);
+    const command = {
+      name: 'lightOn',
+      requestId: 'lifecycle-command-1',
+      requestPayload: '{"pulses":1,"duration":1}',
+      reply: jest.fn(async () => ({delivery: 'submitted'})),
+    };
+    const property = {
+      name: 'writeableProp',
+      value: 'requested sample',
+      version: 4,
+      source: 'twin',
+      ack: jest.fn(async () => ({delivery: 'submitted'})),
+    };
+    await device.on.mock.calls[0][1](command);
+    await device.on.mock.calls[1][1](property);
+    const observedCommand = commands.mock.calls[0][0];
+    const observedProperty = properties.mock.calls[0][0];
+    expect(observedCommand.requestPayload).toBe(command.requestPayload);
+    expect(observedProperty.value).toBe(property.value);
+    const finish = store.beginExecution(observedCommand);
+    finish('completed');
+    expect(
+      await observedCommand.reply(IIoTCCommandResponse.SUCCESS, '{}'),
+    ).toBe(await command.reply.mock.results[0].value);
+    expect(await observedProperty.ack('Applied')).toBe(
+      await property.ack.mock.results[0].value,
+    );
+    expect(command.reply).toHaveBeenCalledWith(
+      IIoTCCommandResponse.SUCCESS,
+      '{}',
+    );
+    expect(property.ack).toHaveBeenCalledWith('Applied');
+    expect(device.sendProperty).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().latest).toMatchObject({
+      telemetry: {outcome: 'submitted', names: ['battery']},
+      'reported-property': {outcome: 'submitted', names: ['readOnlyProp']},
+      'twin-request': {outcome: 'submitted'},
+      upload: {outcome: 'acknowledged', status: 201},
+      command: {name: 'lightOn', outcome: 'observed'},
+      'command-execution': {outcome: 'completed'},
+      'command-reply': {outcome: 'submitted', response: 'success'},
+      'desired-property': {source: 'twin', version: 4},
+      'property-ack': {source: 'twin', outcome: 'submitted'},
+    });
+    expect(consumers[0].storage.credentials.deviceId).toBe(
+      credentials.deviceId,
+    );
+    expect(store.getSnapshot().identity.deviceId).not.toBe(
+      credentials.deviceId,
+    );
+    offCommand();
+    offProperty();
+    expect(offCommand).toHaveBeenCalledTimes(1);
+    expect(offProperty).toHaveBeenCalledTimes(1);
+    await client.disconnect();
+    expect(device.disconnect).toHaveBeenCalledTimes(1);
+    expect(device.isConnected()).toBe(false);
+    expect(store.getSnapshot()).toMatchObject({
+      active: false,
+      history: [],
+      latest: {},
+    });
+  });
+
+  it('invalidates observations immediately on a transport error stage before publishing that error', async () => {
+    const device = candidate();
+    createDeviceClient.mockReturnValue(device);
+    await mount();
+    const attempt = await start();
+    expect(await attempt.result).toEqual({ok: true});
+    const client = status().client;
+    const store = getObservationStore(client);
+    const {onStage} = createDeviceClient.mock.calls[0][1];
+    await client.sendProperty({readOnlyProp: 'sample'});
+    const connectedSnapshot = store.getSnapshot();
+    act(() => onStage('connected'));
+    expect(store.getSnapshot()).toBe(connectedSnapshot);
+
+    const observedStages = [];
+    const unsubscribe = store.subscribe(() => {
+      observedStages.push({
+        snapshot: store.getSnapshot(),
+        stage: status().stage,
+        error: status().error,
+      });
+    });
+    device.cancel();
+    device.isConnected.mockClear();
+    const failure = new ConnectionError('CONNECTION_LOST');
+    act(() => onStage('error', failure));
+    expect(observedStages).toHaveLength(1);
+    expect(observedStages[0]).toMatchObject({
+      snapshot: {active: false, history: [], latest: {}, identity: null},
+      stage: 'connected',
+      error: null,
+    });
+    expect(store.getSnapshot().generation).not.toBe(
+      connectedSnapshot.generation,
+    );
+    expect(status()).toMatchObject({client, stage: 'error', error: failure});
+    expect(device.isConnected).not.toHaveBeenCalled();
+    expect(device.on).not.toHaveBeenCalled();
+    expect(device.connect).toHaveBeenCalledTimes(1);
+    expect(device.sendProperty).toHaveBeenCalledTimes(1);
+    expect(device.sendTelemetry).not.toHaveBeenCalled();
+    expect(device.fetchTwin).not.toHaveBeenCalled();
+    unsubscribe();
   });
 
   it('does not persist or publish a failed candidate and allows a manual retry', async () => {
@@ -183,7 +430,7 @@ describe('connection lifecycle through real providers', () => {
     expect(consumers[0].central.request.current).toBeNull();
     const next = await start(1);
     expect(await next.result).toEqual({ok: true});
-    expect(status().client === retry).toBe(true);
+    expectObserved(status().client, retry);
     expect(status().error).toBeNull();
   });
 
@@ -211,7 +458,9 @@ describe('connection lifecycle through real providers', () => {
       await act(async () => {
         options.onStage('error', new ConnectionError('CONNECT_FAILED'));
         gate[settlement](
-          settlement === 'reject' ? new Error('Late failure') : undefined,
+          settlement === 'reject'
+            ? new Error('Late failure')
+            : assignedIdentity,
         );
         expect((await attempt.result).error.code).toBe('CANCELLED');
       });
@@ -226,7 +475,7 @@ describe('connection lifecycle through real providers', () => {
       expect(Keychain.setGenericPassword).not.toHaveBeenCalled();
       const next = await start(1);
       expect(await next.result).toEqual({ok: true});
-      expect(status().client === retry).toBe(true);
+      expectObserved(status().client, retry);
     },
   );
 
@@ -275,7 +524,10 @@ describe('connection lifecycle through real providers', () => {
     const disconnect = deferred();
     const connect = deferred();
     const oldDevice = candidate();
-    oldDevice.disconnect.mockImplementation(() => disconnect.promise);
+    oldDevice.disconnect.mockImplementation(async () => {
+      await disconnect.promise;
+      oldDevice.cancel();
+    });
     const newDevice = candidate(connect);
     createDeviceClient
       .mockReturnValueOnce(oldDevice)
@@ -293,10 +545,10 @@ describe('connection lifecycle through real providers', () => {
     expect(status().loading).toBe(true);
     expect(status(1).loading).toBe(true);
     await act(async () => {
-      connect.resolve();
+      connect.resolve(assignedIdentity);
       expect(await reconnect.result).toEqual({ok: true});
     });
-    expect(status().client === newDevice).toBe(true);
+    expectObserved(status().client, newDevice);
     expect(status().loading).toBe(false);
   });
 
@@ -334,7 +586,7 @@ describe('connection lifecycle through real providers', () => {
     expect(Keychain.resetGenericPassword).not.toHaveBeenCalled();
     const next = await start(1);
     expect(await next.result).toEqual({ok: true});
-    expect(status().client === retry).toBe(true);
+    expectObserved(status().client, retry);
     expect(status().error).toBeNull();
     expect(consumers[0].storage.credentials.deviceId).toBe(
       credentials.deviceId,
@@ -362,7 +614,7 @@ describe('connection lifecycle through real providers', () => {
       expect(Keychain.getGenericPassword).toHaveBeenCalledTimes(1);
       expect(createDeviceClient).toHaveBeenCalledTimes(stored ? 1 : 0);
       if (stored) {
-        expect(appControls.connection[3].client === device).toBe(true);
+        expectObserved(appControls.connection[3].client, device);
       }
       await act(async () => {
         await appControls.storage.save({
