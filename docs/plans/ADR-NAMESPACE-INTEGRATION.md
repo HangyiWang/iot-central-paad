@@ -69,11 +69,12 @@ It requests no keys and performs no cloud writes. See the
 
 ### Native Home / Explore / Activity implementation (2026-09-19)
 
-Current redesign status (2026-09-20): both retained-device native lanes and
+Original redesign delivery (2026-09-20): both retained-device native lanes and
 in-place Windows delivery are complete. Android is accepted on `0f2e54d` in
 run `35479615461`; iOS retains its separate acceptance on `66b4902` in run
 `35477325730`. The completed-delivery record below supersedes the historical
-failed-run and pending statements in this section.
+failed-run and pending statements in this section. The subsequent detail
+refinement is now delivered on both platforms from `5b59919`, recorded below.
 
 Implementation source: `f856e4e3875fdb2300fe03478eeffaac3f52a59a` on
 `feature/adr-onboarding`. This implements the subsequently approved workflow Home,
@@ -331,12 +332,37 @@ implementation. The treatment follows Apple's guidance on
 and [loading](https://developer.apple.com/design/human-interface-guidelines/loading):
 quiet hierarchy, useful feedback and unchanged accessible reach.
 
-Native delivery for this refinement is pending. The owner renewed narrowly
-scoped consent to reuse the same two retained individual enrollments for this
-pass and corrective runs, then update Windows in place. Earlier native
-acceptance above does not establish acceptance of these changed screens.
-No new Azure resources, IAM privileges, raw diagnostic capture or physical-phone
-signing are included.
+Native delivery completed from source
+`5b59919acd91d0c75925d84e16d5da6fa3a2e12b` in
+[run 35529669229](https://github.com/HangyiWang/iot-central-paad/actions/runs/35529669229).
+The owner renewed narrowly scoped consent for the same two retained individual
+enrollments. Both platforms newly completed the connected Home/Explore/Activity
+flow and genuine saved-credential cold restoration; earlier acceptance was not
+substituted. Independent reads matched each fresh proof, assigned Hub/device,
+phone model and retained registry binding.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Installed Android `foundation-ci.apk` | `51012e16a36e160df1ceb5a69e05a2365909c9713332167efb5b2a4c7f167f1c` |
+| iOS `foundation-simulator.app.zip` | `2c204d0e9f9fd20fde3a14f0f50876780651c3862b242e649c75713ab44ae4f3` |
+
+Windows received the matching accepted APK using `install -r`. Bounded native
+observations confirmed Connected, exact assignment/Hub/model and retained Azure
+context after upgrade and again after an actual process stop/new launch.
+Details was closed and the app left running. No data clear, uninstall,
+credential re-entry, storage injection or raw capture was used.
+
+Both owned temporary inputs were removed at 19:04:57 UTC after terminal run
+completion, with durable receipts and both slots confirmed empty. Owned observer
+processes/files were removed. Windows observations completed at 19:26:47 UTC;
+the final delivery record is `build/native-delivery-5b59919/delivery-final.json`,
+with `windows-delivery.json`, `safe-delivery-summary.json` and
+`build/actions-installed-5b59919.json` retaining local provenance.
+
+This is emulator/Simulator acceptance, not physical-phone signing, large-text,
+media-upload or direct-Hub acceptance. The registry association was retained,
+not newly created; downstream telemetry receipt remains unchecked. No new Azure
+resources, IAM privileges or raw diagnostic capture were included.
 
 ### Completed simulator acceptance (2026-09-18)
 
