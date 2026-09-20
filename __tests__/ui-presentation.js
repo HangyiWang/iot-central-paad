@@ -128,7 +128,10 @@ test.each([false, true])(
         colors.surface,
         colors.background,
         colors.inset,
+        colors.gradientStart,
+        colors.gradientEnd,
         ...colors.tints,
+        ...colors.toolSurfaces,
       ].flatMap(background => [
         [colors.text, background],
         [colors.muted, background],
@@ -136,6 +139,10 @@ test.each([false, true])(
       [colors.onPrimary, colors.primary],
       [colors.positive, colors.positiveSurface],
       [colors.danger, colors.dangerSurface],
+      ...colors.toolAccents.map(background => [
+        colors.toolOnAccent,
+        background,
+      ]),
     ];
     for (const [foreground, background] of pairs) {
       const a = luminance(foreground);

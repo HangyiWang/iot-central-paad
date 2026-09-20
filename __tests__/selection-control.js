@@ -111,10 +111,13 @@ test.each([false, true])(
     expect(timing).toHaveBeenCalledTimes(1);
     expect(timing.mock.calls[0][1]).toMatchObject({
       toValue: rtl ? -156 : 156,
-      duration: 220,
+      duration: 260,
       useNativeDriver: true,
       isInteraction: false,
     });
+    const {easing} = timing.mock.calls[0][1];
+    expect([easing(0), easing(1)]).toEqual([0, 1]);
+    expect(easing(0.5)).toBeGreaterThan(0.5);
     act(() => root().props.onLayout({nativeEvent: {layout: {width: 300}}}));
     expect(stop).toHaveBeenCalledTimes(1);
     expect(timing).toHaveBeenCalledTimes(1);

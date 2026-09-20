@@ -72,6 +72,22 @@ beforeEach(() => {
   hooks.useSimulation.mockReturnValue([false]);
   hooks.useTheme.mockReturnValue({dark: false, colors: {card: '#fff'}});
 });
+it('reports modal coverage so native Home decoration stops behind Details', () => {
+  const visibility = jest.fn();
+  act(() => {
+    view = renderer.create(
+      <ConnectionSummary
+        onManualConnection={manual}
+        onDetailsVisibilityChange={visibility}
+      />,
+    );
+  });
+  expect(visibility).toHaveBeenLastCalledWith(false);
+  act(() => press('Connection details'));
+  expect(visibility).toHaveBeenLastCalledWith(true);
+  act(() => view.root.findByType(Modal).props.onRequestClose());
+  expect(visibility).toHaveBeenLastCalledWith(false);
+});
 it('opens scrollable details with value-only IDs and local-only destructive forgetting', async () => {
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   const share = jest.spyOn(Share, 'share').mockResolvedValue({});

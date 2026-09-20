@@ -5,10 +5,12 @@ import React, {useMemo, useRef, useState} from 'react';
 import {FlatList, Platform, Pressable, StyleSheet, View} from 'react-native';
 import {Icon} from '@rneui/themed';
 import {useLogger, useTheme} from 'hooks';
-import {Headline, Text} from './components/typography';
+import {Text} from './components/typography';
 import Strings, {resolveString} from 'strings';
 import {TimedLog} from './types';
 import {palette} from './theme/palette';
+import {detailStyles} from './theme/detailStyles';
+import FluidDisclosure from './components/fluidDisclosure';
 import SelectionControl from './components/selectionControl';
 
 export function logLevel(eventName: string): 'info' | 'warning' | 'error' {
@@ -17,7 +19,7 @@ export function logLevel(eventName: string): 'info' | 'warning' | 'error' {
   return 'info';
 }
 
-const Logs = React.memo(() => {
+const Logs = React.memo(({visible = true}: {visible?: boolean}) => {
   const {dark} = useTheme();
   const appearance = palette(dark);
   const [logs] = useLogger();
@@ -32,10 +34,14 @@ const Logs = React.memo(() => {
   );
   const text = Strings.LogScreen;
   return (
-    <View style={[styles.container, {backgroundColor: appearance.background}]}>
+    <View style={styles.container}>
       <View style={styles.heading}>
         <View style={styles.headingRow}>
-          <Headline style={styles.headingTitle}>{text.Title}</Headline>
+          <Text
+            accessibilityRole="header"
+            style={[detailStyles.sectionTitle, styles.headingTitle]}>
+            {text.Title}
+          </Text>
           <Pressable
             testID="logs-latest"
             accessibilityRole="button"
@@ -60,6 +66,7 @@ const Logs = React.memo(() => {
           <SelectionControl
             variant="filter"
             label={text.Title}
+            focused={visible}
             options={[
               {id: 'logs-filter-all', label: text.All},
               {id: 'logs-filter-issues', label: text.Issues},
@@ -78,11 +85,22 @@ const Logs = React.memo(() => {
         data={entries}
         keyExtractor={entry => String(entry.id)}
         renderItem={({item, index}) => (
-          <LogEvent entry={item} last={index === entries.length - 1} />
+          <LogEvent
+            entry={item}
+            visible={visible}
+            last={index === entries.length - 1}
+          />
         )}
         contentContainerStyle={styles.feed}
         ListEmptyComponent={
-          <View style={[styles.empty, {backgroundColor: appearance.surface}]}>
+          <View
+            style={[
+              styles.empty,
+              {
+                backgroundColor: appearance.surface,
+                borderColor: appearance.border,
+              },
+            ]}>
             <View
               accessible={false}
               style={[
@@ -110,7 +128,15 @@ const Logs = React.memo(() => {
 });
 
 export const LogEvent = React.memo(
-  ({entry, last}: {entry: TimedLog[number]; last?: boolean}) => {
+  ({
+    entry,
+    last = true,
+    visible = true,
+  }: {
+    entry: TimedLog[number];
+    last?: boolean;
+    visible?: boolean;
+  }) => {
     const {dark} = useTheme();
     const appearance = palette(dark);
     const [expanded, setExpanded] = useState(false);
@@ -122,24 +148,27 @@ export const LogEvent = React.memo(
         : level === 'warning'
         ? appearance.tints[3]
         : appearance.tints[1];
+    const accent =
+      level === 'error'
+        ? appearance.danger
+        : level === 'warning'
+        ? appearance.toolAccents[2]
+        : appearance.controlBorder;
     const text = Strings.LogScreen;
     return (
       <View testID={`log-event-${entry.id}`} style={styles.eventRow}>
-        <View accessible={false} style={styles.timeline}>
-          <View style={[styles.eventIcon, {backgroundColor: background}]}>
-            <Icon
-              name={
-                level === 'error'
-                  ? 'alert-circle-outline'
-                  : level === 'warning'
-                  ? 'alert-outline'
-                  : 'information-outline'
-              }
-              type="material-community"
-              size={18}
-              color={foreground}
-            />
-          </View>
+        <View
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.timeline}>
+          <View
+            style={[
+              styles.mark,
+              expanded && styles.markOpen,
+              {backgroundColor: accent},
+            ]}
+          />
           {!last && (
             <View
               style={[
@@ -149,7 +178,7 @@ export const LogEvent = React.memo(
             />
           )}
         </View>
-        <View style={[styles.eventCard, {backgroundColor: appearance.surface}]}>
+        <View style={styles.eventBody}>
           <View style={styles.eventMeta}>
             <Text
               style={[
@@ -175,7 +204,11 @@ export const LogEvent = React.memo(
                 styles.disclosure,
                 pressed && styles.pressed,
               ]}>
-              <View accessible={false}>
+              <View
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={[styles.chevron, {borderColor: appearance.border}]}>
                 <Icon
                   name={expanded ? 'chevron-up' : 'chevron-down'}
                   type="material-community"
@@ -188,8 +221,22 @@ export const LogEvent = React.memo(
           <Text selectable style={styles.eventTitle}>
             {entry.logItem.eventName}
           </Text>
-          {expanded ? (
-            <View style={[styles.payload, {backgroundColor: appearance.inset}]}>
+          <FluidDisclosure expanded={!expanded} visible={visible}>
+            <Text
+              numberOfLines={2}
+              style={[styles.preview, {color: appearance.muted}]}>
+              {entry.logItem.eventData}
+            </Text>
+          </FluidDisclosure>
+          <FluidDisclosure expanded={expanded} visible={visible}>
+            <View
+              style={[
+                styles.payload,
+                {
+                  backgroundColor: appearance.inset,
+                  borderColor: appearance.border,
+                },
+              ]}>
               <Text
                 testID={`log-payload-${entry.id}`}
                 selectable
@@ -197,13 +244,7 @@ export const LogEvent = React.memo(
                 {entry.logItem.eventData}
               </Text>
             </View>
-          ) : (
-            <Text
-              numberOfLines={2}
-              style={[styles.preview, {color: appearance.muted}]}>
-              {entry.logItem.eventData}
-            </Text>
-          )}
+          </FluidDisclosure>
         </View>
       </View>
     );
@@ -249,17 +290,20 @@ const styles = StyleSheet.create({
   },
   pressed: {opacity: 0.6},
   feed: {paddingHorizontal: 20, paddingBottom: 24, flexGrow: 1},
-  eventRow: {flexDirection: 'row', gap: 10},
-  timeline: {width: 32, alignItems: 'center'},
-  eventIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  eventRow: {flexDirection: 'row', gap: 12},
+  timeline: {width: 12, alignItems: 'center'},
+  mark: {width: 10, height: 10, borderRadius: 5, marginTop: 13},
+  markOpen: {width: 12, height: 12, borderRadius: 6, marginTop: 12},
+  timelineLine: {width: 2, flex: 1, borderRadius: 1, marginTop: 6},
+  eventBody: {flex: 1, minWidth: 0, paddingBottom: 16},
+  chevron: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  timelineLine: {width: 1, flex: 1, marginVertical: 5},
-  eventCard: {flex: 1, padding: 16, borderRadius: 20, marginBottom: 12, gap: 7},
   eventMeta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -275,15 +319,26 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   timestamp: {fontSize: 11, lineHeight: 17, flexGrow: 1, flexShrink: 1},
-  eventTitle: {fontSize: 14, lineHeight: 21, fontWeight: '600'},
-  preview: {fontSize: 14, lineHeight: 21},
-  payload: {padding: 12, borderRadius: 12},
+  eventTitle: {fontSize: 14, lineHeight: 21, fontWeight: '600', marginTop: 4},
+  preview: {fontSize: 14, lineHeight: 21, paddingTop: 5},
+  payload: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   payloadText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 12,
     lineHeight: 19,
   },
-  empty: {padding: 28, borderRadius: 24, alignItems: 'center', gap: 12},
+  empty: {
+    padding: 28,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    gap: 12,
+  },
   emptyIcon: {
     width: 56,
     height: 56,

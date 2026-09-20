@@ -17,7 +17,7 @@ afterEach(() => act(() => tree?.unmount()));
 
 it('exposes the complete distributed license in an optional selectable disclosure', () => {
   const license = require('fs').readFileSync(
-    require.resolve('@expo-google-fonts/quicksand/LICENSE_FONT'),
+    require('path').join(__dirname, '..', 'LICENSE.fraunces'),
     'utf8',
   );
   Constants.expoConfig.extra.headerFontLicense = license;

@@ -1,6 +1,13 @@
 import {Platform, StyleSheet} from 'react-native';
+import {DISPLAY_FONT_FAMILY} from './fonts';
 
 export const detailStyles = StyleSheet.create({
+  displayTitle: {
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 24,
+    lineHeight: 31,
+    letterSpacing: -0.2,
+  },
   sheetTitle: {
     fontSize: 24,
     lineHeight: 31,

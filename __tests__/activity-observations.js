@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {FlatList} from 'react-native';
+import {FlatList, StyleSheet} from 'react-native';
 import Activity, {
   CommunicationSummary,
   communicationObservations,
@@ -9,6 +9,8 @@ import Activity, {
   observationTitle,
 } from '../src/experience/Activity';
 import {StorageContext} from '../src/contexts/storage';
+import {palette} from '../src/theme/palette';
+import {DISPLAY_FONT_FAMILY} from '../src/theme/fonts';
 
 let mockSnapshot;
 jest.mock('../src/observation', () => ({
@@ -258,4 +260,70 @@ it('expands only safe typed metadata and labels command execution limitations', 
         node => node.props.selectable && node.props.children === 'request-7',
       ),
   ).toBe(true);
+});
+
+it('keeps a display-face page title and a readable trail rather than nested cards', () => {
+  const failed = event(9, {
+    kind: 'upload',
+    outcome: 'failed',
+    errorCode: 'OPERATION_FAILED',
+  });
+  mockSnapshot = snapshot([failed]);
+  act(() => {
+    view = renderer.create(<Activity />);
+  });
+  const colors = palette(false);
+  const heading = view.root
+    .findAllByType('Text')
+    .find(node => node.props.accessibilityRole === 'header');
+  expect(StyleSheet.flatten(heading.props.style)).toMatchObject({
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 24,
+    lineHeight: 31,
+  });
+  expect(StyleSheet.flatten(heading.props.style).fontWeight).toBeUndefined();
+  const row = view.root.findAllByProps({testID: 'activity-event-9'})[0];
+  expect(StyleSheet.flatten(row.props.style).backgroundColor).toBeUndefined();
+  act(() => press('activity-toggle-9'));
+  const details = view.root.findAllByProps({testID: 'activity-details-9'})[0];
+  expect(StyleSheet.flatten(details.props.style).backgroundColor).toBe(
+    colors.surface,
+  );
+  const toggle = () =>
+    view.root
+      .findAllByProps({testID: 'activity-toggle-9'})
+      .find(node => typeof node.props.onPress === 'function');
+  expect(toggle().props.accessibilityState.expanded).toBe(true);
+  expect(toggle().props.accessibilityLabel).toContain('Hide details');
+  act(() => press('activity-toggle-9'));
+  expect(view.root.findAllByProps({testID: 'activity-details-9'})).toHaveLength(
+    0,
+  );
+  expect(toggle().props.accessibilityState.expanded).toBe(false);
+});
+
+it('stops motion in the layer that is not on screen instead of animating it hidden', () => {
+  const first = event(1, {kind: 'twin-request', outcome: 'submitted'});
+  const second = event(2, {
+    kind: 'telemetry',
+    names: ['battery'],
+    outcome: 'submitted',
+  });
+  mockSnapshot = snapshot([first, second]);
+  act(() => {
+    view = renderer.create(<Activity />);
+  });
+  const rendered = index =>
+    view.root.findByType(FlatList).props.renderItem({
+      item: index === 0 ? first : second,
+      index,
+    }).props;
+  expect(rendered(0)).toMatchObject({visible: true, last: false});
+  expect(rendered(1)).toMatchObject({visible: true, last: true});
+  act(() => press('activity-diagnostics'));
+  expect(view.root.findByType('DiagnosticsViewer').props.visible).toBe(true);
+  expect(rendered(0).visible).toBe(false);
+  act(() => press('activity-observations'));
+  expect(view.root.findByType('DiagnosticsViewer').props.visible).toBe(false);
+  expect(rendered(0).visible).toBe(true);
 });

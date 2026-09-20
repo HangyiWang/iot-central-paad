@@ -168,7 +168,7 @@ the QR itself contains a device credential.
 
 ## Local activity versus independent Azure confirmation
 
-Connected pages use a compact status row beneath the **Phone as a device**
+Connected pages use a compact status row beneath the **Phone as a Device**
 header, without a repeated connection heading. Tap **Details**
 to see the full assigned device ID, Hub and model, or to disconnect, reconnect
 or open manual connection settings. Identity values remain selectable and are

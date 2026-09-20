@@ -3,7 +3,9 @@ import {FlatList, Pressable, StyleSheet, View} from 'react-native';
 import {Icon} from '@rneui/themed';
 import {useIsFocused} from '@react-navigation/native';
 import {Text} from '../components/typography';
+import AppBackground from '../components/appBackground';
 import DetailsAction from '../components/detailsAction';
+import FluidDisclosure from '../components/fluidDisclosure';
 import SelectionControl from '../components/selectionControl';
 import Logs from '../Logs';
 import {useTheme} from '../hooks';
@@ -142,13 +144,18 @@ export default function Activity() {
     !entries.some(event => event.id === telemetry.id)
       ? telemetry
       : undefined;
+  const observing = focused && !diagnostics;
   return (
-    <View style={[styles.container, {backgroundColor: colors.background}]}>
+    <AppBackground style={styles.container}>
       <View style={styles.heading}>
         <View style={styles.toolbar}>
           <Text
             accessibilityRole="header"
-            style={[detailStyles.sheetTitle, styles.body]}>
+            style={[
+              detailStyles.displayTitle,
+              styles.body,
+              {color: colors.text},
+            ]}>
             {text.Title}
           </Text>
           {!diagnostics && (
@@ -197,7 +204,7 @@ export default function Activity() {
           <SelectionControl
             variant="filter"
             label={text.Filter}
-            focused={focused && !diagnostics}
+            focused={observing}
             options={[
               {id: 'activity-filter-all', label: text.All},
               {id: 'activity-filter-issues', label: text.Issues},
@@ -211,7 +218,13 @@ export default function Activity() {
           testID="activity-list"
           data={entries}
           keyExtractor={event => `${event.generation}-${event.id}`}
-          renderItem={({item}) => <ObservationRow event={item} />}
+          renderItem={({item, index}) => (
+            <ObservationRow
+              event={item}
+              visible={observing}
+              last={index === entries.length - 1}
+            />
+          )}
           contentContainerStyle={styles.feed}
           ListHeaderComponent={
             <>
@@ -238,7 +251,11 @@ export default function Activity() {
                     ]}>
                     {text.TelemetryHistory}
                   </Text>
-                  <ObservationRow event={latestTelemetry} />
+                  <ObservationRow
+                    event={latestTelemetry}
+                    visible={observing}
+                    last={!entries.length}
+                  />
                 </View>
               )}
             </>
@@ -246,7 +263,14 @@ export default function Activity() {
           ListEmptyComponent={
             latestTelemetry ? null : (
               <View
-                style={[detailStyles.card, {backgroundColor: colors.surface}]}>
+                style={[
+                  detailStyles.card,
+                  detailStyles.bordered,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}>
                 <Text style={detailStyles.sectionTitle}>
                   {issuesOnly ? text.NoIssues : text.Empty}
                 </Text>
@@ -265,14 +289,22 @@ export default function Activity() {
           importantForAccessibility={
             !diagnostics ? 'no-hide-descendants' : 'auto'
           }>
-          <Logs />
+          <Logs visible={focused && diagnostics} />
         </View>
       )}
-    </View>
+    </AppBackground>
   );
 }
 
-export function ObservationRow({event}: {event: Observation}) {
+export function ObservationRow({
+  event,
+  visible = true,
+  last = true,
+}: {
+  event: Observation;
+  visible?: boolean;
+  last?: boolean;
+}) {
   const {dark} = useTheme();
   const colors = palette(dark);
   const [expanded, setExpanded] = useState(false);
@@ -284,96 +316,122 @@ export function ObservationRow({event}: {event: Observation}) {
       ? event.name
       : null;
   return (
-    <View
-      testID={`activity-event-${event.id}`}
-      style={[
-        detailStyles.card,
-        styles.event,
-        {backgroundColor: colors.surface},
-      ]}>
-      <View style={styles.eventHeader}>
-        <View style={[styles.body, styles.eventCopy]}>
-          <Text
-            style={[
-              detailStyles.sectionTitle,
-              {color: issue ? colors.danger : colors.text},
-            ]}>
-            {observationTitle(event)}
-          </Text>
-          <Text style={[detailStyles.supporting, {color: colors.muted}]}>
-            {text.Local}: {new Date(event.observedAt).toLocaleString()}
-          </Text>
-        </View>
-        <Pressable
-          testID={`activity-toggle-${event.id}`}
-          accessibilityRole="button"
-          accessibilityState={{expanded}}
-          accessibilityLabel={`${
-            expanded ? text.HideDetails : text.Details
-          }: ${observationTitle(event)}`}
-          onPress={() => setExpanded(value => !value)}
-          style={({pressed}) => [styles.disclosure, pressed && styles.pressed]}>
-          <View
-            accessible={false}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants">
-            <Icon
-              name={expanded ? 'chevron-up' : 'chevron-down'}
-              type="material-community"
-              size={16}
-              color={colors.muted}
-            />
-          </View>
-        </Pressable>
+    <View testID={`activity-event-${event.id}`} style={styles.event}>
+      <View
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={styles.stem}>
+        <View
+          style={[
+            styles.mark,
+            expanded && styles.markOpen,
+            {backgroundColor: issue ? colors.danger : colors.controlBorder},
+          ]}
+        />
+        {!last && (
+          <View style={[styles.stemLine, {backgroundColor: colors.border}]} />
+        )}
       </View>
-      {event.simulated && (
-        <Text style={[detailStyles.status, {color: colors.primary}]}>
-          {text.Simulated}
-        </Text>
-      )}
-      {expanded && (
-        <View testID={`activity-details-${event.id}`}>
-          <Fact label={text.Channel} value={event.kind} />
-          <Fact label={text.Session} value={String(event.generation)} />
-          {names && <Fact label={text.Capability} value={names} />}
-          {'correlation' in event && event.correlation && (
-            <Fact label={text.Request} value={event.correlation.value} />
-          )}
-          {'version' in event && event.version !== null && (
-            <Fact label={text.Version} value={String(event.version)} />
-          )}
-          {'source' in event && (
-            <Fact label={text.Source} value={event.source} />
-          )}
-          {event.kind === 'command-reply' && (
-            <Fact label={text.Reply} value={event.response} />
-          )}
-          {event.outcome === 'failed' && (
-            <Fact label={text.Error} value={event.errorCode} />
-          )}
-          {event.kind === 'upload' &&
-            event.outcome === 'acknowledged' &&
-            event.status !== null && (
-              <Fact label={text.Http} value={String(event.status)} />
+      <View style={[styles.body, styles.trail]}>
+        <View style={styles.eventHeader}>
+          <View style={[styles.body, styles.eventCopy]}>
+            <Text
+              style={[
+                detailStyles.sectionTitle,
+                {color: issue ? colors.danger : colors.text},
+              ]}>
+              {observationTitle(event)}
+            </Text>
+            <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+              {text.Local}: {new Date(event.observedAt).toLocaleString()}
+            </Text>
+            {event.simulated && (
+              <Text style={[detailStyles.status, {color: colors.primary}]}>
+                {text.Simulated}
+              </Text>
             )}
-          {event.identity?.deviceId && (
-            <Fact label={text.Device} value={event.identity.deviceId} />
-          )}
-          {event.identity?.assignedHub && (
-            <Fact label={text.Hub} value={event.identity.assignedHub} />
-          )}
-          {event.identity?.modelId && (
-            <Fact label={text.Model} value={event.identity.modelId} />
-          )}
-          <Text style={[detailStyles.supporting, {color: colors.muted}]}>
-            {event.kind === 'command-execution'
-              ? text.PhysicalLimit
-              : event.kind === 'upload'
-              ? text.UploadChannel
-              : text.NotReceipt}
-          </Text>
+          </View>
+          <Pressable
+            testID={`activity-toggle-${event.id}`}
+            accessibilityRole="button"
+            accessibilityState={{expanded}}
+            accessibilityLabel={`${
+              expanded ? text.HideDetails : text.Details
+            }: ${observationTitle(event)}`}
+            onPress={() => setExpanded(value => !value)}
+            style={({pressed}) => [
+              styles.disclosure,
+              pressed && styles.pressed,
+            ]}>
+            <View
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={[styles.chevron, {borderColor: colors.border}]}>
+              <Icon
+                name={expanded ? 'chevron-up' : 'chevron-down'}
+                type="material-community"
+                size={16}
+                color={colors.muted}
+              />
+            </View>
+          </Pressable>
         </View>
-      )}
+        <FluidDisclosure expanded={expanded} visible={visible}>
+          <View
+            testID={`activity-details-${event.id}`}
+            style={[
+              styles.branch,
+              {backgroundColor: colors.surface, borderColor: colors.border},
+            ]}>
+            <Fact label={text.Channel} value={event.kind} />
+            <Fact label={text.Session} value={String(event.generation)} />
+            {names && <Fact label={text.Capability} value={names} />}
+            {'correlation' in event && event.correlation && (
+              <Fact label={text.Request} value={event.correlation.value} />
+            )}
+            {'version' in event && event.version !== null && (
+              <Fact label={text.Version} value={String(event.version)} />
+            )}
+            {'source' in event && (
+              <Fact label={text.Source} value={event.source} />
+            )}
+            {event.kind === 'command-reply' && (
+              <Fact label={text.Reply} value={event.response} />
+            )}
+            {event.outcome === 'failed' && (
+              <Fact label={text.Error} value={event.errorCode} />
+            )}
+            {event.kind === 'upload' &&
+              event.outcome === 'acknowledged' &&
+              event.status !== null && (
+                <Fact label={text.Http} value={String(event.status)} />
+              )}
+            {event.identity?.deviceId && (
+              <Fact label={text.Device} value={event.identity.deviceId} />
+            )}
+            {event.identity?.assignedHub && (
+              <Fact label={text.Hub} value={event.identity.assignedHub} />
+            )}
+            {event.identity?.modelId && (
+              <Fact label={text.Model} value={event.identity.modelId} />
+            )}
+            <Text
+              style={[
+                detailStyles.supporting,
+                styles.branchNote,
+                {color: colors.muted},
+              ]}>
+              {event.kind === 'command-execution'
+                ? text.PhysicalLimit
+                : event.kind === 'upload'
+                ? text.UploadChannel
+                : text.NotReceipt}
+            </Text>
+          </View>
+        </FluidDisclosure>
+      </View>
     </View>
   );
 }
@@ -411,9 +469,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   feed: {paddingHorizontal: 20, paddingBottom: 24},
-  event: {marginBottom: 12},
+  event: {flexDirection: 'row', gap: 12},
+  stem: {width: 12, alignItems: 'center'},
+  mark: {width: 10, height: 10, borderRadius: 5, marginTop: 9},
+  markOpen: {width: 12, height: 12, borderRadius: 6, marginTop: 8},
+  stemLine: {width: 2, flex: 1, borderRadius: 1, marginTop: 6},
+  trail: {paddingBottom: 18},
   eventHeader: {flexDirection: 'row', alignItems: 'flex-start', gap: 8},
   eventCopy: {gap: 4},
+  branch: {
+    marginTop: 10,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  branchNote: {paddingBottom: 14, paddingTop: 4},
   disclosure: {
     minWidth: 48,
     minHeight: 48,
@@ -421,6 +492,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: -8,
     marginEnd: -8,
+  },
+  chevron: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pressed: {opacity: 0.6},
   sessionNotice: {marginBottom: 12},

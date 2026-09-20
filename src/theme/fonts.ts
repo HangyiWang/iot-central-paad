@@ -1,1 +1,1 @@
-export const DISPLAY_FONT_FAMILY = 'Quicksand-Bold';
+export const DISPLAY_FONT_FAMILY = 'PAADFraunces-Medium';

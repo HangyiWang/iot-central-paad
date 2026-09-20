@@ -74,6 +74,7 @@ export function useMotionAllowed(visible = true): boolean {
 export function useGentleTransition(
   trigger: string | number | boolean,
   visible = true,
+  duration = 360,
 ) {
   const permitted = useMotionAllowed(visible);
   const progress = useRef(new Animated.Value(1)).current;
@@ -85,7 +86,7 @@ export function useGentleTransition(
     progress.setValue(0);
     const animation = Animated.timing(progress, {
       toValue: 1,
-      duration: 360,
+      duration,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
       isInteraction: false,
@@ -95,6 +96,34 @@ export function useGentleTransition(
       animation.stop();
       progress.setValue(1);
     };
-  }, [permitted, progress, trigger]);
+  }, [duration, permitted, progress, trigger]);
+  return progress;
+}
+
+/** A native-driven light sweep with an end pause, never a data/transport timer. */
+export function useDecorativeLoop(active: boolean) {
+  const permitted = useMotionAllowed(active);
+  const progress = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!permitted) {
+      progress.setValue(0);
+      return;
+    }
+    const ease = Easing.inOut(Easing.quad);
+    const animation = Animated.loop(
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 3800,
+        easing: value => ease(Math.min((value * 3800) / 2600, 1)),
+        useNativeDriver: true,
+        isInteraction: false,
+      }),
+    );
+    animation.start();
+    return () => {
+      animation.stop();
+      progress.setValue(0);
+    };
+  }, [permitted, progress]);
   return progress;
 }

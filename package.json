@@ -16,7 +16,6 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
-    "@expo-google-fonts/quicksand": "0.4.1",
     "@react-native-masked-view/masked-view": "0.3.2",
     "@react-navigation/bottom-tabs": "7.19.1",
     "@react-navigation/elements": "2.9.42",

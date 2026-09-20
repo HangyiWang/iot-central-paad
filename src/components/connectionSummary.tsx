@@ -39,9 +39,11 @@ import {useGentleTransition} from '../hooks/motion';
 export default function ConnectionSummary({
   onManualConnection,
   detailsRequest = 0,
+  onDetailsVisibilityChange,
 }: {
   onManualConnection(): void;
   detailsRequest?: number;
+  onDetailsVisibilityChange?(visible: boolean): void;
 }) {
   const [connect, cancel, clear, {client, loading, error, stage}] =
     useConnectIoTCentralClient();
@@ -57,6 +59,9 @@ export default function ConnectionSummary({
     'closed' | 'opening' | 'open'
   >('closed');
   const details = detailsPhase !== 'closed';
+  useEffect(() => {
+    onDetailsVisibilityChange?.(details);
+  }, [details, onDetailsVisibilityChange]);
   const openDetails = () =>
     setDetailsPhase(phase => (phase === 'closed' ? 'opening' : phase));
   const closeDetails = () => setDetailsPhase('closed');

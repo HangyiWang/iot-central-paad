@@ -1,8 +1,13 @@
 export const ExperienceStrings = {
   Home: {
+    Capability: 'IoT Plug and Play',
     Map: 'Connection',
     MapHint: 'Tap a node to understand its role and this setup.',
-    MapLegend: 'Solid: phone calls. Dashed: namespace links.',
+    MapLegend:
+      'Solid: the phone\u2019s two-way links. Dashed: cloud coordination.',
+    FlowHint: 'The light shows connection state, not message traffic.',
+    FlowNote:
+      'While connected, a soft light drifts along the connectors. It is a decorative state indicator, not packets, throughput or delivery confirmation. DPS is contacted for assignment; it is not a persistent message path.',
     MapAuthority:
       'Relationships explained here are not a live Azure resource check.',
     NamespaceLinks: 'Namespace service links and Hub allocation configuration',

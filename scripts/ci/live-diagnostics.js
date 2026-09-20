@@ -90,6 +90,7 @@ const PERMISSION_ABSENCE_SELECTOR = String.raw`^com\.(android|google\.android)\.
 const PERMISSION_ABSENCE_CATEGORY = 'android-permission-absence';
 const UI_LABELS = new Map([
   ['IoT PnP', 'app-root'], ['IoT Plug and Play', 'app-heading'],
+  ['Phone as a Device', 'app-heading'],
   ['Phone as a device', 'app-heading'],
   ['Home Screen', 'launcher'], ['SpringBoard', 'launcher'],
   ['Manually connect', 'manual-heading'], ['Connect manually', 'manual-entry'],

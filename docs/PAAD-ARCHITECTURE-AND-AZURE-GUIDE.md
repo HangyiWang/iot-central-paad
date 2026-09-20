@@ -126,7 +126,7 @@ Versions below describe the current [package manifest](../package.json).
 | **Expo SDK 57.0.24** | Compatible native modules, app configuration, native-project generation, and development tooling around React Native. Expo is not a separate replacement for React Native. |
 | **TypeScript 6.0.3** | Checks code-level types before running: clients, JSON values, connection states, and observation outcomes. It does not certify cloud delivery. |
 | **React Navigation** and its native support packages | Root screens, bottom tabs, and the Explore tool stack; safe areas and gestures keep controls usable around system bars. |
-| **React Native Elements (`@rneui`), vector icons, Expo Font/Quicksand** | Reusable controls, icons, and the bundled display font. Native/configured font changes require a new native build. |
+| **React Native Elements (`@rneui`), vector icons, Expo Font/Fraunces** | Reusable controls, icons, and the bundled display font. Fraunces highlights the “Phone as a Device” heading and page titles; readable system type handles controls and data. Native/configured font changes require a new native build. |
 | **`react-native-azure-iotcentral-client` 1.1.10** | A contained compatibility dependency: cryptographic/legacy credential helpers and the underlying Hub MQTT client. PAAD wraps version-specific internals in `legacyHub.ts`; its vendor DPS, upload, logger, retry loop, and unbounded reconnection are not used. |
 | **App-owned `src/connection` and `expo/fetch`** | The actual application connection API, HTTPS provisioning/upload requests, deadlines, endpoint restrictions, and redirect refusal. |
 | **Local Expo module `modules/paad-device`** | Swift/URLSession on iOS and Kotlin/OkHttp on Android implement TLS WebSockets that refuse redirects. It is repository code, not an Azure SDK or an Expo Go feature. |
@@ -136,6 +136,17 @@ Versions below describe the current [package manifest](../package.json).
 | **`react-native-ble-plx` and permissions support** | Bluetooth Low Energy advertisement scanning and OS access checks. PAAD does not implement arbitrary Bluetooth pairing or characteristic read/write tools. |
 | **`react-native-svg`, `react-native-maps`** | Bundled charts and native location-map presentation. Android map display needs build-time configuration; coordinates can still be shown without it. |
 | **Jest / React Native Testing Library, ESLint / Prettier** | Developer tests, static checks, and formatting. These are development tools, not cloud services. |
+
+The native Fraunces font is included in the app, so displaying it does not
+download anything from a font service. Its file is
+`src/assets/fonts/PAADFraunces-Medium.ttf`, and its open-font license is
+[`LICENSE.fraunces`](../LICENSE.fraunces). This is a static Medium instance
+(`wght=500`, `opsz=24`, `SOFT=20`, `WONK=0`) of the official Google Fonts
+Fraunces source at revision `e44c4b011a820c2cbe2fd2cfa8052037d7edb571`,
+generated with FontTools 4.65.0. “Static” here means those typography choices
+are fixed inside one small font file, which keeps Android and iOS consistent.
+The native family/PostScript name is `PAADFraunces-Medium`; body text does
+not depend on this font.
 
 ## 4. Which app build can I use?
 

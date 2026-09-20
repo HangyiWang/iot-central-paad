@@ -12,7 +12,7 @@ name: Credential-free bundled startup and manual-navigation smoke
     timeout: 60000
 - assertVisible:
     id: app-header-title
-    text: "^Phone as a device$"
+    text: "^Phone as a Device$"
 - assertVisible: "Connect manually"
 - tapOn:
     id: registration-manual
@@ -81,5 +81,5 @@ name: Credential-free bundled startup and manual-navigation smoke
     timeout: 60000
 - assertVisible:
     id: app-header-title
-    text: "^Phone as a device$"
+    text: "^Phone as a Device$"
 - assertVisible: "Connect manually"

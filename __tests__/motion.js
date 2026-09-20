@@ -1,7 +1,11 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import {AccessibilityInfo, Animated, AppState, View} from 'react-native';
-import {useGentleTransition, useMotionAllowed} from '../src/hooks/motion';
+import {
+  useDecorativeLoop,
+  useGentleTransition,
+  useMotionAllowed,
+} from '../src/hooks/motion';
 
 let view;
 let resolvePreference;
@@ -17,9 +21,14 @@ function Probe({visible = true}) {
   return <View testID="motion" accessibilityState={{busy: allowed}} />;
 }
 
-function Transition({visible = true, revision = 0}) {
-  useGentleTransition(revision, visible);
+function Transition({visible = true, revision = 0, duration = 360}) {
+  useGentleTransition(revision, visible, duration);
   return null;
+}
+
+function Loop({active = true}) {
+  const phase = useDecorativeLoop(active);
+  return <View testID="loop-phase" style={{opacity: phase}} />;
 }
 
 beforeEach(() => {
@@ -154,6 +163,7 @@ test('transitions are finite, non-interaction animations and stop on blur or red
   act(() => {
     view = renderer.create(<Transition />);
   });
+
   expect(timing).not.toHaveBeenCalled();
   await act(async () => resolvePreference(false));
   expect(timing).toHaveBeenCalledTimes(1);
@@ -174,4 +184,92 @@ test('transitions are finite, non-interaction animations and stop on blur or red
   expect(timing).toHaveBeenCalledTimes(3);
   act(() => preferenceChanged(true));
   expect(stop).toHaveBeenCalledTimes(3);
+});
+
+test('channel light loops natively only while allowed and resets on every suppression', async () => {
+  const start = jest.fn();
+  const stop = jest.fn();
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  const loop = jest.spyOn(Animated, 'loop').mockReturnValue({
+    start,
+    stop,
+    reset: jest.fn(),
+  });
+  act(() => {
+    view = renderer.create(<Loop />);
+  });
+  expect(loop).not.toHaveBeenCalled();
+  await act(async () => resolvePreference(false));
+  expect(start).toHaveBeenCalledTimes(1);
+  expect(timing.mock.calls[0][1]).toMatchObject({
+    duration: 3800,
+    useNativeDriver: true,
+    isInteraction: false,
+  });
+  expect(timing.mock.calls[0][1].easing(0.8)).toBe(1);
+  act(() => view.update(<Loop active={false} />));
+  expect(stop).toHaveBeenCalledTimes(1);
+  expect(
+    view.root
+      .findByProps({testID: 'loop-phase'})
+      .props.style.opacity.__getValue(),
+  ).toBe(0);
+  act(() => view.update(<Loop />));
+  expect(start).toHaveBeenCalledTimes(2);
+  act(() => applicationChanged('background'));
+  expect(stop).toHaveBeenCalledTimes(2);
+  act(() => applicationChanged('active'));
+  expect(start).toHaveBeenCalledTimes(3);
+  act(() => preferenceChanged(true));
+  expect(stop).toHaveBeenCalledTimes(3);
+});
+
+test('tool entry can use a longer finite duration without changing its motion gates', async () => {
+  const stop = jest.fn();
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop,
+    reset: jest.fn(),
+  });
+  act(() => {
+    view = renderer.create(<Transition duration={460} />);
+  });
+  await act(async () => resolvePreference(false));
+  expect(timing.mock.calls[0][1]).toMatchObject({
+    duration: 460,
+    isInteraction: false,
+    useNativeDriver: true,
+  });
+  act(() => view.unmount());
+  view = undefined;
+  expect(stop).toHaveBeenCalledTimes(1);
+});
+
+test('unmounting a moving channel stops its loop and restores the still phase', async () => {
+  const stop = jest.fn();
+  jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  jest.spyOn(Animated, 'loop').mockReturnValue({
+    start: jest.fn(),
+    stop,
+    reset: jest.fn(),
+  });
+  act(() => {
+    view = renderer.create(<Loop />);
+  });
+  await act(async () => resolvePreference(false));
+  const phase = view.root.findByProps({testID: 'loop-phase'}).props.style
+    .opacity;
+  act(() => phase.setValue(0.6));
+  act(() => view.unmount());
+  view = undefined;
+  expect(stop).toHaveBeenCalledTimes(1);
+  expect(phase.__getValue()).toBe(0);
 });

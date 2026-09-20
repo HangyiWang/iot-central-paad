@@ -4,9 +4,9 @@
 const Strings = {
   Title: 'IoT Plug and Play',
   Header: {
-    Title: 'Phone as a device',
+    Title: 'Phone as a Device',
     Brand: 'Phone',
-    Descriptor: 'as a device',
+    Descriptor: 'as a Device',
   },
   AzureContext: {
     Title: 'Azure environment',
@@ -185,7 +185,7 @@ const Strings = {
   Settings: {
     Title: 'Settings',
     Font: {
-      Title: 'Quicksand font license',
+      Title: 'Fraunces font license',
       Unavailable: 'The bundled font license is unavailable in this build.',
     },
     Theme: {

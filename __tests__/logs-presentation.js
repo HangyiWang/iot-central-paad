@@ -4,6 +4,7 @@ import {FlatList, StyleSheet} from 'react-native';
 import Logs, {LogEvent, logLevel} from '../src/Logs';
 import * as hooks from '../src/hooks';
 import LogsProvider, {LogsContext} from '../src/contexts/logs';
+import {palette} from '../src/theme/palette';
 
 jest.mock('../src/hooks', () => ({
   useLogger: jest.fn(),
@@ -155,4 +156,57 @@ test('levels come from event names, not guesses about successful payload deliver
   expect(logLevel('WARN')).toBe('warning');
   expect(logLevel('FILE UPLOAD')).toBe('info');
   expect(logLevel('INFO')).toBe('info');
+});
+
+test('a diagnostic reads as a trail entry: no nested card, opaque payload, honest level', () => {
+  const item = entry(51, 'WARNING', 'Sensor unavailable');
+  act(() => {
+    view = renderer.create(<LogEvent entry={item} />);
+  });
+  const colors = palette(false);
+  const row = view.root.findAllByProps({testID: 'log-event-51'})[0];
+  expect(StyleSheet.flatten(row.props.style).backgroundColor).toBeUndefined();
+  for (const node of view.root.findAll(
+    child => typeof child.type === 'string' && child.type === 'View',
+  )) {
+    const background = StyleSheet.flatten(node.props.style)?.backgroundColor;
+    expect(background).not.toBe(colors.background);
+  }
+  expect(visibleText()).toContain('Warning');
+  expect(visibleText()).toContain('Sensor unavailable');
+  act(() => press('log-toggle-51'));
+  const payload = view.root.findAllByProps({testID: 'log-payload-51'})[0];
+  expect(payload.props.children).toBe('Sensor unavailable');
+  const block = view.root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      StyleSheet.flatten(node.props.style)?.backgroundColor === colors.inset,
+  );
+  expect(block.length).toBeGreaterThan(0);
+});
+
+test('rows learn their visibility and position from the feed, never from navigation state', () => {
+  const events = [entry(60, 'INFO'), entry(61, 'ERROR')];
+  hooks.useLogger.mockReturnValue([events]);
+  act(() => {
+    view = renderer.create(<Logs visible={false} />);
+  });
+  const rendered = index =>
+    view.root.findByType(FlatList).props.renderItem({
+      item: events[index],
+      index,
+    }).props;
+  expect(rendered(0)).toMatchObject({visible: false, last: false});
+  expect(rendered(1)).toMatchObject({visible: false, last: true});
+  act(() => view.update(<Logs visible />));
+  expect(rendered(1)).toMatchObject({visible: true, last: true});
+  // A row rendered on its own, with no navigator, still settles statically.
+  act(() => {
+    view.update(<LogEvent entry={events[1]} />);
+  });
+  expect(view.root.findAllByProps({testID: 'log-payload-61'})).toHaveLength(0);
+  act(() => press('log-toggle-61'));
+  expect(
+    view.root.findAllByProps({testID: 'log-payload-61'}).length,
+  ).toBeGreaterThan(0);
 });

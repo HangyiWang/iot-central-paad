@@ -1,11 +1,18 @@
 import React from 'react';
-import {Pressable, ScrollView, StyleSheet, View} from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import {Icon} from '@rneui/themed';
 import {Text} from '../components/typography';
 import {useTheme} from '../hooks';
 import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
 import ToolStrings from './toolStrings';
+import AppBackground from '../components/appBackground';
 
 export type ExploreTool =
   | 'Telemetry'
@@ -54,94 +61,110 @@ const tools: {
 export default function Explore({onOpen}: {onOpen(tool: ExploreTool): void}) {
   const {dark} = useTheme();
   const colors = palette(dark);
+  const {width, fontScale} = useWindowDimensions();
+  const stacked = width < 340 || fontScale > 1.3;
   return (
-    <ScrollView
-      testID="explore-directory"
-      style={{backgroundColor: colors.background}}
-      contentContainerStyle={styles.content}>
-      <View style={styles.heading}>
-        <Text
-          accessibilityRole="header"
-          style={[detailStyles.sheetTitle, {color: colors.text}]}>
-          {text.Title}
-        </Text>
+    <AppBackground>
+      <ScrollView
+        testID="explore-directory"
+        style={styles.scroll}
+        contentContainerStyle={styles.content}>
+        <View style={styles.heading}>
+          <Text
+            accessibilityRole="header"
+            style={[detailStyles.displayTitle, {color: colors.text}]}>
+            {text.Title}
+          </Text>
+          <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+            {text.Description}
+          </Text>
+        </View>
+        <View
+          testID="explore-tools-grid"
+          style={[styles.tools, stacked && styles.stackedTools]}>
+          {tools.map((tool, index) => (
+            <Pressable
+              key={tool.route}
+              testID={`explore-tool-${tool.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${tool.title}. ${tool.detail}`}
+              onPress={() => onOpen(tool.route)}
+              style={({pressed}) => [
+                detailStyles.card,
+                styles.tool,
+                stacked && styles.stackedTool,
+                {
+                  backgroundColor: colors.toolSurfaces[index],
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.86 : 1,
+                },
+              ]}>
+              <View
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={[
+                  styles.icon,
+                  {
+                    backgroundColor: colors.toolAccents[index],
+                  },
+                ]}>
+                <Icon
+                  name={tool.icon}
+                  type="material-community"
+                  color={colors.toolOnAccent}
+                  size={23}
+                />
+              </View>
+              <View style={styles.body}>
+                <Text style={[detailStyles.sectionTitle, {color: colors.text}]}>
+                  {tool.title}
+                </Text>
+                <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+                  {tool.detail}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
         <Text style={[detailStyles.supporting, {color: colors.muted}]}>
-          {text.Description}
+          {text.Availability}
         </Text>
-      </View>
-      {tools.map((tool, index) => (
-        <Pressable
-          key={tool.route}
-          testID={`explore-tool-${tool.id}`}
-          accessibilityRole="button"
-          accessibilityLabel={`${tool.title}. ${tool.detail}`}
-          onPress={() => onOpen(tool.route)}
-          style={({pressed}) => [
-            detailStyles.card,
-            styles.tool,
-            {
-              backgroundColor: pressed ? colors.inset : colors.surface,
-              borderColor: colors.border,
-            },
-          ]}>
-          <View
-            accessible={false}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            style={[
-              styles.icon,
-              {
-                backgroundColor: colors.tints[index],
-                borderColor: colors.controlBorder,
-              },
-            ]}>
-            <Icon
-              name={tool.icon}
-              type="material-community"
-              color={colors.text}
-              size={23}
-            />
-          </View>
-          <View style={styles.body}>
-            <Text style={[detailStyles.sectionTitle, {color: colors.text}]}>
-              {tool.title}
-            </Text>
-            <Text style={[detailStyles.supporting, {color: colors.muted}]}>
-              {tool.detail}
-            </Text>
-          </View>
-          <Icon
-            name="chevron-right"
-            type="material-community"
-            color={colors.muted}
-            size={20}
-            accessible={false}
-          />
-        </Pressable>
-      ))}
-      <Text style={[detailStyles.supporting, {color: colors.muted}]}>
-        {text.Availability}
-      </Text>
-    </ScrollView>
+      </ScrollView>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
   content: {padding: 20, gap: 12},
+  scroll: {flex: 1},
   heading: {gap: 6, marginBottom: 4},
+  tools: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
+  stackedTools: {flexDirection: 'column'},
   tool: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 88,
+    flexBasis: '47%',
+    flexGrow: 1,
+    minWidth: 0,
+    minHeight: 180,
+    alignItems: 'flex-start',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  stackedTool: {
+    flexBasis: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 104,
+    width: '100%',
+  },
   icon: {
-    width: 42,
-    height: 42,
-    borderRadius: 16,
-    borderWidth: 1,
+    width: 44,
+    height: 44,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  body: {flex: 1, minWidth: 0, gap: 4},
+  body: {flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 6},
 });

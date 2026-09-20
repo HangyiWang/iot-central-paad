@@ -1,5 +1,5 @@
 import React from 'react';
-import {Platform, StyleSheet} from 'react-native';
+import {StyleSheet} from 'react-native';
 import {useTheme} from 'hooks';
 import Strings from 'strings';
 import {palette} from '../theme/palette';
@@ -33,8 +33,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: DISPLAY_FONT_FAMILY,
     fontSize: 20,
-    fontWeight: Platform.OS === 'android' ? '700' : undefined,
     lineHeight: 26,
-    letterSpacing: 0.2,
+    letterSpacing: -0.15,
   },
 });

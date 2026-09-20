@@ -5,7 +5,7 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   // These RN libraries (and uuid's browser entry) ship uncompiled ESM/Flow/TS.
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native(?:-[^/]+)?|@react-native(?:-community)?|@react-navigation|@rneui|expo(?:-[^/]+)?|@expo(?:/[^/]+)?|uuid)/)',
+    'node_modules/(?!((jest-)?react-native(?:-[^/]+)?|@react-native(?:-community|-masked-view)?|@react-navigation|@rneui|expo(?:-[^/]+)?|@expo(?:/[^/]+)?|uuid)/)',
   ],
   moduleNameMapper: {
     '\\.svg$': '<rootDir>/test-support/svgMock.js',

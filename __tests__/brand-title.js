@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {Platform, StyleSheet} from 'react-native';
+import {StyleSheet} from 'react-native';
 import BrandTitle from '../src/components/brandTitle';
 import {palette} from '../src/theme/palette';
 import Strings from '../src/strings';
@@ -20,7 +20,7 @@ it.each([false, true])(
       tree = renderer.create(<BrandTitle />);
     });
     const title = tree.root.findByProps({testID: 'app-header-title'});
-    expect(title.props.accessibilityLabel).toBe('Phone as a device');
+    expect(title.props.accessibilityLabel).toBe('Phone as a Device');
     expect(title.props.accessibilityRole).toBe('header');
     expect(`${Strings.Header.Brand} ${Strings.Header.Descriptor}`).toBe(
       Strings.Header.Title,
@@ -30,10 +30,9 @@ it.each([false, true])(
       .find(node => node.props.children === Strings.Header.Brand);
     const typography = {
       fontFamily: DISPLAY_FONT_FAMILY,
-      fontWeight: Platform.OS === 'android' ? '700' : undefined,
       fontSize: 20,
       lineHeight: 26,
-      letterSpacing: 0.2,
+      letterSpacing: -0.15,
     };
     expect(StyleSheet.flatten(brand.props.style)).toMatchObject({
       ...typography,
@@ -43,6 +42,7 @@ it.each([false, true])(
       ...typography,
       color: palette(dark).muted,
     });
+    expect(StyleSheet.flatten(title.props.style).fontWeight).toBeUndefined();
     expect(title.props).toMatchObject({
       numberOfLines: 1,
       adjustsFontSizeToFit: true,

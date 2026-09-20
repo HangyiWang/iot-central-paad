@@ -13,7 +13,11 @@ import {useMotionAllowed} from '../hooks/motion';
 import {palette} from '../theme/palette';
 import {Text} from './typography';
 
+/** One fluid curve for the selection thumb, shared with disclosure motion. */
+const fluid = Easing.bezier(0.22, 0.7, 0.2, 1);
+
 type Choice = {id: string; label: string};
+
 type Props = {
   options: readonly [Choice, Choice];
   selected: 0 | 1;
@@ -55,8 +59,8 @@ export default function SelectionControl({
     }
     const animation = Animated.timing(position, {
       toValue,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
+      duration: 260,
+      easing: fluid,
       useNativeDriver: true,
       isInteraction: false,
     });

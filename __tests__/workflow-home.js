@@ -11,6 +11,9 @@ import {PHONE_MODEL_ID} from '../src/connection/types';
 import {parseAzureContext} from '../src/onboarding/azureContext';
 import {useTheme} from '../src/hooks';
 import {palette} from '../src/theme/palette';
+import {detailStyles} from '../src/theme/detailStyles';
+import {useDecorativeLoop} from '../src/hooks/motion';
+import {caretPath, channelPath} from '../src/experience/ChannelFlow';
 
 const Native = require('react-native');
 
@@ -32,7 +35,29 @@ jest.mock('react-native-svg', () => ({
   __esModule: true,
   default: 'Svg',
   Path: 'Path',
+  Defs: 'Defs',
+  LinearGradient: 'LinearGradient',
+  Stop: 'Stop',
+  Rect: 'Rect',
+  G: 'G',
 }));
+jest.mock('@react-native-masked-view/masked-view', () => {
+  const ReactModule = require('react');
+  return {
+    __esModule: true,
+    // Drop the mask element: a React element prop is not serializable here.
+    default: ({maskElement, ...props}) =>
+      ReactModule.createElement('MaskedView', props),
+  };
+});
+jest.mock('../src/hooks/motion', () => {
+  const {Animated} = require('react-native');
+  return {
+    useMotionAllowed: jest.fn(() => true),
+    useGentleTransition: jest.fn(() => new Animated.Value(1)),
+    useDecorativeLoop: jest.fn(() => new Animated.Value(0)),
+  };
+});
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({top: 24, bottom: 16, left: 0, right: 0}),
 }));
@@ -300,19 +325,178 @@ test.each([320, 360, 440])(
       `0 0 ${serviceWidth} 24`,
     );
     expect(control('home-map-phone-lines').props.viewBox).toBe(
-      `0 0 ${measuredWidth} 28`,
+      `0 0 ${measuredWidth} 34`,
     );
     expect(namespace[0]).toBeCloseTo(serviceWidth / 2);
     expect(namespace[3]).toBeCloseTo(serviceNodeWidth / 2);
     expect(namespace[6]).toBeCloseTo(serviceWidth - serviceNodeWidth / 2);
-    expect(namespace[3] + inset).toBeCloseTo(dps[0]);
-    expect(namespace[6] + inset).toBeCloseTo(hub[0]);
-    expect(dps[3]).toBeCloseTo(measuredWidth / 2 - phoneWidth / 4);
-    expect(hub[3]).toBeCloseTo(measuredWidth / 2 + phoneWidth / 4);
-    expect(dps[0]).toBeLessThan(dps[3]);
-    expect(hub[0]).toBeGreaterThan(hub[3]);
+    // Each route starts on its service center and ends on its phone quarter.
+    const dpsPhoneX = namespace[3] + inset;
+    const hubPhoneX = namespace[6] + inset;
+    const phoneLeftX = measuredWidth / 2 - phoneWidth / 4;
+    const phoneRightX = measuredWidth / 2 + phoneWidth / 4;
+    expect(dps[0]).toBeCloseTo(dpsPhoneX);
+    expect(hub[0]).toBeCloseTo(hubPhoneX);
+    expect(dps[dps.length - 2]).toBeCloseTo(phoneLeftX);
+    expect(hub[hub.length - 2]).toBeCloseTo(phoneRightX);
+    expect(dps[0]).toBeLessThan(dps[dps.length - 2]);
+    expect(hub[0]).toBeGreaterThan(hub[hub.length - 2]);
+    // The two routes are exact mirrors of each other about the map center.
+    expect(control('home-map-phone-dps-path').props.d).toBe(
+      channelPath(dpsPhoneX, phoneLeftX),
+    );
+    expect(control('home-map-phone-hub-path').props.d).toBe(
+      channelPath(hubPhoneX, phoneRightX),
+    );
+    expect(dpsPhoneX + hubPhoneX).toBeCloseTo(measuredWidth);
+    expect(phoneLeftX + phoneRightX).toBeCloseTo(measuredWidth);
+    // Neither route bends into a smile: it stays vertical, runs, then lands.
+    expect(dps[1]).toBe(1);
+    expect(dps[dps.length - 1]).toBe(33);
+    for (const path of [dps, hub]) {
+      for (let index = 1; index < path.length; index += 2)
+        expect(path[index]).toBeLessThanOrEqual(path[path.length - 1]);
+    }
+    // A caret on each end of each route marks the two-way connector.
+    for (const [id, from, to] of [
+      ['dps', dpsPhoneX, phoneLeftX],
+      ['hub', hubPhoneX, phoneRightX],
+    ]) {
+      const arrows = control(`home-map-phone-${id}-arrows`);
+      expect(arrows.props.d).toBe(caretPath(from, to));
+      expect(arrows.props.fill).toBe('none');
+      expect(arrows.props.strokeDasharray).toBeUndefined();
+    }
   },
 );
+
+test('draws only one solid two-way connector per service and keeps ADR dashed', () => {
+  render();
+  const solid = tree.root
+    .findAllByType('Path')
+    .filter(path => !path.props.strokeDasharray);
+  expect(control('home-map-namespace-path').props.strokeDasharray).toBe('4 3');
+  expect(solid).toHaveLength(4);
+  for (const path of solid) {
+    expect(path.props.stroke).toBe(palette(false).primary);
+    expect(path.props.strokeLinecap).toBe('round');
+    expect(path.props.strokeLinejoin).toBe('round');
+  }
+  // No route ever joins the phone to ADR.
+  expect(
+    tree.root.findAllByProps({testID: 'home-map-phone-adr-path'}),
+  ).toHaveLength(0);
+});
+
+test.each([false, true])(
+  'tints the phone as the device and ADR as the namespace in dark mode %s',
+  dark => {
+    useTheme.mockReturnValue({dark});
+    render();
+    const colors = palette(dark);
+    const background = id =>
+      Native.StyleSheet.flatten(control(id).props.style({pressed: false}))
+        .backgroundColor;
+    expect(background('home-node-phone')).toBe(colors.primary);
+    expect(background('home-node-adr')).toBe(colors.tints[1]);
+    expect(background('home-node-dps')).toBe(colors.surface);
+    expect(background('home-node-hub')).toBe(colors.surface);
+    for (const label of control('home-node-phone').findAllByType('Text'))
+      expect(Native.StyleSheet.flatten(label.props.style).color).toBe(
+        colors.onPrimary,
+      );
+  },
+);
+
+test('names the capability and the connection heading without a second product title', () => {
+  render();
+  expect(content()).toContain('IoT Plug and Play');
+  expect(content()).not.toContain('IOT PLUG AND PLAY');
+  expect(content()).not.toContain('Phone as a Device');
+  const heading = tree.root
+    .findAllByType('Text')
+    .find(node => node.props.accessibilityRole === 'header');
+  const style = Native.StyleSheet.flatten(heading.props.style);
+  expect(heading.props.children).toBe(text.Map);
+  expect(style.fontFamily).toBe(detailStyles.displayTitle.fontFamily);
+  // Android falls back to sans-serif when a weight is paired with the family.
+  expect(style.fontWeight).toBeUndefined();
+  expect(style.fontSize).toBe(detailStyles.displayTitle.fontSize);
+  expect(style.lineHeight).toBe(detailStyles.displayTitle.lineHeight);
+  dimensions = {...dimensions, width: 320, fontScale: 1.8};
+  render();
+  expect(
+    Native.StyleSheet.flatten(
+      tree.root
+        .findAllByType('Text')
+        .find(node => node.props.accessibilityRole === 'header').props.style,
+    ).fontSize,
+  ).toBe(detailStyles.displayTitle.fontSize);
+});
+
+test('explains the decorative light instead of claiming traffic', () => {
+  render();
+  expect(content()).toContain(text.FlowNote);
+  const legend = tree.root
+    .findAllByType('Text')
+    .find(node => node.props.accessibilityLabel?.includes(text.FlowNote));
+  expect(legend.props.children).toBe(`${text.MapLegend} ${text.FlowHint}`);
+  expect(legend.props.accessibilityLabel).not.toContain(text.FlowHint);
+  for (const claim of ['packets', 'throughput', 'delivery confirmation'])
+    expect(text.FlowNote).toContain(claim);
+  expect(text.FlowNote).toContain('not a persistent message path');
+  expect(text.MapLegend).toContain('Dashed');
+});
+
+test.each([
+  ['a real connection', {}, true],
+  ['simulation', {simulated: true}, false],
+  ['a reconnect in progress', {connecting: true}, false],
+  ['a reported error', {error: new ConnectionError('CONNECTION_LOST')}, false],
+  ['a client that reports no connection', {offline: true}, false],
+])('runs the decorative light only for %s', (_label, overrides, expected) => {
+  if (overrides.simulated) storage.simulated = true;
+  if (overrides.connecting) connection.connecting = true;
+  if (overrides.error) connection.error = overrides.error;
+  if (overrides.offline) connection.client.isConnected = jest.fn(() => false);
+  render();
+  expect(useDecorativeLoop).toHaveBeenLastCalledWith(expected);
+  expect(
+    tree.root.findAllByProps({testID: 'home-map-flow-hub'}).length > 0,
+  ).toBe(expected);
+  expect(connection.client.connect).not.toHaveBeenCalled();
+});
+
+test('suppresses the decorative light for a covering modal and an open panel', () => {
+  props.motionVisible = false;
+  render();
+  expect(useDecorativeLoop).toHaveBeenLastCalledWith(false);
+  props.motionVisible = true;
+  render();
+  expect(useDecorativeLoop).toHaveBeenLastCalledWith(true);
+  press('home-node-hub');
+  expect(useDecorativeLoop).toHaveBeenLastCalledWith(false);
+  expect(tree.root.findAllByProps({testID: 'home-map-flow-hub'})).toHaveLength(
+    0,
+  );
+  dismiss();
+  expect(useDecorativeLoop).toHaveBeenLastCalledWith(true);
+});
+
+test('animates only the Hub route and never DPS when the setup bypasses provisioning', () => {
+  storage.credentials = {
+    connectionString: `HostName=direct.azure-devices.net;DeviceId=phone;SharedAccessKey=${key}`,
+  };
+  render();
+  expect(control('home-map-flow-hub')).toBeDefined();
+  expect(tree.root.findAllByProps({testID: 'home-map-flow-dps'})).toHaveLength(
+    0,
+  );
+  expect(
+    tree.root.findAllByProps({testID: 'home-map-phone-dps-arrows'}),
+  ).toHaveLength(0);
+  expect(content()).toContain(text.DpsNotUsed);
+});
 
 test('uses actual map width for the direct-Hub compact threshold and rotation', () => {
   storage.credentials = {
@@ -637,6 +821,13 @@ test.each([
     expect(content()).toContain(text.NamespaceLinks);
     expect(content()).toContain(text.PhoneDpsPath);
     expect(content()).toContain(text.PhoneHubPath);
+    expect(
+      tree.root.findAllByProps({testID: 'home-map-phone-lines'}),
+    ).toHaveLength(0);
+    expect(
+      tree.root.findAllByProps({testID: 'home-map-flow-hub'}),
+    ).toHaveLength(0);
+    expect(useDecorativeLoop).toHaveBeenLastCalledWith(false);
     for (const node of ['phone', 'dps', 'hub', 'adr']) {
       press(`home-node-${node}`);
       expect(control('home-panel-close')).toBeDefined();

@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import Svg, {Path} from 'react-native-svg';
 import {Icon} from '@rneui/themed';
+import AppBackground from '../components/appBackground';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useIsFocused} from '@react-navigation/native';
 import {IoTCContext} from '../contexts/iotc';
@@ -33,7 +34,8 @@ import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
 import {projectSetup} from './setupProjection';
 import {ExperienceStrings} from './strings';
-import {useGentleTransition} from '../hooks/motion';
+import ChannelFlow, {Channel} from './ChannelFlow';
+import {useDecorativeLoop, useGentleTransition} from '../hooks/motion';
 
 export type WorkflowHomeProps = {
   sensors: ItemProps[];
@@ -41,6 +43,8 @@ export type WorkflowHomeProps = {
   onTelemetry(): void;
   onActivity(): void;
   communication?: React.ReactNode;
+  /** Home sets this false while a native modal covers it; focus alone cannot see that. */
+  motionVisible?: boolean;
 };
 
 type Node = 'phone' | 'dps' | 'hub' | 'adr';
@@ -61,6 +65,7 @@ export default function WorkflowHome({
   onTelemetry,
   onActivity,
   communication,
+  motionVisible = true,
 }: WorkflowHomeProps) {
   const {client, error, connecting} = useContext(IoTCContext);
   const {credentials, simulated, azureContext, azureContextError} =
@@ -103,13 +108,30 @@ export default function WorkflowHome({
     sensor => sensor.enabled && sensor.availability === 'unavailable',
   );
   const focused = useIsFocused();
+  const onStage = focused && panel === null && motionVisible;
+  // Decorative light only for a real, current, non-simulated connection.
+  const connected = Boolean(
+    !simulated &&
+      !connecting &&
+      !error &&
+      typeof client?.isConnected === 'function' &&
+      client.isConnected(),
+  );
+  const flowing = connected && onStage && !stacked;
+  const flowProgress = useDecorativeLoop(flowing);
+  const channels: Channel[] = [
+    ...(projection.mode !== 'hub'
+      ? [{id: 'dps' as const, from: dpsPhoneX, to: phoneLeftX}]
+      : []),
+    {id: 'hub' as const, from: hubPhoneX, to: phoneRightX},
+  ];
   const mapArrival = useGentleTransition(
     `${stacked}:${projection.mode}`,
-    focused && panel === null,
+    onStage,
   );
   const attentionArrival = useGentleTransition(
     `${connectionAttention}:${sensorAttention}`,
-    focused && panel === null && (connectionAttention || sensorAttention),
+    onStage && (connectionAttention || sensorAttention),
   );
   const namespaceLineStyle = {
     opacity: mapArrival.interpolate({
@@ -184,21 +206,30 @@ export default function WorkflowHome({
         key === 'adr' && !stacked && styles.namespaceNode,
         {
           backgroundColor: pressed
-            ? colors.border
+            ? key === 'phone'
+              ? colors.positive
+              : colors.border
             : key === 'phone'
-            ? colors.tints[0]
+            ? colors.primary
+            : key === 'adr'
+            ? colors.tints[1]
             : colors.surface,
           borderColor: key === 'phone' ? colors.primary : colors.controlBorder,
         },
       ]}>
-      <Text style={[styles.nodeTitle, {color: colors.text}]}>
+      <Text
+        style={[
+          styles.nodeTitle,
+          {color: key === 'phone' ? colors.onPrimary : colors.text},
+        ]}>
         {text.Nodes[key].Title}
       </Text>
       <Text
         style={[
           detailStyles.supporting,
           styles.nodeSubtitle,
-          {color: colors.muted},
+          key === 'phone' && styles.deviceSubtitle,
+          {color: key === 'phone' ? colors.onPrimary : colors.muted},
         ]}>
         {key === 'dps' && projection.mode === 'hub'
           ? text.DpsNotUsed
@@ -523,7 +554,7 @@ export default function WorkflowHome({
   };
 
   return (
-    <View style={[styles.root, {backgroundColor: colors.background}]}>
+    <AppBackground style={styles.root}>
       <ScrollView
         testID="workflow-home-content"
         accessibilityElementsHidden={panel !== null}
@@ -552,8 +583,16 @@ export default function WorkflowHome({
             {backgroundColor: colors.surface, borderColor: colors.border},
           ]}>
           <Text
+            style={[
+              detailStyles.supporting,
+              styles.kicker,
+              {color: colors.primary},
+            ]}>
+            {text.Capability}
+          </Text>
+          <Text
             accessibilityRole="header"
-            style={[detailStyles.sectionTitle, {color: colors.text}]}>
+            style={[detailStyles.displayTitle, {color: colors.text}]}>
             {text.Map}
           </Text>
           {note(text.MapHint)}
@@ -604,41 +643,16 @@ export default function WorkflowHome({
               </View>
             </View>
             {!stacked && (
-              <Animated.View pointerEvents="none" style={phoneLineStyle}>
-                <Svg
-                  testID="home-map-phone-lines"
-                  height={28}
-                  width="100%"
-                  viewBox={`0 0 ${measuredWidth} 28`}
-                  preserveAspectRatio="none"
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants">
-                  {projection.mode !== 'hub' && (
-                    <Path
-                      testID="home-map-phone-dps-path"
-                      d={`M${dpsPhoneX} 0V14H${phoneLeftX}V28M${
-                        dpsPhoneX - 4
-                      } 5L${dpsPhoneX} 0L${dpsPhoneX + 4} 5M${
-                        phoneLeftX - 4
-                      } 23L${phoneLeftX} 28L${phoneLeftX + 4} 23`}
-                      stroke={colors.primary}
-                      fill="none"
-                      strokeWidth={1.5}
-                    />
-                  )}
-                  <Path
-                    testID="home-map-phone-hub-path"
-                    d={`M${hubPhoneX} 0V14H${phoneRightX}V28M${
-                      hubPhoneX - 4
-                    } 5L${hubPhoneX} 0L${hubPhoneX + 4} 5M${
-                      phoneRightX - 4
-                    } 23L${phoneRightX} 28L${phoneRightX + 4} 23`}
-                    stroke={colors.primary}
-                    fill="none"
-                    strokeWidth={1.5}
-                  />
-                </Svg>
-              </Animated.View>
+              <ChannelFlow
+                width={measuredWidth}
+                channels={channels}
+                color={colors.primary}
+                // The light must read brighter than its route in either theme.
+                glow={dark ? colors.positive : colors.positiveSurface}
+                flowing={flowing}
+                progress={flowProgress}
+                style={phoneLineStyle}
+              />
             )}
             {stacked && (
               <View
@@ -656,9 +670,9 @@ export default function WorkflowHome({
           <Text
             accessibilityLabel={`${text.NamespaceLinks}. ${
               projection.mode === 'hub' ? text.DpsNotUsed : text.PhoneDpsPath
-            }. ${text.PhoneHubPath}. ${text.MapAuthority}`}
+            }. ${text.PhoneHubPath}. ${text.FlowNote}. ${text.MapAuthority}`}
             style={[detailStyles.supporting, {color: colors.muted}]}>
-            {text.MapLegend}
+            {`${text.MapLegend} ${text.FlowHint}`}
           </Text>
         </View>
         {(connectionAttention || sensorAttention) && (
@@ -810,13 +824,15 @@ export default function WorkflowHome({
           </ScrollView>
         </View>
       </Modal>
-    </View>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
   root: {flex: 1},
   content: {paddingTop: 16, gap: 12},
+  kicker: {textTransform: 'none', letterSpacing: 0.6, marginBottom: -4},
+  deviceSubtitle: {opacity: 0.88},
   card: {borderRadius: 20, borderWidth: 1, padding: 14, gap: 10},
   map: {width: '100%', maxWidth: 440, alignSelf: 'center'},
   azure: {

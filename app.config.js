@@ -1,8 +1,8 @@
 const fs = require('node:fs');
-const displayFont =
-  './node_modules/@expo-google-fonts/quicksand/700Bold/Quicksand_700Bold.ttf';
+const path = require('node:path');
+const displayFont = './src/assets/fonts/PAADFraunces-Medium.ttf';
 const fontLicense = fs.readFileSync(
-  require.resolve('@expo-google-fonts/quicksand/LICENSE_FONT'),
+  path.join(__dirname, 'LICENSE.fraunces'),
   'utf8',
 );
 const isCI =
@@ -87,7 +87,11 @@ module.exports = ({config}) => ({
     ],
     [
       'expo-camera',
-      {cameraPermission, microphonePermission: false, recordAudioAndroid: false},
+      {
+        cameraPermission,
+        microphonePermission: false,
+        recordAudioAndroid: false,
+      },
     ],
     [
       'expo-image-picker',
@@ -124,7 +128,14 @@ module.exports = ({config}) => ({
     ],
     [
       'react-native-permissions',
-      {iosPermissions: ['Bluetooth', 'Camera', 'LocationWhenInUse', 'PhotoLibrary']},
+      {
+        iosPermissions: [
+          'Bluetooth',
+          'Camera',
+          'LocationWhenInUse',
+          'PhotoLibrary',
+        ],
+      },
     ],
     [
       'expo-font',
@@ -136,9 +147,9 @@ module.exports = ({config}) => ({
             './node_modules/react-native-vector-icons/Fonts/MaterialIcons.ttf',
             './node_modules/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf',
             {
-              fontFamily: 'Quicksand-Bold',
+              fontFamily: 'PAADFraunces-Medium',
               fontDefinitions: [
-                {path: displayFont, weight: 700, style: 'normal'},
+                {path: displayFont, weight: 500, style: 'normal'},
               ],
             },
           ],
