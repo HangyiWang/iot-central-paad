@@ -22,6 +22,7 @@ jest.mock('../src/hooks', () => ({
 }));
 jest.mock('@rneui/themed', () => ({Icon: 'Icon', Text: 'Text'}));
 jest.mock('../src/Logs', () => 'DiagnosticsViewer');
+jest.mock('@react-navigation/native', () => ({useIsFocused: () => true}));
 
 const event = (id, detail) => ({
   id,

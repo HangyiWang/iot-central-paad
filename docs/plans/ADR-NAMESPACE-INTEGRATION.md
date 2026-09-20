@@ -301,6 +301,43 @@ registry association was retained, not newly created. The earlier intermittent
 iOS missing-element failure remains unexplained despite subsequent successful
 native acceptance.
 
+#### Native detail refinement (2026-09-20)
+
+The follow-on refinement keeps the accepted runtime, connection flows, native
+selectors and source/protocol boundaries. Home now uses **Connection** and
+**Latest observations**, with centered map labels and a brief connector,
+connection-emblem and attention-icon settle. This is decorative arrival motion,
+not animated packets, a live topology audit or evidence of Azure traffic.
+
+Sensor and technical-name actions share a quieter card footer. Activity uses a
+neutral Observations/Diagnostics selector, subordinate All/Issues chips and
+borderless disclosure glyphs. Smaller painted controls retain separate native
+48-point touch frames, accessibility state and wrapping text. Bluetooth waiting
+and unavailable states are integrated into scrollable page content rather than
+a floating loader; empty results no longer keep pull-to-refresh spinning.
+Registration groups a restrained scan action with a quiet manual choice.
+
+Motion shares a reference-counted native accessibility/app-state subscription.
+Decorative transitions are finite, non-interaction native-driver transforms or
+opacity changes, and stop when hidden, backgrounded or Reduce Motion is enabled.
+The Bluetooth indicator represents waiting for advertisements, not measured
+progress, and becomes a still glyph under Reduce Motion.
+
+Claude Opus 5/high provided the scoped design critique and Bluetooth/Registration
+implementation. The treatment follows Apple's guidance on
+[motion](https://developer.apple.com/design/human-interface-guidelines/motion),
+[buttons](https://developer.apple.com/design/human-interface-guidelines/buttons),
+[segmented controls](https://developer.apple.com/design/human-interface-guidelines/segmented-controls)
+and [loading](https://developer.apple.com/design/human-interface-guidelines/loading):
+quiet hierarchy, useful feedback and unchanged accessible reach.
+
+Native delivery for this refinement is pending. The owner renewed narrowly
+scoped consent to reuse the same two retained individual enrollments for this
+pass and corrective runs, then update Windows in place. Earlier native
+acceptance above does not establish acceptance of these changed screens.
+No new Azure resources, IAM privileges, raw diagnostic capture or physical-phone
+signing are included.
+
 ### Completed simulator acceptance (2026-09-18)
 
 The foundation's ordinary locked build/startup lanes passed on Android and iOS

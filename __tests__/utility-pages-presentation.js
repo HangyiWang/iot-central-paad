@@ -1,6 +1,13 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {FlatList, ScrollView, StyleSheet} from 'react-native';
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  AppState,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+} from 'react-native';
 import FileUpload from '../src/FileUpload';
 import {BluetoothPage} from '../src/bluetooth/Bluetooth';
 import {LogsContext} from '../src/contexts/logs';
@@ -190,7 +197,13 @@ test('Bluetooth does not duplicate the app header and keeps scanning failures ex
   expect(visibleText()).toContain('Looking for devices');
   act(() => manager.observeAdvertisements.mock.calls[0][1]());
   expect(visibleText()).toContain('Bluetooth unavailable');
-  expect(view.root.findByType(FlatList).props.refreshing).toBe(false);
+  // The refresh control does not infer progress from an empty list.
+  const list = view.root.findByType(FlatList);
+  expect(list.props.refreshing).toBeUndefined();
+  expect(list.props.onRefresh).toBeUndefined();
+  expect(list.props.refreshControl.props.refreshing).toBe(false);
+  act(() => list.props.refreshControl.props.onRefresh());
+  expect(manager.resetDeviceList).toHaveBeenCalledTimes(1);
   act(() => view.unmount());
   view = undefined;
   expect(remove).toHaveBeenCalledTimes(1);
@@ -222,9 +235,9 @@ test('Bluetooth scanning control meets the minimum touch target and the detail s
         node.props.accessibilityLabel === 'Scan again',
     )
     .find(node => node.props.onPress);
-  const target = StyleSheet.flatten(scan.props.style);
-  expect(target.width).toBeGreaterThanOrEqual(44);
-  expect(target.height).toBeGreaterThanOrEqual(44);
+  const target = StyleSheet.flatten(scan.props.style({pressed: false}));
+  expect(target.minWidth).toBeGreaterThanOrEqual(48);
+  expect(target.minHeight).toBeGreaterThanOrEqual(48);
   act(() => scan.props.onPress());
   expect(manager.resetDeviceList).toHaveBeenCalledTimes(1);
 
@@ -233,9 +246,118 @@ test('Bluetooth scanning control meets the minimum touch target and the detail s
       <Detail route={{params: {deviceId: 'abc', deviceName: 'Test device'}}} />,
     );
   });
+  // The wait state belongs to the page, not to an overlay above it.
+  expect(view.root.findAllByType('Loader')).toHaveLength(0);
+  const page = view.root.findByType(ScrollView);
+  expect(StyleSheet.flatten(page.props.contentContainerStyle)).toMatchObject({
+    flexGrow: 1,
+    paddingVertical: 16,
+  });
+  expect(StyleSheet.flatten(page.props.style).height).toBeUndefined();
+  expect(
+    view.root.findAllByProps({testID: 'bluetooth-detail-status'}).length,
+  ).toBeGreaterThan(0);
+  expect(visibleText()).toContain('Waiting for this device');
+  expect(visibleText()).toContain('No readings yet');
+  expect(visibleText()).toContain(
+    'Keep this device nearby and powered on. Readings appear when it advertises.',
+  );
   act(() => manager.observeAdvertisements.mock.calls.slice(-1)[0][1]());
   expect(visibleText()).toContain('Bluetooth unavailable');
   expect(visibleText()).toContain(
     'Enable Bluetooth and allow Nearby Devices access in Settings.',
   );
+  expect(view.root.findAllByType('Loader')).toHaveLength(0);
+  expect(view.root.findAllByType(ScrollView)).toHaveLength(1);
+});
+
+test('the busy indicator waits for the motion preference and stops once advertisements arrive', async () => {
+  const remove = jest.fn();
+  const manager = {
+    observeAdvertisements: jest.fn(() => ({remove})),
+    setResetDeviceListCallback: jest.fn(),
+    resetDeviceList: jest.fn(),
+  };
+  IotcBleManager.getInstance.mockReturnValue(manager);
+  const previousState = AppState.currentState;
+  AppState.currentState = 'active';
+  jest.spyOn(AppState, 'addEventListener').mockReturnValue({remove: jest.fn()});
+  jest
+    .spyOn(AccessibilityInfo, 'addEventListener')
+    .mockReturnValue({remove: jest.fn()});
+  jest
+    .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+    .mockResolvedValue(false);
+  try {
+    act(() => {
+      view = renderer.create(<BluetoothPage />);
+    });
+    const List = view.root.findAllByType('BluetoothScreen')[0].props.component;
+    act(() => {
+      view.update(
+        <List navigation={{addListener: jest.fn(() => jest.fn())}} />,
+      );
+    });
+    const indicators = () => view.root.findAllByType(ActivityIndicator);
+    // Reduce Motion is unknown on the first commit, so the row stays still.
+    expect(indicators()).toHaveLength(0);
+    expect(visibleText()).toContain('Looking for devices');
+    await act(async () => {});
+    expect(indicators()).toHaveLength(1);
+    act(() =>
+      manager.observeAdvertisements.mock.calls.slice(-1)[0][0]({
+        id: 'device-1',
+        name: 'Observed device',
+        rssi: -40,
+      }),
+    );
+    // An observed advertisement ends the wait; scanning continues without a spinner.
+    expect(indicators()).toHaveLength(0);
+    expect(visibleText()).toContain('Listening for advertisements');
+    expect(visibleText()).not.toContain('Looking for devices');
+    act(() => manager.observeAdvertisements.mock.calls.slice(-1)[0][1]());
+    expect(indicators()).toHaveLength(0);
+    expect(visibleText()).toContain('Bluetooth unavailable');
+  } finally {
+    AppState.currentState = previousState;
+  }
+});
+
+test('Reduce Motion replaces the busy indicator with a still glyph', async () => {
+  const remove = jest.fn();
+  const manager = {
+    observeAdvertisements: jest.fn(() => ({remove})),
+    setResetDeviceListCallback: jest.fn(),
+    resetDeviceList: jest.fn(),
+  };
+  IotcBleManager.getInstance.mockReturnValue(manager);
+  const previousState = AppState.currentState;
+  AppState.currentState = 'active';
+  jest.spyOn(AppState, 'addEventListener').mockReturnValue({remove: jest.fn()});
+  jest
+    .spyOn(AccessibilityInfo, 'addEventListener')
+    .mockReturnValue({remove: jest.fn()});
+  jest
+    .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+    .mockResolvedValue(true);
+  try {
+    act(() => {
+      view = renderer.create(<BluetoothPage />);
+    });
+    const List = view.root.findAllByType('BluetoothScreen')[0].props.component;
+    act(() => {
+      view.update(
+        <List navigation={{addListener: jest.fn(() => jest.fn())}} />,
+      );
+    });
+    await act(async () => {});
+    expect(view.root.findAllByType(ActivityIndicator)).toHaveLength(0);
+    const status = view.root.findAllByProps({
+      testID: 'bluetooth-scan-status',
+    })[0];
+    expect(status.findAllByType('Icon').length).toBeGreaterThan(0);
+    expect(visibleText()).toContain('Looking for devices');
+  } finally {
+    AppState.currentState = previousState;
+  }
 });

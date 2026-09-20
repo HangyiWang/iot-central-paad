@@ -213,60 +213,65 @@ export function Card(
       ) : (
         content
       )}
-      {onToggle && (
-        <Pressable
-          testID={`sensor-toggle-${accentKey}`}
-          accessibilityRole="switch"
-          accessibilityLabel={`${
-            enabled ? Strings.Core.DisableSensor : Strings.Core.EnableSensor
-          }: ${otherProps.title}`}
-          accessibilityState={{checked: enabled}}
-          onPress={onToggle}
-          style={[
-            detailStyles.action,
-            stylesForContent.toggle,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.controlBorder,
-            },
-          ]}>
-          <Icon
-            name={enabled ? 'toggle-switch' : 'toggle-switch-off-outline'}
-            type="material-community"
-            color={colors.primary}
-            size={28}
-            accessible={false}
-          />
-          <Text
-            style={[
-              detailStyles.actionLabel,
-              stylesForContent.actionLabel,
-              {color: colors.primary},
-            ]}>
-            {enabled ? Strings.Core.DisableSensor : Strings.Core.EnableSensor}
-          </Text>
-        </Pressable>
-      )}
-      {technicalName && (
-        <View style={stylesForContent.technical}>
-          <DetailsAction
-            id={`property-technical-${accentKey}`}
-            label={
-              technicalVisible
-                ? ToolStrings.Properties.TechnicalHide
-                : ToolStrings.Properties.TechnicalShow
-            }
-            expanded={technicalVisible}
-            onPress={() => setTechnicalVisible(current => !current)}
-          />
-          {technicalVisible && (
-            <Text
-              testID={`property-name-${accentKey}`}
-              selectable
-              style={[detailStyles.value, {color: colors.text}]}>
-              {technicalName}
-            </Text>
+      {(onToggle || technicalName) && (
+        <View
+          style={[stylesForContent.footer, {borderTopColor: colors.border}]}>
+          {onToggle && (
+            <Pressable
+              testID={`sensor-toggle-${accentKey}`}
+              accessibilityRole="switch"
+              accessibilityLabel={`${
+                enabled ? Strings.Core.DisableSensor : Strings.Core.EnableSensor
+              }: ${otherProps.title}`}
+              accessibilityState={{checked: enabled}}
+              onPress={onToggle}
+              style={({pressed}) => [
+                stylesForContent.toggle,
+                pressed && stylesForContent.pressed,
+              ]}>
+              <Icon
+                name={enabled ? 'toggle-switch' : 'toggle-switch-off-outline'}
+                type="material-community"
+                color={enabled ? colors.primary : colors.muted}
+                size={20}
+                accessible={false}
+              />
+              <Text
+                style={[stylesForContent.actionLabel, {color: colors.primary}]}>
+                {enabled
+                  ? Strings.Core.DisableSensor
+                  : Strings.Core.EnableSensor}
+              </Text>
+            </Pressable>
           )}
+          {technicalName && (
+            <DetailsAction
+              id={`property-technical-${accentKey}`}
+              label={
+                technicalVisible
+                  ? ToolStrings.Properties.TechnicalHide
+                  : ToolStrings.Properties.TechnicalShow
+              }
+              expanded={technicalVisible}
+              variant="quiet"
+              onPress={() => setTechnicalVisible(current => !current)}
+            />
+          )}
+        </View>
+      )}
+      {technicalName && technicalVisible && (
+        <View
+          style={[stylesForContent.technical, {backgroundColor: colors.inset}]}>
+          <Text
+            testID={`property-name-${accentKey}`}
+            selectable
+            style={[
+              detailStyles.monospace,
+              stylesForContent.identifier,
+              {color: colors.text},
+            ]}>
+            {technicalName}
+          </Text>
         </View>
       )}
     </View>
@@ -291,15 +296,29 @@ const stylesForContent = StyleSheet.create({
   },
   statuses: {gap: 2},
   label: {fontSize: 14, fontWeight: '600'},
-  actionLabel: {flexShrink: 1},
-  toggle: {
+  actionLabel: {fontSize: 13, lineHeight: 18, fontWeight: '600', flexShrink: 1},
+  footer: {
     marginTop: 12,
+    paddingTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: 20,
+    rowGap: 4,
+  },
+  toggle: {
+    minHeight: 48,
+    minWidth: 48,
+    maxWidth: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
+    paddingVertical: 10,
+    gap: 6,
   },
-  technical: {marginTop: 12, gap: 8},
+  pressed: {opacity: 0.7},
+  technical: {marginTop: 4, padding: 10, borderRadius: 12},
+  identifier: {fontSize: 13, lineHeight: 20},
 });
 
 const Value = React.memo<{

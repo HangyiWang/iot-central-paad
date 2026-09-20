@@ -37,6 +37,8 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({top: 24, bottom: 16, left: 0, right: 0}),
 }));
 
+jest.mock('@react-navigation/native', () => ({useIsFocused: () => true}));
+
 const text = ExperienceStrings.Home;
 const key = Buffer.alloc(32, 7).toString('base64');
 const groupKey = Buffer.alloc(32, 9).toString('base64');
@@ -132,6 +134,33 @@ const dismiss = () => {
     jest.runOnlyPendingTimers();
   });
 };
+
+test.each([1, 1.8])(
+  'centers every map label without truncating at font scale %s',
+  fontScale => {
+    dimensions = {...dimensions, fontScale};
+    render();
+    for (const name of ['adr', 'dps', 'hub', 'phone']) {
+      const button = control(`home-node-${name}`);
+      expect(
+        Native.StyleSheet.flatten(button.props.style({pressed: false})),
+      ).toMatchObject({
+        minHeight: 60,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 2,
+      });
+      for (const label of button.findAllByType('Text')) {
+        expect(Native.StyleSheet.flatten(label.props.style).textAlign).toBe(
+          'center',
+        );
+        expect(label.props.numberOfLines).toBeUndefined();
+        expect(label.props.allowFontScaling).not.toBe(false);
+      }
+    }
+    expect(content()).toContain('Latest observations');
+  },
+);
 
 beforeEach(() => {
   jest.useFakeTimers();

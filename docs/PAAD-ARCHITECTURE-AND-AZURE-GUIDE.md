@@ -355,7 +355,7 @@ converting every measurement to text. This is not a full cloud-model validator.
 
 | Tool / channel | A beginner's next step | Actual behavior and limit |
 | --- | --- | --- |
-| **Home > Connection map** | Tap Phone, DPS, IoT Hub, or ADR. | Explains provided setup, assignment, and service relationships. It is not a live audit of Azure links or permissions. |
+| **Home > Connection** | Tap Phone, DPS, IoT Hub, or ADR. | Explains provided setup, assignment, and service relationships. It is not a live audit of Azure links or permissions. |
 | **Explore > Telemetry** | Inspect readings, source controls, and charts; enable/disable a source deliberately. | Battery, accelerometer, gyroscope, magnetometer, barometer, and geolocation use available hardware/permissions. Enabled, available, and having a reading are different states. |
 | **Settings > Delivery interval** | Choose a suitable interval; default is five seconds. | Changes sensor delivery scheduling. It is not a writable model property or a cloud-delivery guarantee. |
 | **Explore > Properties > Device property** | Enter harmless sample text, then **Submit value**. | Sends `device_info.readOnlyProp`: editable on the phone, read-only from the cloud's point of view. Unsaved drafts are local only. |

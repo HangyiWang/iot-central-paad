@@ -12,6 +12,12 @@ jest.mock('../src/hooks', () => ({
 jest.mock('@rneui/themed', () => ({Icon: 'Icon', Text: 'Text'}));
 
 let view;
+const controlStyle = node =>
+  StyleSheet.flatten(
+    typeof node.props.style === 'function'
+      ? node.props.style({pressed: false})
+      : node.props.style,
+  );
 const visibleText = () =>
   view.root
     .findAllByType('Text')
@@ -54,7 +60,7 @@ test('renders a chronological virtualized feed with stable keys and selectable i
   expect(list().keyExtractor(events[1])).toBe('21');
   for (const id of ['logs-filter-all', 'logs-filter-issues']) {
     expect(
-      StyleSheet.flatten(view.root.findAllByProps({testID: id})[0].props.style),
+      controlStyle(view.root.findAllByProps({testID: id})[0]),
     ).toMatchObject({minWidth: 48, minHeight: 48});
   }
   expect(
@@ -88,9 +94,7 @@ test('an event shows a severity badge and expands the exact selectable payload',
       .accessibilityLabel,
   ).toContain('View details');
   expect(
-    StyleSheet.flatten(
-      view.root.findAllByProps({testID: 'log-toggle-42'})[0].props.style,
-    ),
+    controlStyle(view.root.findAllByProps({testID: 'log-toggle-42'})[0]),
   ).toMatchObject({minWidth: 48, minHeight: 48});
   expect(view.root.findAllByProps({testID: 'log-payload-42'})).toHaveLength(0);
   act(() => press('log-toggle-42'));

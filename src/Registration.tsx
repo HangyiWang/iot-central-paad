@@ -41,6 +41,8 @@ import {IoTCContext, StorageContext} from 'contexts';
 import {CredentialForm} from './onboarding/manual';
 import {DeviceCredentials} from './connection';
 import RegistrationActions from './components/registrationActions';
+import DetailsAction from './components/detailsAction';
+import {palette} from './theme/palette';
 
 const screens = RegistrationScreens;
 type RegistrationRoutes = Record<
@@ -189,9 +191,11 @@ function QRCodeScreen({onConnected}: {onConnected(): void}) {
               }
             />
           )}
-          <Button
-            title={Strings.Registration.QRCode.Manually}
-            testID="registration-manual"
+          <DetailsAction
+            id="registration-manual"
+            label={Strings.Registration.QRCode.Manually}
+            icon="keyboard-outline"
+            block
             onPress={async () => {
               await cancel();
               navigation.replace(screens.MANUAL);
@@ -306,15 +310,9 @@ function EmptyClient() {
           }
         />
       )}
-      <Button
-        testID="registration-scan"
-        title={Strings.Registration.QRCode.Scan}
-        onPress={() => navigation.navigate(screens.QR)}
-      />
-      <Button
-        title={Strings.Registration.QRCode.Manually}
-        testID="registration-manual"
-        onPress={() => navigation.navigate(screens.MANUAL)}
+      <ConnectionChoices
+        onScan={() => navigation.navigate(screens.QR)}
+        onManual={() => navigation.navigate(screens.MANUAL)}
       />
       <Text>
         {Strings.Registration.Footer}
@@ -327,9 +325,56 @@ function EmptyClient() {
   );
 }
 
+/** One restrained scan action grouped with a quiet manual entry of equal reach. */
+function ConnectionChoices({
+  onScan,
+  onManual,
+}: {
+  onScan(): void;
+  onManual(): void;
+}) {
+  const {dark} = useTheme();
+  const colors = palette(dark);
+  return (
+    <View
+      testID="registration-choices"
+      style={[
+        styles.choices,
+        {backgroundColor: colors.surface, borderColor: colors.border},
+      ]}>
+      <DetailsAction
+        id="registration-scan"
+        label={Strings.Registration.QRCode.Scan}
+        icon="qrcode-scan"
+        variant="primary"
+        block
+        onPress={onScan}
+      />
+      <DetailsAction
+        id="registration-manual"
+        label={Strings.Registration.QRCode.Manually}
+        variant="quiet"
+        block
+        onPress={onManual}
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: {flex: 1},
-  container: {flexGrow: 1, justifyContent: 'space-around', padding: 20},
+  container: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    padding: 20,
+    gap: 20,
+  },
+  choices: {
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 12,
+    gap: 4,
+  },
   manual: {padding: 20, paddingBottom: 40},
   scannerFooter: {padding: 16, gap: 12, alignSelf: 'stretch'},
   intro: {marginBottom: 20},

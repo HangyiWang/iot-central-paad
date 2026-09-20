@@ -1,6 +1,6 @@
 export const ExperienceStrings = {
   Home: {
-    Map: 'Connection map',
+    Map: 'Connection',
     MapHint: 'Tap a node to understand its role and this setup.',
     MapLegend: 'Solid: phone calls. Dashed: namespace links.',
     MapAuthority:
@@ -136,7 +136,7 @@ export const ExperienceStrings = {
     ConnectionAttentionHint: 'Review the reported connection error in Details.',
     SensorAttention: 'An enabled sensor is unavailable',
     SensorAttentionHint: 'Review enabled sources in Telemetry.',
-    Communication: 'What this app observed',
+    Communication: 'Latest observations',
     CommunicationEmpty: 'No communication observations are available here.',
     Activity: 'View Activity',
   },

@@ -5,6 +5,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {
   AccessibilityState,
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -33,6 +34,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import AzureContextPanel from './azureContextPanel';
 import DetailsAction from './detailsAction';
 import DetailsRow from './detailsRow';
+import {useGentleTransition} from '../hooks/motion';
 
 export default function ConnectionSummary({
   onManualConnection,
@@ -81,6 +83,10 @@ export default function ConnectionSummary({
   }, [client]);
   const text = Strings.Connection.Summary;
   const online = !simulated && connected;
+  const connectionEntrance = useGentleTransition(
+    online,
+    online && !details && !loading,
+  );
   const emblemColor = online
     ? appearance.positive
     : error && !loading && !simulated
@@ -184,7 +190,7 @@ export default function ConnectionSummary({
         <View
           testID="connection-status-group"
           style={[styles.statusGroup, stacked && styles.stackedGroup]}>
-          <View
+          <Animated.View
             testID="connection-status-emblem"
             accessible={false}
             accessibilityElementsHidden
@@ -195,6 +201,18 @@ export default function ConnectionSummary({
                 backgroundColor: online
                   ? appearance.positiveSurface
                   : appearance.inset,
+                opacity: connectionEntrance.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.72, 1],
+                }),
+                transform: [
+                  {
+                    scale: connectionEntrance.interpolate({
+                      inputRange: [0, 0.6, 1],
+                      outputRange: [0.96, 1.04, 1],
+                    }),
+                  },
+                ],
               },
             ]}>
             <Icon
@@ -213,7 +231,7 @@ export default function ConnectionSummary({
                 },
               ]}
             />
-          </View>
+          </Animated.View>
           <View style={styles.statusContent}>
             <Text
               testID="connection-status"

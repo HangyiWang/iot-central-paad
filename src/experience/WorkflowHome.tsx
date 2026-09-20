@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import {
   AccessibilityInfo,
+  Animated,
   findNodeHandle,
   Modal,
   Platform,
@@ -19,6 +20,7 @@ import {
 import Svg, {Path} from 'react-native-svg';
 import {Icon} from '@rneui/themed';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useIsFocused} from '@react-navigation/native';
 import {IoTCContext} from '../contexts/iotc';
 import {StorageContext} from '../contexts/storage';
 import {useTheme} from '../hooks';
@@ -31,6 +33,7 @@ import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
 import {projectSetup} from './setupProjection';
 import {ExperienceStrings} from './strings';
+import {useGentleTransition} from '../hooks/motion';
 
 export type WorkflowHomeProps = {
   sensors: ItemProps[];
@@ -99,6 +102,43 @@ export default function WorkflowHome({
   const sensorAttention = sensors.some(
     sensor => sensor.enabled && sensor.availability === 'unavailable',
   );
+  const focused = useIsFocused();
+  const mapArrival = useGentleTransition(
+    `${stacked}:${projection.mode}`,
+    focused && panel === null,
+  );
+  const attentionArrival = useGentleTransition(
+    `${connectionAttention}:${sensorAttention}`,
+    focused && panel === null && (connectionAttention || sensorAttention),
+  );
+  const namespaceLineStyle = {
+    opacity: mapArrival.interpolate({
+      inputRange: [0, 0.55, 1],
+      outputRange: [0.35, 0.85, 0.85],
+    }),
+    transform: [
+      {
+        translateY: mapArrival.interpolate({
+          inputRange: [0, 0.55, 1],
+          outputRange: [-3, 0, 0],
+        }),
+      },
+    ],
+  };
+  const phoneLineStyle = {
+    opacity: mapArrival.interpolate({
+      inputRange: [0, 0.25, 1],
+      outputRange: [0.5, 0.6, 1],
+    }),
+    transform: [
+      {
+        translateY: mapArrival.interpolate({
+          inputRange: [0, 0.25, 1],
+          outputRange: [-3, -3, 0],
+        }),
+      },
+    ],
+  };
 
   const finishClose = useCallback(() => {
     const action = afterClose.current;
@@ -154,7 +194,12 @@ export default function WorkflowHome({
       <Text style={[styles.nodeTitle, {color: colors.text}]}>
         {text.Nodes[key].Title}
       </Text>
-      <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+      <Text
+        style={[
+          detailStyles.supporting,
+          styles.nodeSubtitle,
+          {color: colors.muted},
+        ]}>
         {key === 'dps' && projection.mode === 'hub'
           ? text.DpsNotUsed
           : text.Nodes[key].Subtitle}
@@ -185,17 +230,34 @@ export default function WorkflowHome({
           borderColor: colors.controlBorder,
         },
       ]}>
-      <View
+      <Animated.View
         accessible={false}
         accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants">
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          styles.attentionIcon,
+          {
+            backgroundColor:
+              id === 'home-attention-connection'
+                ? colors.dangerSurface
+                : colors.tints[3],
+            transform: [
+              {
+                scale: attentionArrival.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.92, 1],
+                }),
+              },
+            ],
+          },
+        ]}>
         <Icon
           name="alert-outline"
           type="material-community"
-          size={22}
+          size={18}
           color={colors.text}
         />
-      </View>
+      </Animated.View>
       <View style={styles.attentionBody}>
         <Text style={[detailStyles.actionLabel, {color: colors.text}]}>
           {label}
@@ -494,6 +556,7 @@ export default function WorkflowHome({
             style={[detailStyles.sectionTitle, {color: colors.text}]}>
             {text.Map}
           </Text>
+          {note(text.MapHint)}
           <View
             testID={stacked ? 'home-map-stacked' : 'home-map-compact'}
             onLayout={event => setMapWidth(event.nativeEvent.layout.width)}
@@ -511,25 +574,27 @@ export default function WorkflowHome({
               {stacked ? (
                 note(text.NamespaceLinks)
               ) : (
-                <Svg
-                  testID="home-map-namespace-lines"
-                  height={24}
-                  width="100%"
-                  viewBox={`0 0 ${serviceWidth} 24`}
-                  preserveAspectRatio="none"
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants">
-                  <Path
-                    testID="home-map-namespace-path"
-                    d={`M${
-                      serviceWidth / 2
-                    } 0V12M${dpsLinkX} 24V12H${hubLinkX}V24`}
-                    stroke={colors.controlBorder}
-                    strokeDasharray="4 3"
-                    fill="none"
-                    strokeWidth={1.5}
-                  />
-                </Svg>
+                <Animated.View pointerEvents="none" style={namespaceLineStyle}>
+                  <Svg
+                    testID="home-map-namespace-lines"
+                    height={24}
+                    width="100%"
+                    viewBox={`0 0 ${serviceWidth} 24`}
+                    preserveAspectRatio="none"
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants">
+                    <Path
+                      testID="home-map-namespace-path"
+                      d={`M${
+                        serviceWidth / 2
+                      } 0V12M${dpsLinkX} 24V12H${hubLinkX}V24`}
+                      stroke={colors.controlBorder}
+                      strokeDasharray="4 3"
+                      fill="none"
+                      strokeWidth={1.5}
+                    />
+                  </Svg>
+                </Animated.View>
               )}
               <View
                 testID="home-map-services"
@@ -539,39 +604,41 @@ export default function WorkflowHome({
               </View>
             </View>
             {!stacked && (
-              <Svg
-                testID="home-map-phone-lines"
-                height={28}
-                width="100%"
-                viewBox={`0 0 ${measuredWidth} 28`}
-                preserveAspectRatio="none"
-                accessible={false}
-                importantForAccessibility="no-hide-descendants">
-                {projection.mode !== 'hub' && (
+              <Animated.View pointerEvents="none" style={phoneLineStyle}>
+                <Svg
+                  testID="home-map-phone-lines"
+                  height={28}
+                  width="100%"
+                  viewBox={`0 0 ${measuredWidth} 28`}
+                  preserveAspectRatio="none"
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants">
+                  {projection.mode !== 'hub' && (
+                    <Path
+                      testID="home-map-phone-dps-path"
+                      d={`M${dpsPhoneX} 0V14H${phoneLeftX}V28M${
+                        dpsPhoneX - 4
+                      } 5L${dpsPhoneX} 0L${dpsPhoneX + 4} 5M${
+                        phoneLeftX - 4
+                      } 23L${phoneLeftX} 28L${phoneLeftX + 4} 23`}
+                      stroke={colors.primary}
+                      fill="none"
+                      strokeWidth={1.5}
+                    />
+                  )}
                   <Path
-                    testID="home-map-phone-dps-path"
-                    d={`M${dpsPhoneX} 0V14H${phoneLeftX}V28M${
-                      dpsPhoneX - 4
-                    } 5L${dpsPhoneX} 0L${dpsPhoneX + 4} 5M${
-                      phoneLeftX - 4
-                    } 23L${phoneLeftX} 28L${phoneLeftX + 4} 23`}
+                    testID="home-map-phone-hub-path"
+                    d={`M${hubPhoneX} 0V14H${phoneRightX}V28M${
+                      hubPhoneX - 4
+                    } 5L${hubPhoneX} 0L${hubPhoneX + 4} 5M${
+                      phoneRightX - 4
+                    } 23L${phoneRightX} 28L${phoneRightX + 4} 23`}
                     stroke={colors.primary}
                     fill="none"
                     strokeWidth={1.5}
                   />
-                )}
-                <Path
-                  testID="home-map-phone-hub-path"
-                  d={`M${hubPhoneX} 0V14H${phoneRightX}V28M${
-                    hubPhoneX - 4
-                  } 5L${hubPhoneX} 0L${hubPhoneX + 4} 5M${
-                    phoneRightX - 4
-                  } 23L${phoneRightX} 28L${phoneRightX + 4} 23`}
-                  stroke={colors.primary}
-                  fill="none"
-                  strokeWidth={1.5}
-                />
-              </Svg>
+                </Svg>
+              </Animated.View>
             )}
             {stacked && (
               <View
@@ -593,7 +660,6 @@ export default function WorkflowHome({
             style={[detailStyles.supporting, {color: colors.muted}]}>
             {text.MapLegend}
           </Text>
-          {note(text.MapHint)}
         </View>
         {(connectionAttention || sensorAttention) && (
           <View testID="home-attention" style={styles.attention}>
@@ -761,16 +827,24 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   node: {
-    minHeight: 52,
+    minHeight: 60,
     flex: 1,
     borderWidth: 1,
     borderRadius: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 2,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   stackedNode: {flex: 0},
-  nodeTitle: {fontSize: 15, lineHeight: 20, fontWeight: '600'},
+  nodeTitle: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  nodeSubtitle: {textAlign: 'center', lineHeight: 18},
   namespaceNode: {width: '76%', alignSelf: 'center', flex: 0},
   phoneNode: {flex: 0},
   services: {flexDirection: 'row', gap: SERVICE_GAP},
@@ -796,6 +870,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   attentionBody: {flex: 1, minWidth: 0, gap: 3},
+  attentionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   panelHeader: {
     flexDirection: 'row',
     alignItems: 'center',

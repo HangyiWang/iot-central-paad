@@ -79,7 +79,7 @@ it('exposes the enable action separately from chart navigation and the long-pres
   expect(toggle.props.accessibilityState).toEqual({checked: true});
   expect(toggle.props.accessibilityLabel).toBe('Disable sensor: Location');
   expect(
-    StyleSheet.flatten(toggle.props.style).minHeight,
+    StyleSheet.flatten(toggle.props.style({pressed: false})).minHeight,
   ).toBeGreaterThanOrEqual(48);
   const card = view.root.findByType(TouchableOpacity);
   expect(card.findAllByType(Pressable)).toHaveLength(0);

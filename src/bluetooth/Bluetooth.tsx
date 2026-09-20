@@ -3,18 +3,21 @@ import {Icon} from '@rneui/themed';
 import * as React from 'react';
 import {
   View,
+  ActivityIndicator,
   FlatList,
   StyleSheet,
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import {Device, UUID} from 'react-native-ble-plx';
 import {useIsFocused} from '@react-navigation/native';
 import {IotcBleManager} from './BleManager';
 import {ItemProps, Pages} from 'types';
-import {Loader, Text} from '../components';
+import {Text} from '../components';
 import {useIoTCentralClient, useTheme} from '../hooks';
+import {useMotionAllowed} from '../hooks/motion';
 import CardView from 'CardView';
 import Strings from 'strings';
 import {cardTint, palette} from '../theme/palette';
@@ -80,22 +83,36 @@ function BluetoothList({navigation}: BluetoothListProps) {
     };
   }, [navigation, setIsVisible]);
 
+  // The manager reports advertisements and failures, never a scan progress value.
+  // "Waiting" means observation is subscribed and nothing has arrived yet; it ends
+  // on the first advertisement, on failure, and when the screen stops observing.
+  const waiting = isVisible && !unavailable && devices.length === 0;
+  const status = unavailable
+    ? Strings.Bluetooth.Unavailable
+    : waiting
+    ? Strings.Bluetooth.Scanning
+    : Strings.Bluetooth.Observing;
+
   return (
     <View style={[styles.container, {backgroundColor: appearance.background}]}>
       <View style={styles.heading}>
-        <View style={styles.headingText}>
-          <Text
-            testID="bluetooth-tool-title"
-            accessibilityRole="header"
-            style={styles.title}>
-            {Strings.Bluetooth.Title}
-          </Text>
-          <Text style={[styles.description, {color: appearance.muted}]}>
-            {Strings.Bluetooth.Description}
-          </Text>
-        </View>
-        <ReloadButton />
+        <Text
+          testID="bluetooth-tool-title"
+          accessibilityRole="header"
+          style={styles.title}>
+          {Strings.Bluetooth.Title}
+        </Text>
+        <Text style={[styles.description, {color: appearance.muted}]}>
+          {Strings.Bluetooth.Description}
+        </Text>
       </View>
+      <ScanStatus
+        id="bluetooth-scan-status"
+        icon={unavailable ? 'bluetooth-off' : 'bluetooth'}
+        label={status}
+        waiting={waiting}
+        action={<ScanAgainControl />}
+      />
       <FlatList<Device>
         data={devices}
         keyExtractor={device => device.id}
@@ -113,7 +130,7 @@ function BluetoothList({navigation}: BluetoothListProps) {
             title={
               unavailable
                 ? Strings.Bluetooth.Unavailable
-                : Strings.Bluetooth.Scanning
+                : Strings.Bluetooth.Empty
             }
             description={
               unavailable
@@ -125,16 +142,62 @@ function BluetoothList({navigation}: BluetoothListProps) {
         renderItem={({item}) => (
           <BluetoothDeviceListItem item={item} navigation={navigation} />
         )}
-        onRefresh={() => IotcBleManager.getInstance().resetDeviceList()}
-        refreshing={!unavailable && devices.length === 0}
         refreshControl={
+          // Pull to refresh clears the observed list; the manager keeps scanning,
+          // so the control returns immediately instead of spinning without end.
           <RefreshControl
-            refreshing={!unavailable && devices.length === 0}
+            refreshing={false}
             onRefresh={() => IotcBleManager.getInstance().resetDeviceList()}
             colors={[colors.text]}
+            tintColor={appearance.muted}
           />
         }
       />
+    </View>
+  );
+}
+
+/** A decorative indicator only while this screen is genuinely waiting for data. */
+function ScanStatus({
+  id,
+  icon,
+  label,
+  waiting,
+  action,
+}: {
+  id: string;
+  icon: string;
+  label: string;
+  waiting: boolean;
+  action?: React.ReactNode;
+}) {
+  const {dark} = useTheme();
+  const appearance = palette(dark);
+  const animated = useMotionAllowed(waiting);
+  return (
+    <View testID={id} style={styles.status}>
+      <View
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={styles.statusGlyph}>
+        {waiting && animated ? (
+          <ActivityIndicator size="small" color={appearance.primary} />
+        ) : (
+          <Icon
+            name={icon}
+            type="material-community"
+            size={20}
+            color={waiting ? appearance.primary : appearance.muted}
+          />
+        )}
+      </View>
+      <Text
+        accessibilityLiveRegion="polite"
+        style={[styles.statusText, {color: appearance.muted}]}>
+        {label}
+      </Text>
+      {action}
     </View>
   );
 }
@@ -324,23 +387,39 @@ function BluetoothDetail({
     return () => subscription.remove();
   }, [deviceId, iotcentralClient, focused]);
 
-  if (unavailable) {
+  const {dark} = useTheme();
+  const appearance = palette(dark);
+  if (unavailable || !(deviceName && items)) {
     return (
-      <View style={styles.detailStatus}>
-        <StatusCard
-          icon="bluetooth-off"
-          title={Strings.Bluetooth.Unavailable}
-          description={Strings.Bluetooth.UnavailableDetail}
+      <ScrollView
+        style={[styles.page, {backgroundColor: appearance.background}]}
+        contentContainerStyle={styles.pageBody}>
+        <ScanStatus
+          id="bluetooth-detail-status"
+          icon={unavailable ? 'bluetooth-off' : 'bluetooth'}
+          label={
+            unavailable
+              ? Strings.Bluetooth.Unavailable
+              : Strings.Bluetooth.Waiting
+          }
+          waiting={!unavailable && focused}
         />
-      </View>
-    );
-  }
-
-  if (!(deviceName && items)) {
-    return (
-      <View style={styles.listLoaderContainer}>
-        <Loader visible message="Scanning for device" style={styles.loader} />
-      </View>
+        <View style={styles.pageContent}>
+          <StatusCard
+            icon={unavailable ? 'bluetooth-off' : 'bluetooth'}
+            title={
+              unavailable
+                ? Strings.Bluetooth.Unavailable
+                : Strings.Bluetooth.NoReadings
+            }
+            description={
+              unavailable
+                ? Strings.Bluetooth.UnavailableDetail
+                : Strings.Bluetooth.WaitingDetail
+            }
+          />
+        </View>
+      </ScrollView>
     );
   }
 
@@ -351,28 +430,41 @@ function BluetoothDetail({
   );
 }
 
-function ReloadButton() {
+function ScanAgainControl() {
   const {dark} = useTheme();
   const appearance = palette(dark);
   return (
     <Pressable
+      testID="bluetooth-scan-again"
       accessibilityRole="button"
       accessibilityLabel={Strings.Bluetooth.Refresh}
       onPress={() => {
         IotcBleManager.getInstance().resetDeviceList();
       }}
-      style={[styles.reload, {backgroundColor: appearance.surface}]}>
-      <View accessible={false}>
+      style={({pressed}) => [
+        styles.scanAgain,
+        {
+          backgroundColor: pressed ? appearance.border : appearance.surface,
+          borderColor: appearance.border,
+        },
+      ]}>
+      <View
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants">
         <Icon
           name="reload"
           type={Platform.select({
             ios: 'ionicon',
             android: 'material-community',
           })}
-          size={22}
-          color={appearance.text}
+          size={16}
+          color={appearance.primary}
         />
       </View>
+      <Text style={[styles.scanAgainLabel, {color: appearance.primary}]}>
+        {Strings.Bluetooth.Refresh}
+      </Text>
     </Pressable>
   );
 }
@@ -381,16 +473,40 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  heading: {padding: 20, flexDirection: 'row', alignItems: 'center', gap: 12},
-  headingText: {flex: 1, gap: 5},
+  page: {flex: 1},
+  pageBody: {flexGrow: 1, paddingVertical: 16},
+  pageContent: {paddingHorizontal: 20},
+  heading: {paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12, gap: 5},
   title: {fontSize: 24, lineHeight: 31, fontWeight: '600'},
   description: {fontSize: 13, lineHeight: 20},
-  reload: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
+  status: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  statusGlyph: {width: 24, alignItems: 'center', justifyContent: 'center'},
+  statusText: {flex: 1, minWidth: 140, fontSize: 13, lineHeight: 19},
+  scanAgain: {
+    minHeight: 48,
+    minWidth: 48,
+    maxWidth: '100%',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  scanAgainLabel: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+    flexShrink: 1,
   },
   listContent: {paddingHorizontal: 20, paddingBottom: 24},
   deviceCard: {
@@ -410,7 +526,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   deviceBody: {flex: 1, minWidth: 0, gap: 2},
-  detailStatus: {padding: 20},
   notice: {marginBottom: 16, fontSize: 14, lineHeight: 21},
   empty: {borderRadius: 24, padding: 28, alignItems: 'center', gap: 14},
   emptyIcon: {
@@ -455,14 +570,5 @@ const styles = StyleSheet.create({
   rssiText: {
     fontSize: 13,
     lineHeight: 19,
-  },
-  listLoaderContainer: {
-    height: '100%',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loader: {
-    width: '75%',
   },
 });

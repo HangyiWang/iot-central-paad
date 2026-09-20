@@ -1,8 +1,10 @@
 import React, {useContext, useMemo, useRef, useState} from 'react';
 import {FlatList, Pressable, StyleSheet, View} from 'react-native';
 import {Icon} from '@rneui/themed';
+import {useIsFocused} from '@react-navigation/native';
 import {Text} from '../components/typography';
 import DetailsAction from '../components/detailsAction';
+import SelectionControl from '../components/selectionControl';
 import Logs from '../Logs';
 import {useTheme} from '../hooks';
 import {StorageContext} from '../contexts/storage';
@@ -122,6 +124,7 @@ export default function Activity() {
   const {dark} = useTheme();
   const colors = palette(dark);
   const [diagnostics, setDiagnostics] = useState(false);
+  const focused = useIsFocused();
   const [diagnosticsVisited, visitDiagnostics] = useState(false);
   const [issuesOnly, setIssuesOnly] = useState(false);
   const list = useRef<FlatList<Observation>>(null);
@@ -152,6 +155,8 @@ export default function Activity() {
             <DetailsAction
               id="activity-latest"
               label={text.Latest}
+              variant="quiet"
+              icon="arrow-down"
               disabled={!entries.length && !latestTelemetry}
               onPress={() => list.current?.scrollToEnd({animated: false})}
             />
@@ -165,25 +170,19 @@ export default function Activity() {
             {text.Simulated}
           </Text>
         )}
-        <View style={styles.toolbar}>
-          <Filter
-            id="activity-observations"
-            label={text.Observations}
-            viewSwitch
-            selected={!diagnostics}
-            onPress={() => setDiagnostics(false)}
-          />
-          <Filter
-            id="activity-diagnostics"
-            label={text.Diagnostics}
-            viewSwitch
-            selected={diagnostics}
-            onPress={() => {
-              visitDiagnostics(true);
-              setDiagnostics(true);
-            }}
-          />
-        </View>
+        <SelectionControl
+          label={text.Title}
+          focused={focused}
+          options={[
+            {id: 'activity-observations', label: text.Observations},
+            {id: 'activity-diagnostics', label: text.Diagnostics},
+          ]}
+          selected={diagnostics ? 1 : 0}
+          onSelect={index => {
+            if (index === 1) visitDiagnostics(true);
+            setDiagnostics(index === 1);
+          }}
+        />
       </View>
       <View
         style={[styles.container, diagnostics && styles.hidden]}
@@ -195,17 +194,16 @@ export default function Activity() {
           <Text style={[detailStyles.supporting, {color: colors.muted}]}>
             {text.Filter}
           </Text>
-          <Filter
-            id="activity-filter-all"
-            label={text.All}
-            selected={!issuesOnly}
-            onPress={() => setIssuesOnly(false)}
-          />
-          <Filter
-            id="activity-filter-issues"
-            label={text.Issues}
-            selected={issuesOnly}
-            onPress={() => setIssuesOnly(true)}
+          <SelectionControl
+            variant="filter"
+            label={text.Filter}
+            focused={focused && !diagnostics}
+            options={[
+              {id: 'activity-filter-all', label: text.All},
+              {id: 'activity-filter-issues', label: text.Issues},
+            ]}
+            selected={issuesOnly ? 1 : 0}
+            onSelect={index => setIssuesOnly(index === 1)}
           />
         </View>
         <FlatList
@@ -274,55 +272,6 @@ export default function Activity() {
   );
 }
 
-function Filter({
-  id,
-  label,
-  selected,
-  onPress,
-  viewSwitch = false,
-}: {
-  id: string;
-  label: string;
-  selected: boolean;
-  onPress(): void;
-  viewSwitch?: boolean;
-}) {
-  const {dark} = useTheme();
-  const colors = palette(dark);
-  return (
-    <Pressable
-      testID={id}
-      accessibilityRole="button"
-      accessibilityState={{selected}}
-      onPress={onPress}
-      style={[
-        styles.filter,
-        {
-          backgroundColor: selected
-            ? viewSwitch
-              ? colors.primary
-              : colors.tints[0]
-            : colors.surface,
-          borderColor: selected ? colors.primary : colors.controlBorder,
-        },
-      ]}>
-      <Text
-        style={[
-          detailStyles.actionLabel,
-          {
-            color: selected
-              ? viewSwitch
-                ? colors.onPrimary
-                : colors.primary
-              : colors.text,
-          },
-        ]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 export function ObservationRow({event}: {event: Observation}) {
   const {dark} = useTheme();
   const colors = palette(dark);
@@ -363,10 +312,7 @@ export function ObservationRow({event}: {event: Observation}) {
             expanded ? text.HideDetails : text.Details
           }: ${observationTitle(event)}`}
           onPress={() => setExpanded(value => !value)}
-          style={[
-            styles.disclosure,
-            {borderColor: colors.controlBorder, backgroundColor: colors.inset},
-          ]}>
+          style={({pressed}) => [styles.disclosure, pressed && styles.pressed]}>
           <View
             accessible={false}
             accessibilityElementsHidden
@@ -374,8 +320,8 @@ export function ObservationRow({event}: {event: Observation}) {
             <Icon
               name={expanded ? 'chevron-up' : 'chevron-down'}
               type="material-community"
-              size={22}
-              color={colors.primary}
+              size={16}
+              color={colors.muted}
             />
           </View>
         </Pressable>
@@ -464,15 +410,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  filter: {
-    minWidth: 48,
-    minHeight: 48,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderRadius: 14,
-    justifyContent: 'center',
-  },
   feed: {paddingHorizontal: 20, paddingBottom: 24},
   event: {marginBottom: 12},
   eventHeader: {flexDirection: 'row', alignItems: 'flex-start', gap: 8},
@@ -482,9 +419,10 @@ const styles = StyleSheet.create({
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
+    marginTop: -8,
+    marginEnd: -8,
   },
+  pressed: {opacity: 0.6},
   sessionNotice: {marginBottom: 12},
   communication: {gap: 8},
   summary: {

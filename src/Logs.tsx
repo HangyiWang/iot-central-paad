@@ -9,6 +9,7 @@ import {Headline, Text} from './components/typography';
 import Strings, {resolveString} from 'strings';
 import {TimedLog} from './types';
 import {palette} from './theme/palette';
+import SelectionControl from './components/selectionControl';
 
 export function logLevel(eventName: string): 'info' | 'warning' | 'error' {
   if (/\berror\b/i.test(eventName)) return 'error';
@@ -56,42 +57,16 @@ const Logs = React.memo(() => {
           {text.Header}
         </Text>
         <View style={styles.toolbar}>
-          <View style={styles.filters}>
-            {[false, true].map(issues => (
-              <Pressable
-                key={String(issues)}
-                testID={issues ? 'logs-filter-issues' : 'logs-filter-all'}
-                accessibilityRole="button"
-                accessibilityState={{selected: issuesOnly === issues}}
-                onPress={() => setIssuesOnly(issues)}
-                style={[
-                  styles.filter,
-                  {
-                    backgroundColor:
-                      issuesOnly === issues
-                        ? appearance.primary
-                        : appearance.surface,
-                    borderColor:
-                      issuesOnly === issues
-                        ? appearance.primary
-                        : appearance.controlBorder,
-                  },
-                ]}>
-                <Text
-                  style={[
-                    styles.actionLabel,
-                    {
-                      color:
-                        issuesOnly === issues
-                          ? appearance.onPrimary
-                          : appearance.text,
-                    },
-                  ]}>
-                  {issues ? text.Issues : text.All}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <SelectionControl
+            variant="filter"
+            label={text.Title}
+            options={[
+              {id: 'logs-filter-all', label: text.All},
+              {id: 'logs-filter-issues', label: text.Issues},
+            ]}
+            selected={issuesOnly ? 1 : 0}
+            onSelect={index => setIssuesOnly(index === 1)}
+          />
           <Text style={[styles.count, {color: appearance.muted}]}>
             {resolveString(text.Count, String(entries.length))}
           </Text>
@@ -196,14 +171,16 @@ export const LogEvent = React.memo(
               }: ${entry.logItem.eventName}`}
               accessibilityState={{expanded}}
               onPress={() => setExpanded(current => !current)}
-              hitSlop={12}
-              style={styles.disclosure}>
+              style={({pressed}) => [
+                styles.disclosure,
+                pressed && styles.pressed,
+              ]}>
               <View accessible={false}>
                 <Icon
                   name={expanded ? 'chevron-up' : 'chevron-down'}
                   type="material-community"
-                  size={20}
-                  color={appearance.primary}
+                  size={16}
+                  color={appearance.muted}
                 />
               </View>
             </Pressable>
@@ -254,18 +231,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   count: {fontSize: 13, lineHeight: 20},
-  filters: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  filter: {
-    minWidth: 48,
-    minHeight: 48,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 22,
-    borderWidth: 1,
-  },
   actionLabel: {fontSize: 13, lineHeight: 19, fontWeight: '600'},
   textAction: {
+    minWidth: 48,
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
@@ -276,7 +244,10 @@ const styles = StyleSheet.create({
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: -8,
+    marginEnd: -8,
   },
+  pressed: {opacity: 0.6},
   feed: {paddingHorizontal: 20, paddingBottom: 24, flexGrow: 1},
   eventRow: {flexDirection: 'row', gap: 10},
   timeline: {width: 32, alignItems: 'center'},

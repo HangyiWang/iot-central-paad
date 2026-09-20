@@ -369,6 +369,12 @@ const Strings = {
     Refresh: 'Scan again',
     Scanning: 'Looking for devices',
     ScanningDetail: 'Keep a supported Bluetooth device nearby and powered on.',
+    Observing: 'Listening for advertisements',
+    Empty: 'No devices yet',
+    Waiting: 'Waiting for this device',
+    NoReadings: 'No readings yet',
+    WaitingDetail:
+      'Keep this device nearby and powered on. Readings appear when it advertises.',
     Unavailable: 'Bluetooth unavailable',
     UnavailableDetail:
       'Enable Bluetooth and allow Nearby Devices access in Settings.',

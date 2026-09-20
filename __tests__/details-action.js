@@ -133,3 +133,40 @@ test('distinguishes external links, expanded toggles and disabled busy actions',
   expect(style(true)).toEqual(style());
   expect(onPress).not.toHaveBeenCalled();
 });
+
+test.each([false, true])(
+  'quiet actions shrink only the visual chrome (dark %s)',
+  dark => {
+    useTheme.mockReturnValue({dark});
+    const onPress = jest.fn();
+    act(() => {
+      tree = renderer.create(
+        <DetailsAction
+          id="action"
+          variant="quiet"
+          label="Show technical name"
+          expanded={false}
+          onPress={onPress}
+        />,
+      );
+    });
+    expect(style()).toMatchObject({
+      minHeight: 48,
+      minWidth: 48,
+      borderWidth: 0,
+      backgroundColor: 'transparent',
+      maxWidth: '100%',
+    });
+    expect(control().props.accessibilityState.expanded).toBe(false);
+    expect(
+      StyleSheet.flatten(tree.root.findByType('Text').props.style),
+    ).toMatchObject({
+      fontSize: 13,
+      lineHeight: 18,
+      flexShrink: 1,
+    });
+    expect(tree.root.findByType('Icon').props.size).toBe(16);
+    act(() => control().props.onPress());
+    expect(onPress).toHaveBeenCalledTimes(1);
+  },
+);

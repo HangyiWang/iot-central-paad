@@ -18,7 +18,7 @@ type Props = {
   onPress(): void | Promise<void>;
   id?: string;
   icon?: string;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'danger' | 'quiet';
   accessibilityLabel?: string;
   disabled?: boolean;
   busy?: boolean;
@@ -49,6 +49,7 @@ export default function DetailsAction({
   const inactive = disabled || busy;
   const primary = variant === 'primary';
   const danger = variant === 'danger';
+  const quiet = variant === 'quiet';
   const color = inactive
     ? colors.muted
     : primary
@@ -79,7 +80,12 @@ export default function DetailsAction({
       accessible={false}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
-      <Icon name={name} type="material-community" size={18} color={color} />
+      <Icon
+        name={name}
+        type="material-community"
+        size={quiet ? 16 : 18}
+        color={color}
+      />
     </View>
   );
   return (
@@ -107,6 +113,8 @@ export default function DetailsAction({
             ? colors.primary
             : colors.controlBorder,
         },
+        quiet && styles.quiet,
+        quiet && pressed && !inactive && styles.pressedPrimary,
         pressed && !inactive && primary && styles.pressedPrimary,
         inactive && detailStyles.disabled,
         style,
@@ -116,7 +124,13 @@ export default function DetailsAction({
       ) : icon ? (
         glyph(icon)
       ) : null}
-      <Text style={[detailStyles.actionLabel, styles.label, {color}]}>
+      <Text
+        style={[
+          detailStyles.actionLabel,
+          styles.label,
+          quiet && styles.quietLabel,
+          {color},
+        ]}>
         {label}
       </Text>
       {trailing && glyph(trailing)}
@@ -138,5 +152,14 @@ const styles = StyleSheet.create({
   },
   block: {alignSelf: 'stretch'},
   label: {flexShrink: 1, textAlign: 'center'},
+  quiet: {
+    minWidth: 48,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  quietLabel: {fontSize: 13, lineHeight: 18},
   pressedPrimary: {opacity: 0.82},
 });
