@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import React, {useCallback, useMemo, useState} from 'react';
-import {useColorScheme} from 'react-native';
+import {StatusBar, useColorScheme} from 'react-native';
 import {
   DefaultTheme,
   DarkTheme,
@@ -72,7 +72,10 @@ const ThemeProvider: React.FC<{children: React.ReactNode}> = ({children}) => {
   return (
     <ThemeContext.Provider value={value}>
       <NavigationThemeProvider value={navigationTheme}>
-        <UIThemeProvider theme={uiTheme}>{children}</UIThemeProvider>
+        <UIThemeProvider theme={uiTheme}>
+          <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
+          {children}
+        </UIThemeProvider>
       </NavigationThemeProvider>
     </ThemeContext.Provider>
   );

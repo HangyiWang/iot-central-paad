@@ -20,6 +20,7 @@ import {
   createStackNavigator,
   StackNavigationProp,
 } from '@react-navigation/stack';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useConnectIoTCentralClient, useScreenDimensions, useTheme} from 'hooks';
 import {
   NavigationParams,
@@ -287,10 +288,19 @@ export function ManualConnect({onConnected}: {onConnected(): void}) {
 function EmptyClient() {
   const navigation = useNavigation<StackNavigationProp<RegistrationRoutes>>();
   const focused = useIsFocused();
+  const insets = useSafeAreaInsets();
   const {credentials} = useContext(StorageContext);
   const [connect, , , {error, loading}] = useConnectIoTCentralClient();
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        {
+          paddingBottom: 20 + insets.bottom,
+          paddingLeft: 20 + insets.left,
+          paddingRight: 20 + insets.right,
+        },
+      ]}>
       <Text>
         <Name>{Strings.Registration.Header.Welcome}</Name>
         {Strings.Registration.Header.Text}

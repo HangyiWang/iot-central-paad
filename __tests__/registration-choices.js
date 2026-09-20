@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {StyleSheet} from 'react-native';
+import {ScrollView, StyleSheet} from 'react-native';
 import {Registration} from '../src/Registration';
 import {RegistrationScreens} from '../src/types';
 import {palette} from '../src/theme/palette';
@@ -15,6 +15,10 @@ jest.mock('@react-navigation/stack', () => {
 const {Screen: StackScreen} = require('@react-navigation/stack');
 const mockNavigate = jest.fn();
 const mockReplace = jest.fn();
+let mockInsets = {top: 24, bottom: 24, left: 0, right: 0};
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => mockInsets,
+}));
 jest.mock('@react-navigation/native', () => ({
   CommonActions: {reset: jest.fn(config => config)},
   useIsFocused: () => true,
@@ -63,6 +67,7 @@ const flatten = node =>
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockInsets = {top: 24, bottom: 24, left: 0, right: 0};
   hooks.useConnectIoTCentralClient.mockReturnValue([
     connect,
     cancel,
@@ -123,6 +128,30 @@ test('both welcome choices keep their real navigation behavior', () => {
   act(() => control('registration-manual').props.onPress());
   expect(mockNavigate).toHaveBeenLastCalledWith(RegistrationScreens.MANUAL);
   expect(mockReplace).not.toHaveBeenCalled();
+});
+
+test.each([
+  {top: 24, bottom: 24, left: 0, right: 0},
+  {top: 59, bottom: 34, left: 0, right: 0},
+  {top: 0, bottom: 24, left: 44, right: 16},
+])('welcome content clears system bars and cutouts (%j)', insets => {
+  mockInsets = insets;
+  renderEmptyScreen();
+  const scroll = view.root.findByType(ScrollView);
+  const content = StyleSheet.flatten(scroll.props.contentContainerStyle);
+  expect(content).toMatchObject({
+    flexGrow: 1,
+    padding: 20,
+    paddingBottom: 20 + insets.bottom,
+    paddingLeft: 20 + insets.left,
+    paddingRight: 20 + insets.right,
+  });
+  expect(content.height).toBeUndefined();
+  expect(content.maxHeight).toBeUndefined();
+  expect(content.paddingTop).toBeUndefined();
+  expect(JSON.stringify(view.toJSON())).toContain(
+    Strings.Registration.StartHere.Title,
+  );
 });
 
 test('the scanner footer keeps a legible manual action that cancels before replacing', async () => {
