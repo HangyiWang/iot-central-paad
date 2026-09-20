@@ -77,7 +77,7 @@ const SYSTEM_SURFACE_IDS = new Map([
   ['android:id/aerr_wait', 'anr-dialog'],
 ]);
 const SYSTEM_SURFACE_CODES = Object.freeze([...new Set(SYSTEM_SURFACE_IDS.values())]);
-// Presence evidence only; the UI helper still permits ordinary denial only.
+// Presence evidence only; these categories do not establish which control was acted on.
 const PERMISSION_DENY_CONTROLS = new Map(
   ['com.android.permissioncontroller', 'com.google.android.permissioncontroller'].flatMap(namespace => [
     [`${namespace}:id/permission_deny_button`, 'deny'],

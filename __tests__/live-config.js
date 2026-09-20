@@ -427,7 +427,7 @@ const permissionHelper = () => yaml.loadAll(
   fs.readFileSync('.maestro/dismiss-android-permissions.yaml', 'utf8'),
 );
 
-test('permission handling is Android-only, four guarded deny taps, then a fail-closed prompt assertion', () => {
+test('Android denial variants share four guarded taps, then a fail-closed prompt assertion', () => {
   const [config, flow] = permissionHelper();
   expect(config.appId).toBe('${MAESTRO_APP_ID}');
   expect(config.env).toEqual({AFTER_DETAILS_TAP: 'false'});
@@ -440,7 +440,7 @@ test('permission handling is Android-only, four guarded deny taps, then a fail-c
   expect(Object.keys(repeated).sort()).toEqual(['commands', 'times']);
   expect(repeated.commands).toHaveLength(1);
   const dismissal = repeated.commands[0].runFlow;
-  const denyId = '^com\\.(android|google\\.android)\\.permissioncontroller:id/permission_deny_button$';
+  const denyId = '^com\\.(android|google\\.android)\\.permissioncontroller:id/(permission_deny_button|permission_deny_and_dont_ask_again_button)$';
   expect(dismissal.when).toEqual({visible: {id: denyId}});
   expect(dismissal.commands).toEqual([
     {tapOn: {id: denyId, retryTapIfNoChange: false}},
@@ -452,15 +452,20 @@ test('permission handling is Android-only, four guarded deny taps, then a fail-c
   const prompt = new RegExp(remaining.id);
   for (const pkg of ['com.android.permissioncontroller', 'com.google.android.permissioncontroller']) {
     expect(deny.test(`${pkg}:id/permission_deny_button`)).toBe(true);
+    expect(deny.test(`${pkg}:id/permission_deny_and_dont_ask_again_button`)).toBe(true);
     for (const resource of ['grant_dialog', 'permission_message', 'permission_deny_button',
       'permission_deny_and_dont_ask_again_button', 'permission_allow_foreground_only_button']) {
       expect(prompt.test(`${pkg}:id/${resource}`)).toBe(true);
     }
-    expect(deny.test(`${pkg}:id/permission_allow_button`)).toBe(false);
-    expect(deny.test(`${pkg}:id/permission_deny_and_dont_ask_again_button`)).toBe(false);
+    for (const resource of ['permission_allow_button', 'permission_allow_foreground_only_button',
+      'permission_allow_one_time_button', 'permission_allow_all_button', 'permission_deny_button_extra']) {
+      expect(deny.test(`${pkg}:id/${resource}`)).toBe(false);
+    }
   }
   for (const resource of ['android:id/button1', 'android:id/aerr_close',
     'com.android.settings:id/permission_deny_button', 'unrelated:id/permission_deny_button',
+    'com.android.settings:id/permission_deny_and_dont_ask_again_button',
+    'unrelated:id/permission_deny_and_dont_ask_again_button',
     'com.android.permissioncontroller.evil:id/permission_deny_button']) {
     expect(deny.test(resource)).toBe(false);
     expect(prompt.test(resource)).toBe(false);

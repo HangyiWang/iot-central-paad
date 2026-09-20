@@ -68,6 +68,11 @@ It requests no keys and performs no cloud writes. See the
 
 ### Native Home / Explore / Activity implementation (2026-09-19)
 
+Current redesign status (2026-09-20): iOS connected traversal, cloud proof and
+genuine cold restoration passed on `66b4902` in run `35477325730`. Android
+traversal and the in-place Windows update remain incomplete; the identified
+Android permission-control correction is described below.
+
 Implementation source: `f856e4e3875fdb2300fe03478eeffaac3f52a59a` on
 `feature/adr-onboarding`. This implements the subsequently approved workflow Home,
 not the older Device dashboard or guide-only Home proposal.
@@ -207,6 +212,44 @@ Both temporary inputs were removed at 23:15:14 UTC after terminal completion
 at 23:14:55 UTC, and both slots are empty. No failed APK was installed. The
 unchanged Windows app was relaunched without clearing data or re-entering
 credentials; fresh connection and retained-context confirmation remain pending.
+
+Credential-free replay
+[35476697538](https://github.com/HangyiWang/iot-central-paad/actions/runs/35476697538)
+passed with harness `7abf8a14366dc1ec56f1af13db69a9cdf2b30c53` and the unchanged
+`797b1b8` Simulator binary. The fixed summary and synthetic log agree on
+`smoke` / `finished` / `not-running`, and the owned simulator was deleted.
+The earlier missing-element failure was not reproduced or explained. This is
+synthetic navigation/input evidence, not connected cold restoration.
+
+Run [35477325730](https://github.com/HangyiWang/iot-central-paad/actions/runs/35477325730),
+source `66b490276c14219d368fc1f15329b0da73101084`, identifies Android's failed
+permission-absence assertion at sequence 169. Its bound hierarchy contains a
+known permission dialog and the `deny-and-dont-ask-again` control, with no ordinary
+deny control recorded. Resource namespaces do not establish foreground ownership,
+and this result does not retrospectively identify the previous run's failure.
+The next CI-only correction permits that exact denial variant alongside ordinary
+denial, retaining the shared four-tap budget, refusal to grant access, and all
+sheet/identity/proof/traversal/restoration assertions. App and Windows permission
+policies are unchanged.
+
+The iOS lane of that run passed the ordered Home/Explore/Activity traversal,
+exact identity/model/proof assertions and genuine saved-credential cold
+restoration. Its final record is `live / passed / finished / not-running`, with
+`connected`, `nonceSubmitted` and `coldRestored` all true. Independent fresh
+assignment, Hub, model, nonce/platform and retained-registry bindings matched
+for both platforms; Android's UI failure still prevents overall acceptance.
+The accepted iOS Simulator archive is `foundation-simulator.app.zip`, SHA-256
+`ed2b5a9b919e7efa33892616f9c2988e414f2408a137566df3369b4a51b673bc`,
+from artifact `live-build-ios-66b490276c14219d368fc1f15329b0da73101084-1`.
+This is not physical-iPhone acceptance or new registry-record creation;
+downstream telemetry receipt remains unchecked.
+
+The workflow completed at 00:24:24 UTC on September 20. Both owned input slots
+were confirmed empty at 00:35:00 UTC. A monitor receipt-write failure required
+recovery, so the original deletion timestamp is unavailable; no input was
+recreated. The unchanged Windows app was relaunched without installing the
+failed candidate, clearing data or entering credentials. Fresh connection and
+retained-context confirmation are still pending.
 
 ### Completed simulator acceptance (2026-09-18)
 

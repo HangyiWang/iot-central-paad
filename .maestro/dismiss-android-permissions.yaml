@@ -9,16 +9,17 @@ env:
     commands:
       - evalScript: ${output.androidPermissionDenied = false}
       # Conditional lookups also cover a prompt arriving after the preceding app tap.
+      # Both denial variants share this one budget in the disposable hosted CI flow.
       - repeat:
           times: 4
           commands:
             - runFlow:
                 when:
                   visible:
-                    id: '^com\.(android|google\.android)\.permissioncontroller:id/permission_deny_button$'
+                    id: '^com\.(android|google\.android)\.permissioncontroller:id/(permission_deny_button|permission_deny_and_dont_ask_again_button)$'
                 commands:
                   - tapOn:
-                      id: '^com\.(android|google\.android)\.permissioncontroller:id/permission_deny_button$'
+                      id: '^com\.(android|google\.android)\.permissioncontroller:id/(permission_deny_button|permission_deny_and_dont_ask_again_button)$'
                       retryTapIfNoChange: false
                   - evalScript: ${output.androidPermissionDenied = true}
       # Exhaustion or an unsupported permission choice must fail, never grant access.
