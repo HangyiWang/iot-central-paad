@@ -1,8 +1,9 @@
 # PAAD ADR namespace integration plan
 
-Status: SAS-first prototype implemented; Android and iOS simulator cloud-proof
-and connected cold-restoration gates completed.
-Date: 2026-09-18. Branch: `feature/adr-onboarding`.
+Status: SAS-first prototype and native Home / Explore / Activity implemented;
+retained-device Android/iOS connected traversal, cloud proof, cold restoration
+and in-place Windows emulator delivery completed.
+Date: 2026-09-20. Branch: `feature/adr-onboarding`.
 Parent: `modernize/paad-foundation`.
 
 ## CI-first update (2026-09-16)
@@ -68,10 +69,11 @@ It requests no keys and performs no cloud writes. See the
 
 ### Native Home / Explore / Activity implementation (2026-09-19)
 
-Current redesign status (2026-09-20): iOS connected traversal, cloud proof and
-genuine cold restoration passed on `66b4902` in run `35477325730`. Android
-traversal and the in-place Windows update remain incomplete; the identified
-Android permission-control correction is described below.
+Current redesign status (2026-09-20): both retained-device native lanes and
+in-place Windows delivery are complete. Android is accepted on `0f2e54d` in
+run `35479615461`; iOS retains its separate acceptance on `66b4902` in run
+`35477325730`. The completed-delivery record below supersedes the historical
+failed-run and pending statements in this section.
 
 Implementation source: `f856e4e3875fdb2300fe03478eeffaac3f52a59a` on
 `feature/adr-onboarding`. This implements the subsequently approved workflow Home,
@@ -250,6 +252,54 @@ recovery, so the original deletion timestamp is unavailable; no input was
 recreated. The unchanged Windows app was relaunched without installing the
 failed candidate, clearing data or entering credentials. Fresh connection and
 retained-context confirmation are still pending.
+
+#### Completed redesign delivery (2026-09-20)
+
+| Platform | Accepted source | Run |
+| --- | --- | --- |
+| Android emulator and installed Windows APK | `0f2e54df977bb49fa610363c06891edc651edb68` | [35479615461](https://github.com/HangyiWang/iot-central-paad/actions/runs/35479615461) |
+| iOS Simulator | `66b490276c14219d368fc1f15329b0da73101084` | [35477325730](https://github.com/HangyiWang/iot-central-paad/actions/runs/35477325730) |
+
+Android passed the mandatory, fail-fast native flow: Home panels, all four
+Explore tools, unsent draft retention, Activity and diagnostic disclosures,
+exact assignment/model/proof, and a genuine stop/relaunch with saved-credential
+restoration. Independent reads matched its fresh nonce/platform, assignment,
+Hub, model and retained registry binding. Android does not emit an iOS-style
+`coldRestored` flag; its restoration evidence is the passed source-bound flow.
+
+The iOS app, harness, native dependencies and executable logic did not change
+between these accepted sources. Their only differences are the Android
+permission helper, its tests, this ledger and a diagnostic comment. Its earlier
+accepted artifact is preserved under its actual source/run, not relabeled.
+
+The installed Android `foundation-ci.apk` SHA-256 is
+`1c3afea337055f63a0141f14bc2fc72d1b08eebeaf08048aab5d092cbbb2eb85`,
+from artifact `live-build-android-0f2e54df977bb49fa610363c06891edc651edb68-1`.
+The accepted iOS archive hash remains
+`ed2b5a9b919e7efa33892616f9c2988e414f2408a137566df3369b4a51b673bc`.
+
+Windows received only that accepted APK through `install -r`. The bounded
+observer confirmed Connected, exact assignment/Hub/model, and the retained
+Azure context after upgrade and again after an actual process stop and new
+process launch. Details was closed afterward and the app remains running.
+No uninstall, data clear, credential re-entry, storage injection, screenshot
+or hierarchy dump was used. In-app registry status remains **Not checked**.
+
+The Android workflow completed at 01:07:47 UTC; its owned input was removed at
+01:08:42 UTC with durable receipts. The iOS slot was never populated for this
+Android-only run, and both slots are empty. Owned observer processes/files were
+removed. Windows delivery completed at 01:27:22 UTC. Local exact evidence is
+retained under `build/native-delivery-0f2e54d/`, particularly
+`paired-delivery-final.json`, `windows-delivery.json` and
+`safe-delivery-summary.json`; `build/actions-installed-0f2e54d.json` records
+installed provenance. These ignored operational artifacts are not published
+with the source.
+
+This completes the retained DPS emulator/Simulator delivery, not physical-phone,
+media-upload, large-text, direct-Hub or downstream-telemetry acceptance. The
+registry association was retained, not newly created. The earlier intermittent
+iOS missing-element failure remains unexplained despite subsequent successful
+native acceptance.
 
 ### Completed simulator acceptance (2026-09-18)
 

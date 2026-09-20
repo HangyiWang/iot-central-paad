@@ -161,10 +161,14 @@ optional local setup are in the [README](../README.md#build-and-run).
 The [simulator guide](ADR-SIMULATOR.md#windows-emulator-with-a-wsl-checkout)
 explains installing an approved bundled Android artifact.
 
-**Acceptance limit:** earlier simulator onboarding/proof/restoration evidence
-does not validate every later UI revision. The current Home/Explore/Activity
-redesign still requires source-bound native acceptance; see the
+**Current delivery (2026-09-20):** the Home/Explore/Activity experience completed
+the retained-DPS Android emulator and iOS Simulator flows, including fresh cloud
+proof and saved-credential restoration. The Windows emulator was updated in
+place with its credentials and imported Azure context retained, including after
+a cold restart. Exact sources, runs and remaining limits are recorded in the
 [acceptance ledger](plans/ADR-NAMESPACE-INTEGRATION.md#native-home--explore--activity-implementation-2026-09-19).
+This does not establish physical-phone, media-upload, large-text or direct-Hub
+acceptance, and it does not produce a physical-iPhone installation package.
 Production reliability, physical sensors/BLE/camera/torch, background operation,
 and full platform parity are not guaranteed. A successful build is not a cloud
 test, and this document is not artifact validation.
