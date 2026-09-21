@@ -211,3 +211,32 @@ test('ordinary credential-free startup does not silently enable simulation or su
   expect(smoke).not.toContain('traverseExperience');
   expect(smoke).not.toContain('tap(.formSubmit)');
 });
+
+test('ordinary iOS startup declines only the known save sheet without skipping return or cold-launch assertions', () => {
+  const flow = commands('startup.yaml');
+  const back = flow.findIndex(step => step.tapOn?.id === 'registration-back');
+  expect(flow.slice(back + 1, back + 5)).toEqual([
+    {runFlow: 'dismiss-ios-password-save.yaml'},
+    {assertVisible: '.*Start here.*'},
+    {assertVisible: 'Connect manually'},
+    'stopApp',
+  ]);
+  expect(flow[back + 5].launchApp.clearState).toBe(false);
+  const decline = commands('dismiss-ios-password-save.yaml');
+  expect(decline).toEqual([
+    {
+      runFlow: {
+        when: {
+          platform: 'iOS',
+          visible: {text: '^Save Password\\?$'},
+          notVisible: {id: 'connection-deviceKey'},
+        },
+        commands: [
+          {assertVisible: {text: '^Save$'}},
+          {tapOn: {text: '^Not Now$', retryTapIfNoChange: false}},
+          {assertNotVisible: {text: '^Save Password\\?$'}},
+        ],
+      },
+    },
+  ]);
+});

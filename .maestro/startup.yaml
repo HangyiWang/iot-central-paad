@@ -67,6 +67,8 @@ name: Credential-free bundled startup and manual-navigation smoke
 # Never submit these deliberately invalid fixtures or send cloud traffic.
 - tapOn:
     id: registration-back
+# iOS can suggest saving even though these non-account fields opt out of autofill.
+- runFlow: dismiss-ios-password-save.yaml
 - assertVisible: ".*Start here.*"
 - assertVisible: "Connect manually"
 - stopApp
