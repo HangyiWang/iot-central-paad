@@ -38,6 +38,7 @@ function withFixture(testBody, {download = false} = {}) {
     fs.copyFileSync('scripts/ci/replay-artifact.js', file('scripts/ci/replay-artifact.js'));
     fs.copyFileSync('.maestro/startup.yaml', file('.maestro/startup.yaml'));
     fs.copyFileSync('.maestro/dismiss-quickstep-anr.yaml', file('.maestro/dismiss-quickstep-anr.yaml'));
+    fs.copyFileSync('.maestro/dismiss-ios-password-save.yaml', file('.maestro/dismiss-ios-password-save.yaml'));
     const apk = Buffer.from('credential-free mock APK, not an Android binary');
     const apkSha256 = crypto.createHash('sha256').update(apk).digest('hex');
     const identity = [
@@ -223,6 +224,7 @@ test('replays the shared synthetic startup assertions and never submits Connect'
     .not.toContain('connection-submit');
   expect(commands.filter(command => command.runFlow)).toEqual([
     {runFlow: 'dismiss-quickstep-anr.yaml'},
+    {runFlow: 'dismiss-ios-password-save.yaml'},
     {runFlow: 'dismiss-quickstep-anr.yaml'},
   ]);
   expect(commands.some(command => command.runScript)).toBe(false);

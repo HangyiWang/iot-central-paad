@@ -45,7 +45,7 @@ function withFixture(testBody, {download = false} = {}) {
     fs.writeFileSync(file('scripts/ci/replay-ios.sh'), script);
     fs.writeFileSync(file('scripts/ci/replay-artifact.js'), helper);
     fs.copyFileSync('scripts/ci/show-ios-simulator.sh', file('scripts/ci/show-ios-simulator.sh'));
-    for (const name of ['startup.yaml', 'dismiss-quickstep-anr.yaml']) {
+    for (const name of ['startup.yaml', 'dismiss-quickstep-anr.yaml', 'dismiss-ios-password-save.yaml']) {
       fs.copyFileSync(`.maestro/${name}`, file(`.maestro/${name}`));
     }
     const archive = 'synthetic ZIP fixture, not a real app or archive';
