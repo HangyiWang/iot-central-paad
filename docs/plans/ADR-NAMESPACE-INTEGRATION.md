@@ -3,8 +3,8 @@
 Status: SAS-first prototype and native Home / Explore / Activity implemented.
 Source-specific retained-device acceptance is recorded below. The later
 Confluence refinement is installed on Windows with saved-context and genuine
-cold-restoration acceptance. Optional traversal remains partial; a native
-gradient-coverage correction awaits delivery.
+cold-restoration acceptance, including the corrected native gradient coverage.
+Optional Activity, Diagnostics and Bluetooth traversal remains partial.
 Date: 2026-09-21. Branch: `feature/adr-onboarding`.
 Parent: `modernize/paad-foundation`.
 
@@ -462,6 +462,41 @@ percentage sizing in a non-collapsible, unpadded absolute-fill viewport,
 preserving the approved colours and control geometry. Its native rendering
 confirmation and delivery are separate from the successful `1b1a552`
 preservation result above.
+
+The correction, source `ee99db9c59f4dbbcd2b4b8f14d6ded7367391dd4`,
+completed ordinary
+[run 35615328625](https://github.com/HangyiWang/iot-central-paad/actions/runs/35615328625),
+attempt 1, on all three lanes. Both hosted native images were inspected before
+installation: the primary control has full gradient coverage without the
+short upper-left capsule, and the Profile plate and labels remain aligned.
+
+| Binary | SHA-256 |
+| --- | --- |
+| Installed Android APK | `9358de1a7207caddb27a66c75831a83506f4ea7db45a92934a5f4681c798fdba` |
+| iOS Simulator ZIP | `3df3aabaf018ec7eec3d4117bc92d12624394a7ee77945e8a58d7b6d23696d2f` |
+
+The corrected APK was installed with `install -r` over `1b1a552`. Exact
+identity, Hub, model and Azure context matched a fresh pre-install baseline
+after upgrade and after a genuine stopped/new-process cold launch. No old
+context was restored over user data. The app was left running on Home,
+Connected, with connection Details closed.
+
+The four Home panels, three non-Bluetooth tools, initial visibility of all
+four Explore titles, and Activity controls were reached. Observation
+disclosure stopped at a scoped scroll. Diagnostics was attempted independently
+but stopped at a controls tap before log disclosure; the fixed record does not
+distinguish the exact failed control. These optional failures are not claimed
+as successful traversal, and their underlying causes remain unestablished.
+Bluetooth grants could not be established, so its entry was skipped without
+prompting or changing permissions. Native animation trajectories and
+large-text fit remain outside the completed coverage.
+
+The pre-install app was Disconnected for an unknown reason; only normal
+launch and automatic restoration were used, not a forced reconnect for
+motion. No data clearing, credential re-entry, storage injection, private
+captures, new live inputs, cloud proof, or OS/permission changes occurred.
+Owned observers, temporary payloads and active approval were cleaned;
+earlier delivery evidence was preserved.
 
 ### Completed simulator acceptance (2026-09-18)
 
