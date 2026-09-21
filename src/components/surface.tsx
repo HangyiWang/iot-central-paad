@@ -107,28 +107,37 @@ export const SurfaceFill = React.memo(function SurfacePaint({
   const [from, to] = surfaceStops(dark, paint);
   const id = `surface-${useId().replace(/\W/g, '')}`;
   return (
-    <Svg
+    <View
+      collapsable={false}
       pointerEvents="none"
       accessible={false}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      width="100%"
-      height="100%"
       style={StyleSheet.absoluteFill}>
-      <Defs>
-        <LinearGradient id={id} x1="0%" y1="0%" x2="0%" y2="100%">
-          <Stop offset="0" stopColor={from} />
-          <Stop offset="1" stopColor={to} />
-        </LinearGradient>
-      </Defs>
-      <Rect
+      {/* Resolve SVG percentages against an unpadded viewport, not the control's content box. */}
+      <Svg
+        pointerEvents="none"
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
         width="100%"
         height="100%"
-        rx={radius}
-        ry={radius}
-        fill={`url(#${id})`}
-      />
-    </Svg>
+        style={StyleSheet.absoluteFill}>
+        <Defs>
+          <LinearGradient id={id} x1="0%" y1="0%" x2="0%" y2="100%">
+            <Stop offset="0" stopColor={from} />
+            <Stop offset="1" stopColor={to} />
+          </LinearGradient>
+        </Defs>
+        <Rect
+          width="100%"
+          height="100%"
+          rx={radius}
+          ry={radius}
+          fill={`url(#${id})`}
+        />
+      </Svg>
+    </View>
   );
 });
 

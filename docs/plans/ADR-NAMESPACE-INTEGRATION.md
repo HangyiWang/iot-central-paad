@@ -2,8 +2,9 @@
 
 Status: SAS-first prototype and native Home / Explore / Activity implemented.
 Source-specific retained-device acceptance is recorded below. The later
-Confluence build is installed on Windows with partial native acceptance;
-the requested follow-on visual refinement awaits native delivery.
+Confluence refinement is installed on Windows with saved-context and genuine
+cold-restoration acceptance. Optional traversal remains partial; a native
+gradient-coverage correction awaits delivery.
 Date: 2026-09-21. Branch: `feature/adr-onboarding`.
 Parent: `modernize/paad-foundation`.
 
@@ -431,7 +432,36 @@ labels. Connection light has a broader swell and a trailing glint; large-text
 layouts use separately labelled horizontal relationship lanes rather than
 unanchored forks. Finite tool entry, selection and disclosure share one fluid
 curve. Disconnected, simulated, background and reduced-motion gates remain
-intact. This source refinement is not yet an installed acceptance.
+intact.
+
+Source `1b1a55211c5bd651be00726a769df7f606f9aa7a` completed ordinary
+[run 35609360569](https://github.com/HangyiWang/iot-central-paad/actions/runs/35609360569),
+attempt 1, on JavaScript, Android and iOS Simulator. Its Android APK was
+installed in place over `432ef4d`, without clearing data or re-entering
+credentials. Exact identity, Hub, model and Azure context matched a fresh
+pre-install baseline both after upgrade and after a confirmed stopped-process,
+new-process cold launch. The app was left on Home, Connected, in real mode.
+
+| Binary | SHA-256 |
+| --- | --- |
+| Installed Android APK | `26024799036bc83d2ed2caa4994565d4ac53f82a64981969a7bc731f666e041d` |
+| iOS Simulator ZIP | `f6bf42822fb0ee5c5e4bf2d4b773845fbc091b0f95355c5519e0fd6e5053af35` |
+
+Coverage reached all four Home panels, the three non-Bluetooth tools, all four
+initial Explore titles, and Activity filters/Latest. Optional Activity
+disclosure traversal stopped at a scoped scroll operation for a reason not
+established by the fixed evidence; diagnostics/logs were not reached.
+Bluetooth was skipped because existing grants could not be established.
+Neither animation trajectories nor large-text native coverage are claimed.
+There were no permission/settings changes, private captures, new live inputs
+or cloud-proof operations. Owned observers and active approvals were cleaned.
+
+Public credential-free screenshots from both native platforms then exposed
+partial gradient coverage inside padded controls. A follow-up isolates SVG
+percentage sizing in a non-collapsible, unpadded absolute-fill viewport,
+preserving the approved colours and control geometry. Its native rendering
+confirmation and delivery are separate from the successful `1b1a552`
+preservation result above.
 
 ### Completed simulator acceptance (2026-09-18)
 
