@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -9,9 +10,14 @@ import {
 } from 'react-native';
 import {Icon} from '@rneui/themed';
 import {useTheme} from '../hooks';
+import {usePressSettle} from '../hooks/press';
 import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
+import {SurfaceFill, SurfacePaintProps, surfaceStops} from './surface';
 import {Text} from './typography';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const RADIUS = 14;
 
 type Props = {
   label: string;
@@ -26,6 +32,7 @@ type Props = {
   external?: boolean;
   onInset?: boolean;
   block?: boolean;
+  visible?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -42,6 +49,7 @@ export default function DetailsAction({
   external = false,
   onInset = false,
   block = false,
+  visible = true,
   style,
 }: Props) {
   const {dark} = useTheme();
@@ -50,6 +58,11 @@ export default function DetailsAction({
   const primary = variant === 'primary';
   const danger = variant === 'danger';
   const quiet = variant === 'quiet';
+  const {pressed, scale, onPressIn, onPressOut} = usePressSettle(
+    'compact',
+    inactive,
+    visible,
+  );
   const color = inactive
     ? colors.muted
     : primary
@@ -57,17 +70,31 @@ export default function DetailsAction({
     : danger
     ? colors.danger
     : colors.primary;
+  // Painted actions share one gradient language: the lighter edge sits at the
+  // top so a control reads as lifted, and pressing deepens it instead of
+  // dimming the label.
+  const paint: SurfacePaintProps | null =
+    inactive || quiet
+      ? null
+      : {
+          tone: primary
+            ? 'primary'
+            : danger
+            ? 'danger'
+            : onInset
+            ? 'raised'
+            : 'secondary',
+          radius: RADIUS,
+          pressed,
+          ...(expanded && !primary && !danger ? {from: colors.tints[0]} : {}),
+        };
   const backgroundColor = inactive
     ? colors.inset
-    : primary
-    ? colors.primary
-    : danger
-    ? colors.dangerSurface
-    : expanded
-    ? colors.tints[0]
-    : onInset
-    ? colors.surface
-    : colors.inset;
+    : paint
+    ? surfaceStops(dark, paint)[0]
+    : pressed
+    ? colors.inset
+    : 'transparent';
   const trailing = external
     ? 'open-in-new'
     : expanded === undefined
@@ -89,7 +116,7 @@ export default function DetailsAction({
     </View>
   );
   return (
-    <Pressable
+    <AnimatedPressable
       testID={id}
       accessibilityRole={external ? 'link' : 'button'}
       accessibilityLabel={accessibilityLabel}
@@ -100,25 +127,26 @@ export default function DetailsAction({
       }}
       disabled={inactive}
       onPress={onPress}
-      style={({pressed}) => [
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      // The settle shrinks the paint, never the reachable target.
+      hitSlop={2}
+      style={[
         detailStyles.action,
+        primary && detailStyles.primaryAction,
         styles.control,
         block && styles.block,
-        {
-          backgroundColor:
-            pressed && !inactive && !primary ? colors.border : backgroundColor,
-          borderColor: danger
-            ? colors.danger
-            : primary && !inactive
-            ? colors.primary
-            : colors.controlBorder,
-        },
         quiet && styles.quiet,
-        quiet && pressed && !inactive && styles.pressedPrimary,
-        pressed && !inactive && primary && styles.pressedPrimary,
+        quiet || (primary && !inactive) ? styles.borderless : styles.edged,
+        {
+          backgroundColor,
+          borderColor: danger ? colors.danger : colors.controlBorder,
+        },
         inactive && detailStyles.disabled,
         style,
+        {transform: [{scale}]},
       ]}>
+      {paint && paint.tone !== 'danger' ? <SurfaceFill {...paint} /> : null}
       {busy ? (
         <ActivityIndicator size="small" color={color} />
       ) : icon ? (
@@ -134,7 +162,7 @@ export default function DetailsAction({
         {label}
       </Text>
       {trailing && glyph(trailing)}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -146,20 +174,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
   },
+  borderless: {borderWidth: 0},
+  edged: {borderWidth: StyleSheet.hairlineWidth},
   block: {alignSelf: 'stretch'},
   label: {flexShrink: 1, textAlign: 'center'},
   quiet: {
     minWidth: 48,
-    backgroundColor: 'transparent',
-    borderWidth: 0,
     paddingHorizontal: 0,
     paddingVertical: 10,
     gap: 6,
   },
   quietLabel: {fontSize: 13, lineHeight: 18},
-  pressedPrimary: {opacity: 0.82},
 });

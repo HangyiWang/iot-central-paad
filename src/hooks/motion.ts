@@ -1,6 +1,8 @@
 import {useEffect, useRef, useSyncExternalStore} from 'react';
 import {AccessibilityInfo, Animated, AppState, Easing} from 'react-native';
 
+export const FLUID_EASING = Easing.bezier(0.22, 0.7, 0.2, 1);
+
 const listeners = new Set<() => void>();
 let allowed = false;
 let generation = 0;
@@ -87,7 +89,7 @@ export function useGentleTransition(
     const animation = Animated.timing(progress, {
       toValue: 1,
       duration,
-      easing: Easing.out(Easing.cubic),
+      easing: FLUID_EASING,
       useNativeDriver: true,
       isInteraction: false,
     });

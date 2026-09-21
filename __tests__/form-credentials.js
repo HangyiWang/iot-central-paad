@@ -1,5 +1,6 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
+import {StyleSheet} from 'react-native';
 import Form from '../src/components/form';
 import Strings from '../src/strings';
 
@@ -53,4 +54,21 @@ test('changing the credential form resets reveal rather than exposing a new key'
     value: 'different-synthetic-key',
     rightIcon: {accessibilityLabel: Strings.Core.ShowCredential},
   });
+});
+
+test('credential reveal gives the actual icon pressable a full-size tonal target', async () => {
+  await act(async () => { app = renderer.create(tree([field])); });
+  const icon = app.root.findByType('Input').props.rightIcon;
+  expect(icon.accessibilityRole).toBe('button');
+  for (const pressed of [false, true]) {
+    const style = StyleSheet.flatten(icon.pressableProps.style({pressed}));
+    expect(style).toMatchObject({
+      minWidth: 48,
+      minHeight: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+    });
+    expect(style.opacity ?? 1).toBe(1);
+    if (pressed) expect(style.backgroundColor).toBeDefined();
+  }
 });

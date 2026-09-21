@@ -10,6 +10,7 @@ import {
   ScrollView,
   Platform,
   Alert,
+  StyleSheet,
   ViewStyle,
   TextStyle,
 } from 'react-native';
@@ -223,11 +224,14 @@ const RightElement = React.memo<{
         }}
         {...(Platform.OS === 'android' && {
           thumbColor: item.value
-            ? colors.primary
+            ? palette(dark).primary
             : dark
             ? colors.text
             : colors.background,
-          trackColor: {true: colors.border, false: colors.border},
+          trackColor: {
+            true: palette(dark).positiveSurface,
+            false: palette(dark).border,
+          },
         })}
       />
     );
@@ -247,13 +251,15 @@ const Root = React.memo<{items: ProfileItem[]; colors: any; dark: boolean}>(
         group: {
           borderRadius: 24,
           overflow: 'hidden',
-          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: appearance.surfaceBorder,
+          backgroundColor: appearance.surfaceRaised,
         },
         row: {
-          backgroundColor: colors.card,
+          backgroundColor: 'transparent',
           minHeight: 76,
           paddingHorizontal: 18,
-          borderBottomColor: appearance.border,
+          borderBottomColor: appearance.surfaceBorder,
         },
         icon: {
           width: 40,
@@ -277,6 +283,10 @@ const Root = React.memo<{items: ProfileItem[]; colors: any; dark: boolean}>(
       [colors, appearance],
     );
 
+    // A pressed row settles onto a gentle tonal fill instead of dimming its text.
+    const rowFeedback = ({pressed}: {pressed: boolean}) =>
+      pressed ? {backgroundColor: appearance.inset} : null;
+
     return (
       <ScrollView
         style={styles.container}
@@ -287,11 +297,9 @@ const Root = React.memo<{items: ProfileItem[]; colors: any; dark: boolean}>(
               key={`setting-${index}`}
               bottomDivider={index < items.length - 1}
               containerStyle={styles.row}
-              onPress={
-                item.action && item.action.type !== 'switch'
-                  ? item.action.fn.bind(null, nav)
-                  : undefined
-              }>
+              {...(item.action && item.action.type !== 'switch'
+                ? {style: rowFeedback, onPress: item.action.fn.bind(null, nav)}
+                : null)}>
               {item.icon && (
                 <View
                   style={[
@@ -322,7 +330,9 @@ const Root = React.memo<{items: ProfileItem[]; colors: any; dark: boolean}>(
               {item.action && (
                 <>
                   <RightElement item={item} colors={colors} dark={dark} />
-                  {item.action.type === 'expand' && <ListItem.Chevron />}
+                  {item.action.type === 'expand' && (
+                    <ListItem.Chevron color={appearance.muted} />
+                  )}
                 </>
               )}
               {item.value && typeof item.value === 'string' && (

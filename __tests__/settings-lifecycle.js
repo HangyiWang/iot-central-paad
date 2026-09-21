@@ -1,12 +1,13 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {Alert, Switch} from 'react-native';
+import {Alert, StyleSheet, Switch} from 'react-native';
 import Settings from '../src/Settings';
 import {StorageContext} from '../src/contexts/storage';
 import {IoTCContext} from '../src/contexts/iotc';
 import {ThemeContext} from '../src/contexts/theme';
 import {ThemeMode} from '../src/types';
 import {defaults} from '../src/contexts/defaults';
+import {palette} from '../src/theme/palette';
 import {
   useConnectIoTCentralClient,
   useSimulation,
@@ -154,4 +155,26 @@ test('failed simulation persistence does not optimistically flip the switch', as
   expect(app.root.findByType(Switch).props.value).toBe(false);
   expect(app.root.findByType(Switch).props.disabled).toBe(false);
   expect(JSON.stringify(report.mock.calls)).not.toContain('private-native');
+});
+
+test('settings rows keep their row semantics with a gentle pressed fill', () => {
+  const colors = palette(false);
+  const rows = app.root.findAllByType('ListItem');
+  const navigable = rows.filter(row => row.props.onPress);
+  expect(navigable.length).toBeGreaterThan(0);
+  for (const row of navigable) {
+    const container = StyleSheet.flatten(row.props.containerStyle);
+    expect(container.minHeight).toBeGreaterThanOrEqual(48);
+    expect(container.backgroundColor).toBe('transparent');
+    expect(row.props.style({pressed: false})).toBeNull();
+    expect(
+      StyleSheet.flatten(row.props.style({pressed: true})).backgroundColor,
+    ).toBe(colors.inset);
+    expect(
+      StyleSheet.flatten(row.props.style({pressed: true})).opacity,
+    ).toBeUndefined();
+  }
+  // A row without an action never advertises a press style.
+  const version = rows.find(row => !row.props.onPress);
+  expect(version.props.style).toBeUndefined();
 });

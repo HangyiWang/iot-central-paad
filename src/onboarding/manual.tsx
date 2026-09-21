@@ -10,6 +10,7 @@ import {
 import {DeviceCredentials, PHONE_MODEL_ID} from '../connection';
 import {useTheme} from '../hooks';
 import {Text, Name} from '../components/typography';
+import DetailsAction from '../components/detailsAction';
 import Strings from '../strings';
 import {palette} from '../theme/palette';
 
@@ -105,52 +106,82 @@ export function CredentialForm({
       <View style={styles.form}>
         <Name>{choices.find(choice => choice.mode === mode)?.label}</Name>
         {!readonly && (
-          <Pressable
-            testID="connection-methods"
-            accessibilityRole="button"
+          <DetailsAction
+            id="connection-methods"
+            label={manual.ChangeMethod}
             accessibilityLabel={manual.ChangeMethod}
-            accessibilityState={{expanded: showMethods, disabled: loading}}
+            variant="quiet"
+            expanded={showMethods}
             disabled={loading}
-            style={styles.changeMethod}
-            onPress={() => setShowMethods(value => !value)}>
-            <Text style={[styles.link, {color: colors.primary}]}>
-              {manual.ChangeMethod}
-            </Text>
-          </Pressable>
+            onPress={() => setShowMethods(value => !value)}
+          />
         )}
         {showMethods &&
-          choices.map(choice => (
-            <Pressable
-              key={choice.mode}
-              testID={`connection-mode-${choice.mode}`}
-              accessibilityRole="radio"
-              accessibilityLabel={choice.label}
-              accessibilityState={{
-                selected: mode === choice.mode,
-                disabled: readonly || loading,
-              }}
-              disabled={readonly || loading}
-              style={[
-                styles.choice,
-                {
-                  borderColor:
-                    mode === choice.mode
+          choices.map(choice => {
+            const selected = mode === choice.mode;
+            const inactive = readonly || loading;
+            return (
+              <Pressable
+                key={choice.mode}
+                testID={`connection-mode-${choice.mode}`}
+                accessibilityRole="radio"
+                accessibilityLabel={choice.label}
+                accessibilityState={{
+                  selected,
+                  disabled: inactive,
+                }}
+                disabled={inactive}
+                onPress={() => {
+                  setMode(choice.mode);
+                  setRevealed(false);
+                  setShowMethods(false);
+                }}
+                style={({pressed}) => [
+                  styles.choice,
+                  {
+                    borderColor: selected
                       ? colors.primary
-                      : appearance.controlBorder,
-                  backgroundColor:
-                    mode === choice.mode
-                      ? appearance.inset
-                      : appearance.surface,
-                },
-              ]}
-              onPress={() => {
-                setMode(choice.mode);
-                setRevealed(false);
-                setShowMethods(false);
-              }}>
-              <Text>{choice.label}</Text>
-            </Pressable>
-          ))}
+                      : appearance.surfaceBorder,
+                    backgroundColor:
+                      pressed && !inactive
+                        ? appearance.inset
+                        : selected
+                        ? appearance.inset
+                        : appearance.surface,
+                  },
+                  inactive && styles.inactiveChoice,
+                ]}>
+                <View
+                  accessible={false}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={[
+                    styles.radio,
+                    {
+                      borderColor: selected
+                        ? colors.primary
+                        : appearance.controlBorder,
+                    },
+                  ]}>
+                  {selected && (
+                    <View
+                      style={[
+                        styles.radioDot,
+                        {backgroundColor: colors.primary},
+                      ]}
+                    />
+                  )}
+                </View>
+                <Text
+                  style={[
+                    styles.choiceLabel,
+                    selected && {color: colors.primary},
+                  ]}>
+                  {choice.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         {mode === 'legacy' && (
           <Text style={{color: appearance.danger}}>{manual.LegacyWarning}</Text>
         )}
@@ -189,27 +220,26 @@ export function CredentialForm({
             />
           </View>
         ))}
-        <Pressable
-          accessibilityRole="button"
+        <DetailsAction
+          label={
+            revealed ? Strings.Core.HideCredential : Strings.Core.ShowCredential
+          }
           accessibilityLabel={
             revealed ? Strings.Core.HideCredential : Strings.Core.ShowCredential
           }
+          icon={revealed ? 'eye-off-outline' : 'eye-outline'}
+          variant="quiet"
           onPress={() => setRevealed(value => !value)}
-          style={styles.changeMethod}>
-          <Text style={[styles.link, {color: colors.primary}]}>
-            {revealed
-              ? Strings.Core.HideCredential
-              : Strings.Core.ShowCredential}
-          </Text>
-        </Pressable>
+        />
         {!readonly && (
-          <Pressable
-            testID="connection-submit"
-            accessibilityRole="button"
+          <DetailsAction
+            id="connection-submit"
+            label={manual.Footer.Connect}
             accessibilityLabel={manual.Footer.Connect}
-            accessibilityState={{disabled: loading}}
+            variant="primary"
+            block
             disabled={loading}
-            style={[styles.submit, {backgroundColor: colors.primary}]}
+            style={styles.submit}
             onPress={async () => {
               if (busy.current) {
                 return;
@@ -221,15 +251,8 @@ export function CredentialForm({
               } finally {
                 busy.current = false;
               }
-            }}>
-            <Text
-              style={[
-                styles.submitText,
-                dark ? styles.darkSubmitText : styles.lightSubmitText,
-              ]}>
-              {manual.Footer.Connect}
-            </Text>
-          </Pressable>
+            }}
+          />
         )}
       </View>
     </TouchableWithoutFeedback>
@@ -241,8 +264,6 @@ const styles = StyleSheet.create({
   sectionTitle: {marginTop: 16, marginBottom: 18},
   field: {marginBottom: 12},
   label: {fontSize: 13, lineHeight: 19, fontWeight: '500'},
-  link: {fontSize: 14, fontWeight: '600'},
-  changeMethod: {minHeight: 48, justifyContent: 'center'},
   input: {
     minHeight: 48,
     borderWidth: 1,
@@ -253,20 +274,25 @@ const styles = StyleSheet.create({
   },
   choice: {
     minHeight: 48,
-    justifyContent: 'center',
-    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 14,
-    padding: 14,
-    marginVertical: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 8,
   },
-  submit: {
-    minHeight: 52,
-    borderRadius: 16,
+  inactiveChoice: {opacity: 0.5},
+  choiceLabel: {flexShrink: 1},
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 16,
   },
-  submitText: {fontWeight: '600'},
-  darkSubmitText: {color: '#17252A'},
-  lightSubmitText: {color: '#fff'},
+  radioDot: {width: 10, height: 10, borderRadius: 5},
+  submit: {marginTop: 8, marginBottom: 16},
 });

@@ -327,3 +327,24 @@ it('stops motion in the layer that is not on screen instead of animating it hidd
   expect(view.root.findByType('DiagnosticsViewer').props.visible).toBe(false);
   expect(rendered(0).visible).toBe(true);
 });
+
+it('answers a disclosure press with a seated chevron, not a faded one', () => {
+  const observed = event(11, {kind: 'upload', outcome: 'requested'});
+  act(() => {
+    view = renderer.create(<ObservationRow event={observed} />);
+  });
+  const toggle = view.root
+    .findAllByProps({testID: 'activity-toggle-11'})
+    .find(node => typeof node.props.onPress === 'function');
+  expect(StyleSheet.flatten(toggle.props.style)).toMatchObject({
+    minWidth: 48,
+    minHeight: 48,
+  });
+  const colors = palette(false);
+  const chevron = pressed =>
+    StyleSheet.flatten(toggle.props.children({pressed}).props.style);
+  expect(chevron(false).backgroundColor).toBe('transparent');
+  expect(chevron(true).backgroundColor).toBe(colors.inset);
+  expect(chevron(true).opacity).toBeUndefined();
+  expect(chevron(true).borderColor).toBe(chevron(false).borderColor);
+});

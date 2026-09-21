@@ -2,6 +2,7 @@ import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import {StyleSheet} from 'react-native';
 import DetailsAction from '../src/components/detailsAction';
+import {surfaceStops} from '../src/components/surface';
 import {useTheme} from '../src/hooks';
 import {palette} from '../src/theme/palette';
 
@@ -11,8 +12,15 @@ jest.mock('@rneui/themed', () => ({Icon: 'Icon'}));
 
 let tree;
 const control = () => tree.root.findAllByProps({testID: 'action'})[0];
-const style = (pressed = false) =>
-  StyleSheet.flatten(control().props.style({pressed}));
+const style = () => StyleSheet.flatten(control().props.style);
+const fills = () =>
+  tree.root
+    .findAllByProps({radius: 14})
+    .filter(node => typeof node.type !== 'string' && node.props.tone);
+const press = (down = true) =>
+  act(() =>
+    down ? control().props.onPressIn() : control().props.onPressOut(),
+  );
 afterEach(() => act(() => tree?.unmount()));
 
 test.each([false, true])(
@@ -34,29 +42,32 @@ test.each([false, true])(
           />,
         );
       });
+      const tone =
+        variant === 'primary'
+          ? 'primary'
+          : variant === 'danger'
+          ? 'danger'
+          : 'secondary';
       expect(style()).toMatchObject({
-        minHeight: 48,
-        borderWidth: 1,
+        minHeight: variant === 'primary' ? 52 : 48,
         borderRadius: 14,
+        paddingHorizontal: 16,
         maxWidth: '100%',
         alignSelf: 'flex-start',
         flexDirection: 'row',
         gap: 8,
-        backgroundColor:
-          variant === 'primary'
-            ? colors.primary
-            : variant === 'danger'
-            ? colors.dangerSurface
-            : colors.inset,
+        backgroundColor: surfaceStops(dark, {tone})[0],
         borderColor:
-          variant === 'primary'
-            ? colors.primary
-            : variant === 'danger'
-            ? colors.danger
-            : colors.controlBorder,
+          variant === 'danger' ? colors.danger : colors.controlBorder,
+        borderWidth: variant === 'primary' ? 0 : StyleSheet.hairlineWidth,
       });
       expect(style().height).toBeUndefined();
-      expect(style(true)).not.toEqual(style());
+      // The reachable target never shrinks with the press settle.
+      expect(control().props.hitSlop).toBe(2);
+      // Flat danger stays flat; the other two carry the shared gradient.
+      expect(fills().map(fill => fill.props.tone)).toEqual(
+        variant === 'danger' ? [] : [tone],
+      );
       const label = tree.root.findByType('Text');
       expect(label.props.numberOfLines).toBeUndefined();
       expect(label.props.allowFontScaling).not.toBe(false);
@@ -65,6 +76,12 @@ test.each([false, true])(
         lineHeight: 20,
         fontWeight: '600',
         flexShrink: 1,
+        color:
+          variant === 'primary'
+            ? colors.onPrimary
+            : variant === 'danger'
+            ? colors.danger
+            : colors.primary,
       });
       expect(
         tree.root.findByType('Icon').parent.props.accessibilityElementsHidden,
@@ -75,8 +92,42 @@ test.each([false, true])(
   },
 );
 
+test.each(['primary', 'secondary', 'danger', 'quiet'])(
+  'answers a press with a deeper surface rather than a dimmed label (%s)',
+  variant => {
+    useTheme.mockReturnValue({dark: false});
+    act(() => {
+      tree = renderer.create(
+        <DetailsAction
+          id="action"
+          label="Send"
+          icon="send"
+          variant={variant}
+          onPress={() => {}}
+        />,
+      );
+    });
+    const resting = style();
+    const labelColor = () =>
+      StyleSheet.flatten(tree.root.findByType('Text').props.style).color;
+    const restingLabel = labelColor();
+    press();
+    const held = style();
+    expect(held.backgroundColor).not.toBe(resting.backgroundColor);
+    expect(held.opacity).toBeUndefined();
+    expect(labelColor()).toBe(restingLabel);
+    if (variant !== 'quiet' && variant !== 'danger') {
+      expect(fills()[0].props.pressed).toBe(true);
+    }
+    press(false);
+    expect(style().backgroundColor).toBe(resting.backgroundColor);
+    expect(fills()[0]?.props.pressed ?? false).toBe(false);
+  },
+);
+
 test('distinguishes external links, expanded toggles and disabled busy actions', () => {
   useTheme.mockReturnValue({dark: false});
+  const colors = palette(false);
   const onPress = jest.fn();
   act(() => {
     tree = renderer.create(
@@ -90,7 +141,11 @@ test('distinguishes external links, expanded toggles and disabled busy actions',
     );
   });
   expect(control().props.accessibilityRole).toBe('link');
-  expect(style().backgroundColor).toBe(palette(false).surface);
+  // On a recessed panel the action lifts with the raised pair.
+  expect(style().backgroundColor).toBe(
+    surfaceStops(false, {tone: 'raised'})[0],
+  );
+  expect(fills()[0].props.tone).toBe('raised');
   expect(tree.root.findByType('Icon').props.name).toBe('open-in-new');
   act(() => {
     tree.update(
@@ -105,9 +160,10 @@ test('distinguishes external links, expanded toggles and disabled busy actions',
   });
   expect(control().props.accessibilityState.expanded).toBe(true);
   expect(style()).toMatchObject({
-    backgroundColor: palette(false).tints[0],
+    backgroundColor: colors.tints[0],
     alignSelf: 'stretch',
   });
+  expect(fills()[0].props.from).toBe(colors.tints[0]);
   expect(tree.root.findByType('Icon').props.name).toBe('chevron-up');
   act(() => {
     tree.update(
@@ -125,12 +181,16 @@ test('distinguishes external links, expanded toggles and disabled busy actions',
     disabled: true,
     busy: true,
   });
+  // A held action stops being painted at all, so it cannot look live.
+  expect(fills()).toEqual([]);
   expect(style()).toMatchObject({
-    borderWidth: 1,
-    borderColor: palette(false).controlBorder,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.controlBorder,
+    backgroundColor: colors.inset,
     opacity: 0.5,
   });
-  expect(style(true)).toEqual(style());
+  press();
+  expect(style().backgroundColor).toBe(colors.inset);
   expect(onPress).not.toHaveBeenCalled();
 });
 
@@ -157,6 +217,7 @@ test.each([false, true])(
       backgroundColor: 'transparent',
       maxWidth: '100%',
     });
+    expect(fills()).toEqual([]);
     expect(control().props.accessibilityState.expanded).toBe(false);
     expect(
       StyleSheet.flatten(tree.root.findByType('Text').props.style),

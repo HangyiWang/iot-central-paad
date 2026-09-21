@@ -4,7 +4,11 @@ import {Animated, StyleSheet, Text, View} from 'react-native';
 import FluidDisclosure from '../src/components/fluidDisclosure';
 import {useMotionAllowed} from '../src/hooks/motion';
 
-jest.mock('../src/hooks/motion', () => ({useMotionAllowed: jest.fn()}));
+// Only the subscription is mocked; the shared curve stays the real one.
+jest.mock('../src/hooks/motion', () => ({
+  ...jest.requireActual('../src/hooks/motion'),
+  useMotionAllowed: jest.fn(),
+}));
 
 let view;
 let animations;

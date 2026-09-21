@@ -4,6 +4,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   StyleSheet,
   View,
@@ -11,9 +12,14 @@ import {
 } from 'react-native';
 import {Icon} from '@rneui/themed';
 import {useTheme} from '../hooks';
+import {usePressSettle} from '../hooks/press';
 import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
+import {SurfaceFill, SurfacePaintProps, surfaceStops} from './surface';
 import {Text} from './typography';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const RADIUS = 14;
 
 type Props = {
   id: string;
@@ -25,6 +31,7 @@ type Props = {
   busy?: boolean;
   expanded?: boolean;
   onInset?: boolean;
+  visible?: boolean;
   onPress(): void | Promise<void>;
 };
 
@@ -38,6 +45,7 @@ export default function DetailsRow({
   busy = false,
   expanded,
   onInset = false,
+  visible = true,
   onPress,
 }: Props) {
   const {dark} = useTheme();
@@ -46,17 +54,35 @@ export default function DetailsRow({
   const stacked = fontScale > 1.45;
   const inactive = disabled || busy;
   const accent = destructive ? appearance.danger : appearance.primary;
-  const background = destructive
-    ? appearance.dangerSurface
-    : expanded || !onInset
-    ? appearance.tints[0]
-    : appearance.surface;
+  const {pressed, scale, onPressIn, onPressOut} = usePressSettle(
+    'card',
+    inactive,
+    visible,
+  );
+  // Rows share the action gradient so a list of them reads as one material.
+  const paint: SurfacePaintProps | null = inactive
+    ? null
+    : {
+        tone: destructive
+          ? 'danger'
+          : expanded || !onInset
+          ? 'secondary'
+          : 'raised',
+        radius: RADIUS,
+        pressed,
+        ...(destructive || (!expanded && onInset)
+          ? {}
+          : {from: appearance.tints[0]}),
+      };
+  const background = paint ? surfaceStops(dark, paint)[0] : appearance.inset;
   // The glyph badge stays one step apart from the row it sits on, so rows keep
   // the same depth on a raised card and on the recessed Azure panel.
   const glyphBackground =
-    background === appearance.surface ? appearance.inset : appearance.surface;
+    !destructive && !expanded && onInset
+      ? appearance.inset
+      : appearance.surface;
   return (
-    <Pressable
+    <AnimatedPressable
       testID={id}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -68,16 +94,20 @@ export default function DetailsRow({
       }}
       disabled={inactive}
       onPress={onPress}
-      style={({pressed}) => [
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      hitSlop={2}
+      style={[
         styles.row,
         stacked && styles.stacked,
         {
           backgroundColor: background,
           borderColor: destructive ? appearance.danger : appearance.border,
         },
-        pressed && !inactive && {backgroundColor: appearance.border},
         inactive && detailStyles.disabled,
+        {transform: [{scale}]},
       ]}>
+      {paint && paint.tone !== 'danger' ? <SurfaceFill {...paint} /> : null}
       <View
         accessible={false}
         accessibilityElementsHidden
@@ -109,7 +139,7 @@ export default function DetailsRow({
           {supporting}
         </Text>
       </View>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -122,8 +152,8 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: RADIUS,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   stacked: {alignItems: 'flex-start'},
   glyph: {

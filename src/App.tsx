@@ -3,7 +3,7 @@
 // Licensed under the MIT License.
 
 import React, {useState, useEffect, useContext, useRef} from 'react';
-import {View, Platform, Pressable, StyleSheet} from 'react-native';
+import {Animated, View, Platform, Pressable, StyleSheet} from 'react-native';
 import Settings from './Settings';
 import {
   NavigationContainer,
@@ -46,6 +46,9 @@ import Options from 'components/options';
 import {TorchCameraHost} from './tools/Torch';
 import BrandTitle from './components/brandTitle';
 import PhoneMark from './components/phoneMark';
+import {SurfaceFill, surfaceStops} from './components/surface';
+import {usePressSettle} from './hooks/press';
+import {palette} from './theme/palette';
 
 const Stack = createStackNavigator<NavigationPages>();
 
@@ -275,21 +278,35 @@ export const Logo = React.memo(function HeaderLogo() {
 });
 
 export const Profile = React.memo((props: {navigate: any}) => {
-  const {colors} = useTheme();
+  const {dark} = useTheme();
+  const appearance = palette(dark);
+  const {pressed, scale, onPressIn, onPressOut} = usePressSettle('compact');
   return (
     <Pressable
       testID="app-settings"
       accessibilityRole="button"
       accessibilityLabel={Strings.Settings.Title}
       onPress={() => props.navigate(Pages.SETTINGS)}
-      style={({pressed}) => [
-        styles.settingsButton,
-        {backgroundColor: colors.card, opacity: pressed ? 0.7 : 1},
-      ]}>
-      <View
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      hitSlop={4}
+      style={styles.settingsButton}>
+      <Animated.View
         accessible={false}
         accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants">
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          styles.settingsPlate,
+          {
+            backgroundColor: surfaceStops(dark, {
+              tone: 'secondary',
+              pressed,
+            })[0],
+            borderColor: appearance.surfaceBorder,
+            transform: [{scale}],
+          },
+        ]}>
+        <SurfaceFill tone="secondary" pressed={pressed} radius={14} />
         <Icon
           name={
             Platform.select({
@@ -298,10 +315,10 @@ export const Profile = React.memo((props: {navigate: any}) => {
             }) as string
           }
           type={Platform.select({ios: 'ionicon', android: 'material'})}
-          color={colors.text}
-          size={22}
+          color={appearance.primary}
+          size={20}
         />
-      </View>
+      </Animated.View>
     </Pressable>
   );
 });
@@ -323,10 +340,18 @@ export const styles = StyleSheet.create({
   settingsButton: {
     minWidth: 48,
     minHeight: 48,
-    borderRadius: 16,
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  settingsPlate: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   marginHorizontal10: {
     marginHorizontal: 10,

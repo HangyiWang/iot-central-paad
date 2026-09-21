@@ -11,6 +11,7 @@ import {decodeAzureContextInput} from '../src/onboarding/azureContextInput';
 import Strings from '../src/strings';
 import {useTheme} from '../src/hooks';
 import {palette} from '../src/theme/palette';
+import {surfaceStops} from '../src/components/surface';
 
 jest.mock('../src/hooks', () => ({useTheme: jest.fn(() => ({dark: false}))}));
 jest.mock('../src/components/typography', () => ({Text: 'Text'}));
@@ -407,10 +408,14 @@ test.each([false, true])(
       ).toBe(true);
       expect(style(portal)).toMatchObject({
         minHeight: 48,
-        backgroundColor: colors.inset,
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         borderColor: colors.controlBorder,
       });
+      // Painted as a lifted secondary control, whichever ground it sits on.
+      expect([
+        surfaceStops(dark, {tone: 'secondary'})[0],
+        surfaceStops(dark, {tone: 'raised'})[0],
+      ]).toContain(style(portal).backgroundColor);
     }
     for (const id of [
       'azure-context-toggle',
@@ -421,7 +426,7 @@ test.each([false, true])(
       expect(style(control(id)).alignSelf).toBe('flex-start');
       expect(style(control(id))).toMatchObject({
         backgroundColor: colors.tints[0],
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         borderColor: colors.controlBorder,
       });
     }
@@ -432,7 +437,7 @@ test.each([false, true])(
     expect(style(control('azure-context-import-toggle'))).toMatchObject({
       minHeight: 48,
       borderRadius: 14,
-      backgroundColor: colors.surface,
+      backgroundColor: surfaceStops(dark, {tone: 'raised'})[0],
     });
     expect(style(control('azure-context-remove'))).toMatchObject({
       backgroundColor: colors.dangerSurface,
@@ -632,7 +637,7 @@ test.each([false, true])(
       expect(style(row)).toMatchObject({
         alignSelf: 'stretch',
         borderRadius: 14,
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         flexDirection: 'row',
       });
       expect(content()).toContain(hint);
@@ -641,7 +646,9 @@ test.each([false, true])(
       backgroundColor: colors.dangerSurface,
       borderColor: colors.danger,
     });
-    expect(style(toggle()).backgroundColor).toBe(colors.surface);
+    expect(style(toggle()).backgroundColor).toBe(
+      surfaceStops(dark, {tone: 'raised'})[0],
+    );
     expect(toggle().props.accessibilityState).toMatchObject({
       expanded: false,
       disabled: false,

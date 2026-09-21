@@ -1,7 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
   Animated,
-  Easing,
   I18nManager,
   Pressable,
   StyleSheet,
@@ -9,12 +8,10 @@ import {
   View,
 } from 'react-native';
 import {useTheme} from '../hooks';
-import {useMotionAllowed} from '../hooks/motion';
+import {FLUID_EASING, useMotionAllowed} from '../hooks/motion';
 import {palette} from '../theme/palette';
+import {SurfaceFill, surfaceStops} from './surface';
 import {Text} from './typography';
-
-/** One fluid curve for the selection thumb, shared with disclosure motion. */
-const fluid = Easing.bezier(0.22, 0.7, 0.2, 1);
 
 type Choice = {id: string; label: string};
 
@@ -60,7 +57,7 @@ export default function SelectionControl({
     const animation = Animated.timing(position, {
       toValue,
       duration: 260,
-      easing: fluid,
+      easing: FLUID_EASING,
       useNativeDriver: true,
       isInteraction: false,
     });
@@ -69,6 +66,9 @@ export default function SelectionControl({
   }, [direction, motion, position, segmentWidth, selected]);
 
   const thumbVisible = segmented && !stacked && segmentWidth > 0;
+  // The thumb is the one lifted piece of the control, so it carries the
+  // shared raised gradient rather than a flat fill.
+  const thumbPaint = {tone: 'raised', radius: 9} as const;
   return (
     <View
       accessible={false}
@@ -100,12 +100,13 @@ export default function SelectionControl({
             styles.thumb,
             {
               width: segmentWidth,
-              backgroundColor: colors.surface,
+              backgroundColor: surfaceStops(dark, thumbPaint)[0],
               borderColor: colors.border,
               transform: [{translateX: position}],
             },
-          ]}
-        />
+          ]}>
+          <SurfaceFill {...thumbPaint} />
+        </Animated.View>
       )}
       {options.map((option, index) => {
         const active = index === selected;
@@ -117,46 +118,47 @@ export default function SelectionControl({
             accessibilityLabel={option.label}
             accessibilityState={{selected: active}}
             onPress={() => onSelect(index === 0 ? 0 : 1)}
-            style={({pressed}) => [
-              styles.target,
-              segmented && !stacked && styles.segment,
-              pressed && styles.pressed,
-            ]}>
-            <View
-              pointerEvents="none"
-              style={[
-                styles.visual,
-                !segmented && styles.chip,
-                {
-                  backgroundColor:
-                    !segmented && active
-                      ? colors.tints[0]
-                      : segmented && active && !thumbVisible
-                      ? colors.surface
-                      : 'transparent',
-                  borderColor: !segmented
-                    ? active
-                      ? colors.primary
-                      : colors.border
-                    : active && !thumbVisible
-                    ? colors.border
-                    : 'transparent',
-                },
-              ]}>
-              <Text
+            style={[styles.target, segmented && !stacked && styles.segment]}>
+            {({pressed}) => (
+              <View
+                pointerEvents="none"
                 style={[
-                  styles.label,
+                  styles.visual,
+                  !segmented && styles.chip,
                   {
-                    color: active
-                      ? segmented
-                        ? colors.text
-                        : colors.primary
-                      : colors.muted,
+                    // A press deepens the seat instead of fading the label.
+                    backgroundColor:
+                      !segmented && active
+                        ? colors.tints[0]
+                        : segmented && active && !thumbVisible
+                        ? colors.surface
+                        : pressed
+                        ? colors.inset
+                        : 'transparent',
+                    borderColor: !segmented
+                      ? active
+                        ? colors.primary
+                        : colors.border
+                      : active && !thumbVisible
+                      ? colors.border
+                      : 'transparent',
                   },
                 ]}>
-                {option.label}
-              </Text>
-            </View>
+                <Text
+                  style={[
+                    styles.label,
+                    {
+                      color: active
+                        ? segmented
+                          ? colors.text
+                          : colors.primary
+                        : colors.muted,
+                    },
+                  ]}>
+                  {option.label}
+                </Text>
+              </View>
+            )}
           </Pressable>
         );
       })}
@@ -209,5 +211,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flexShrink: 1,
   },
-  pressed: {opacity: 0.7},
 });

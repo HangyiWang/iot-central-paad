@@ -350,7 +350,7 @@ function ConnectionChoices({
       testID="registration-choices"
       style={[
         styles.choices,
-        {backgroundColor: colors.surface, borderColor: colors.border},
+        {backgroundColor: colors.surface, borderColor: colors.surfaceBorder},
       ]}>
       <DetailsAction
         id="registration-scan"
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 12,
-    gap: 4,
+    gap: 8,
   },
   manual: {padding: 20, paddingBottom: 40},
   scannerFooter: {padding: 16, gap: 12, alignSelf: 'stretch'},

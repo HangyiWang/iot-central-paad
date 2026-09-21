@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,12 @@ import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
 import ToolStrings from './toolStrings';
 import AppBackground from '../components/appBackground';
+import {
+  SurfaceFill,
+  surfaceElevation,
+  surfaceStops,
+} from '../components/surface';
+import {usePressSettle} from '../hooks/press';
 
 export type ExploreTool =
   | 'Telemetry'
@@ -58,6 +65,82 @@ const tools: {
   },
 ];
 
+type Tool = (typeof tools)[number];
+
+/** One porcelain tile: the accent lives in the plate, not in the field. */
+function Tile({
+  tool,
+  index,
+  stacked,
+  onOpen,
+}: {
+  tool: Tool;
+  index: number;
+  stacked: boolean;
+  onOpen(route: ExploreTool): void;
+}) {
+  const {dark} = useTheme();
+  const colors = palette(dark);
+  const accent = colors.toolAccents[index];
+  const press = usePressSettle('card');
+  const paint = {tone: 'raised' as const, accent, pressed: press.pressed};
+  return (
+    <Animated.View
+      style={[
+        styles.frame,
+        stacked && styles.stackedFrame,
+        {transform: [{scale: press.scale}]},
+      ]}>
+      <Pressable
+        testID={`explore-tool-${tool.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`${tool.title}. ${tool.detail}`}
+        onPress={() => onOpen(tool.route)}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        hitSlop={2}
+        style={[
+          detailStyles.card,
+          styles.tool,
+          stacked && styles.stackedTool,
+          surfaceElevation(dark, 'raised'),
+          {
+            backgroundColor: surfaceStops(dark, paint)[0],
+            borderColor: colors.surfaceBorder,
+          },
+        ]}>
+        <SurfaceFill {...paint} radius={24} />
+        <View
+          testID={`explore-plate-${tool.id}`}
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.icon}>
+          <SurfaceFill
+            radius={15}
+            from={accent}
+            to={colors.toolAccentEnds[index]}
+          />
+          <Icon
+            name={tool.icon}
+            type="material-community"
+            color={colors.toolOnAccent}
+            size={23}
+          />
+        </View>
+        <View style={styles.body}>
+          <Text style={[detailStyles.sectionTitle, {color: colors.text}]}>
+            {tool.title}
+          </Text>
+          <Text style={[detailStyles.supporting, {color: colors.muted}]}>
+            {tool.detail}
+          </Text>
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export default function Explore({onOpen}: {onOpen(tool: ExploreTool): void}) {
   const {dark} = useTheme();
   const colors = palette(dark);
@@ -83,48 +166,13 @@ export default function Explore({onOpen}: {onOpen(tool: ExploreTool): void}) {
           testID="explore-tools-grid"
           style={[styles.tools, stacked && styles.stackedTools]}>
           {tools.map((tool, index) => (
-            <Pressable
+            <Tile
               key={tool.route}
-              testID={`explore-tool-${tool.id}`}
-              accessibilityRole="button"
-              accessibilityLabel={`${tool.title}. ${tool.detail}`}
-              onPress={() => onOpen(tool.route)}
-              style={({pressed}) => [
-                detailStyles.card,
-                styles.tool,
-                stacked && styles.stackedTool,
-                {
-                  backgroundColor: colors.toolSurfaces[index],
-                  borderColor: colors.border,
-                  opacity: pressed ? 0.86 : 1,
-                },
-              ]}>
-              <View
-                accessible={false}
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                style={[
-                  styles.icon,
-                  {
-                    backgroundColor: colors.toolAccents[index],
-                  },
-                ]}>
-                <Icon
-                  name={tool.icon}
-                  type="material-community"
-                  color={colors.toolOnAccent}
-                  size={23}
-                />
-              </View>
-              <View style={styles.body}>
-                <Text style={[detailStyles.sectionTitle, {color: colors.text}]}>
-                  {tool.title}
-                </Text>
-                <Text style={[detailStyles.supporting, {color: colors.muted}]}>
-                  {tool.detail}
-                </Text>
-              </View>
-            </Pressable>
+              tool={tool}
+              index={index}
+              stacked={stacked}
+              onOpen={onOpen}
+            />
           ))}
         </View>
         <Text style={[detailStyles.supporting, {color: colors.muted}]}>
@@ -141,10 +189,11 @@ const styles = StyleSheet.create({
   heading: {gap: 6, marginBottom: 4},
   tools: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
   stackedTools: {flexDirection: 'column'},
+  frame: {flexBasis: '47%', flexGrow: 1, minWidth: 0},
+  stackedFrame: {flexBasis: 'auto', width: '100%'},
   tool: {
-    flexBasis: '47%',
+    // Grow into the row height the frame already claims, so faces align.
     flexGrow: 1,
-    minWidth: 0,
     minHeight: 180,
     alignItems: 'flex-start',
     borderRadius: 24,
@@ -153,11 +202,10 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   stackedTool: {
-    flexBasis: 'auto',
+    flexGrow: 0,
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 104,
-    width: '100%',
   },
   icon: {
     width: 44,

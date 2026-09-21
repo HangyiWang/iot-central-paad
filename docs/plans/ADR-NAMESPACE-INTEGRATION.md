@@ -1,9 +1,10 @@
 # PAAD ADR namespace integration plan
 
-Status: SAS-first prototype and native Home / Explore / Activity implemented;
-retained-device Android/iOS connected traversal, cloud proof, cold restoration
-and in-place Windows emulator delivery completed.
-Date: 2026-09-20. Branch: `feature/adr-onboarding`.
+Status: SAS-first prototype and native Home / Explore / Activity implemented.
+Source-specific retained-device acceptance is recorded below. The later
+Confluence build is installed on Windows with partial native acceptance;
+the requested follow-on visual refinement awaits native delivery.
+Date: 2026-09-21. Branch: `feature/adr-onboarding`.
 Parent: `modernize/paad-foundation`.
 
 ## CI-first update (2026-09-16)
@@ -363,6 +364,74 @@ This is emulator/Simulator acceptance, not physical-phone signing, large-text,
 media-upload or direct-Hub acceptance. The registry association was retained,
 not newly created; downstream telemetry receipt remains unchecked. No new Azure
 resources, IAM privileges or raw diagnostic capture were included.
+
+#### Native Confluence delivery and follow-on refinement (2026-09-21)
+
+The approved Botanical/Prismatic union added the bundled, licensed static
+Fraunces heading **Phone as a Device**, a warm forest palette, responsive
+Explore tiles, two-way Home connectors, and finite native interaction motion.
+The existing runtime, credentials, model and protocol ownership were retained.
+
+The first ordinary build, `35543271731` on `fb6f92b`, exposed the Android
+welcome footer underneath the system navigation bar. Source `58a6227` fixed
+measured safe-area padding and theme-aware status icons without removing the
+startup assertions. Android then passed in `35544976110`; its iOS run was
+interrupted by the optional native `Save Password?` sheet. The existing form
+already opts out of autofill. A narrowly gated, one-time `Not Now` step was
+added to the credential-free startup flow, retaining the return-screen and
+cold-launch requirements. Its shared replay expectations and fixtures were
+synchronized after the JavaScript-only failure in `35560783118`.
+
+Ordinary credential-free JavaScript, Android and iOS Simulator lanes completed
+on source `432ef4d8af9be964f8841e1b2893e61a11cb8f29` in
+[run 35561339204](https://github.com/HangyiWang/iot-central-paad/actions/runs/35561339204),
+attempt 1. Both packages contain the reviewed Fraunces bytes; the hosted
+synthetic images show the correct heading and corrected system-bar layout.
+
+| Binary | SHA-256 |
+| --- | --- |
+| Installed Android APK | `8e93a6ae505b14cb4cbec2ce8d4649ee1c8b5635230522024289e3a6fcaf2cca` |
+| iOS Simulator ZIP | `4c7cfc3c646e4dc2e4a85d17499abde20855c38cc19f3963e678c7236b11bb56` |
+
+The Android APK was installed with `install -r`, without clearing data,
+uninstalling, re-entering credentials or injecting storage. Exact
+identity/Hub/model and saved Azure context matched after the upgrade.
+A real process stop/relaunch initially showed Connected, but full
+cold-context confirmation remained incomplete; a later observation showed
+Disconnected. The cause of that connection loss was not established.
+
+Windows coverage reached the four Home panels, the three non-Bluetooth tools,
+and Activity filters/Latest. All four Explore titles were initially visible
+at normal font scale. Bluetooth entry was skipped because existing permission
+metadata could not be established. Activity disclosure completion and
+diagnostic-log traversal remain incomplete; later visible detail bounds do
+not retroactively establish a completed traversal or an animation trajectory.
+No full Windows acceptance or new connected iOS traversal is claimed.
+
+The later read-only motion observation found a compact Home at approximately
+411 dp and font scale 1.0, in real mode but Disconnected. Android transition
+and window animation scales were `1.0`; animator scale was unset. The
+installed React Native rule therefore indicates Reduce Motion false, although
+the JavaScript hook state was not inspected. Disconnected status explains
+the map's intentional stillness, not every reported missing animation.
+
+Provenance remains in `build/actions-installed-432ef4d.json` and
+`build/native-confluence-delivery/runs/432ef4d8af9be964f8841e1b2893e61a11cb8f29-35561339204/delivery-final.json`.
+Owned observers and temporary device payloads were removed; the app was left
+on Home. There were no new dedicated live inputs, operator cloud setup/proof
+operations, permission changes or private Windows captures. Earlier live proof
+belongs to its earlier source and is not substituted for this delivery.
+
+The owner subsequently requested more perceptible legitimate motion,
+porcelain/mineral Explore gradients with restrained depth, an integrated
+Activity footer action, and consistent controls throughout the app. That
+Opus 5/high refinement now uses a shared porcelain material, mineral icon
+plates, a full-width Activity footer, and tonal press feedback without dimming
+labels. Connection light has a broader swell and a trailing glint; large-text
+layouts use separately labelled horizontal relationship lanes rather than
+unanchored forks. Finite tool entry, selection and disclosure share one fluid
+curve. Disconnected, simulated, background and reduced-motion gates remain
+intact. This source refinement is not yet an installed acceptance.
 
 ### Completed simulator acceptance (2026-09-18)
 

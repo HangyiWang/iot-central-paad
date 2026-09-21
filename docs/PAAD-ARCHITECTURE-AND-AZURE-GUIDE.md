@@ -93,6 +93,12 @@ telemetry store, and a namespace link is not proof that any message arrived.
   `Home.tsx` places Home, Explore, and Activity under one device runtime.
   Switching tabs does not intentionally create a second client or a second set
   of sensor and command handlers.
+- **Shared visual controls:** `components/surface.tsx` paints the subtle
+  gradients, while `hooks/press.ts` gives buttons their short press feedback.
+  These are local drawing and interaction helpers, not extra Azure clients.
+  The connection map's moving light is decoration, not measured traffic or
+  proof of delivery. It stays still when disconnected and respects the phone's
+  Reduce Motion setting; controls remain usable without movement.
 - **Shared runtime:** `DeviceRuntime` owns sensor intent, properties, callbacks,
   and property submissions. The hooks obtain the same client from `IoTCContext`.
   Property drafts survive movement between tool screens in memory; they are not
@@ -134,7 +140,7 @@ Versions below describe the current [package manifest](../package.json).
 | **Expo Sensors, Battery, Location; `react-native-device-info`** | Phone measurements, hardware availability, permission-aware location, and device information. |
 | **Expo Camera and Image Picker** | QR scanning, camera/torch presentation, and selecting or taking an image. Selecting an image starts its upload. |
 | **`react-native-ble-plx` and permissions support** | Bluetooth Low Energy advertisement scanning and OS access checks. PAAD does not implement arbitrary Bluetooth pairing or characteristic read/write tools. |
-| **`react-native-svg`, `react-native-maps`** | Bundled charts and native location-map presentation. Android map display needs build-time configuration; coordinates can still be shown without it. |
+| **`react-native-svg`, `react-native-maps`** | Bundled charts, connection-map drawings, subtle gradients, and native location-map presentation. Android location-map display needs build-time configuration; coordinates can still be shown without it. |
 | **Jest / React Native Testing Library, ESLint / Prettier** | Developer tests, static checks, and formatting. These are development tools, not cloud services. |
 
 The native Fraunces font is included in the app, so displaying it does not

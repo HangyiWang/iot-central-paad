@@ -1,12 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {
-  Animated,
-  Easing,
-  LayoutChangeEvent,
-  StyleSheet,
-  View,
-} from 'react-native';
-import {useMotionAllowed} from '../hooks/motion';
+import {Animated, LayoutChangeEvent, StyleSheet, View} from 'react-native';
+import {FLUID_EASING, useMotionAllowed} from '../hooks/motion';
 
 type Phase = 'closed' | 'opening' | 'open' | 'closing';
 
@@ -20,8 +14,6 @@ type Props = {
   openDuration?: number;
   closeDuration?: number;
 };
-
-const easing = Easing.bezier(0.22, 0.7, 0.2, 1);
 
 /**
  * A finite height transition around real content. Static content is the
@@ -66,7 +58,7 @@ export default function FluidDisclosure({
     const animation = Animated.timing(progress, {
       toValue: opening ? 1 : 0,
       duration: opening ? openDuration : closeDuration,
-      easing,
+      easing: FLUID_EASING,
       useNativeDriver: false,
       isInteraction: false,
     });

@@ -32,11 +32,8 @@ export default function RegistrationActions({
         title={Strings.Core.Close}
         type="outline"
         containerStyle={[styles.control, stacked && styles.stackedControl]}
-        buttonStyle={[
-          styles.button,
-          {backgroundColor: colors.surface, borderColor: colors.controlBorder},
-        ]}
-        titleStyle={[styles.title, {color: colors.text}]}
+        buttonStyle={styles.button}
+        titleStyle={styles.title}
         onPress={onClose}
       />
       <Button
@@ -52,7 +49,7 @@ export default function RegistrationActions({
         iconContainerStyle={styles.icon}
         type="solid"
         containerStyle={[styles.control, stacked && styles.stackedControl]}
-        buttonStyle={[styles.button, {backgroundColor: colors.primary}]}
+        buttonStyle={styles.primaryButton}
         titleStyle={styles.title}
         onPress={onRegisterNew}
       />
@@ -67,6 +64,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    alignItems: 'center',
     gap: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
@@ -75,6 +73,12 @@ const styles = StyleSheet.create({
   stackedControl: {width: '100%', maxWidth: 320},
   button: {
     minHeight: 48,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+  },
+  primaryButton: {
+    minHeight: 52,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 14,

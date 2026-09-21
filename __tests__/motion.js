@@ -2,6 +2,7 @@ import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import {AccessibilityInfo, Animated, AppState, View} from 'react-native';
 import {
+  FLUID_EASING,
   useDecorativeLoop,
   useGentleTransition,
   useMotionAllowed,
@@ -241,6 +242,7 @@ test('tool entry can use a longer finite duration without changing its motion ga
   await act(async () => resolvePreference(false));
   expect(timing.mock.calls[0][1]).toMatchObject({
     duration: 460,
+    easing: FLUID_EASING,
     isInteraction: false,
     useNativeDriver: true,
   });

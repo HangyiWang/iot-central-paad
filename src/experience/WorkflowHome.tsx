@@ -9,6 +9,7 @@ import {
   AccessibilityInfo,
   Animated,
   findNodeHandle,
+  I18nManager,
   Modal,
   Platform,
   Pressable,
@@ -20,6 +21,7 @@ import {
 import Svg, {Path} from 'react-native-svg';
 import {Icon} from '@rneui/themed';
 import AppBackground from '../components/appBackground';
+import Surface, {SurfaceFill} from '../components/surface';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useIsFocused} from '@react-navigation/native';
 import {IoTCContext} from '../contexts/iotc';
@@ -34,8 +36,9 @@ import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
 import {projectSetup} from './setupProjection';
 import {ExperienceStrings} from './strings';
-import ChannelFlow, {Channel} from './ChannelFlow';
+import ChannelFlow, {Channel, ChannelId} from './ChannelFlow';
 import {useDecorativeLoop, useGentleTransition} from '../hooks/motion';
+import {usePressSettle} from '../hooks/press';
 
 export type WorkflowHomeProps = {
   sensors: ItemProps[];
@@ -53,6 +56,13 @@ const MAP_BORDER = 1;
 const MAP_PADDING = 5;
 const SERVICE_GAP = 30;
 const PHONE_WIDTH_PERCENT = 42;
+const STACKED_PATH_PADDING = 4;
+/** Room for a lane's own caret, so each end reads as a head and not a stub. */
+const LANE_EDGE = 10;
+/** Below this there is no honest route to draw, only invalid coordinates. */
+const MIN_ROUTE_WIDTH = 2 * LANE_EDGE + 8;
+const drawable = (value: number | null): value is number =>
+  value !== null && Number.isFinite(value) && value >= MIN_ROUTE_WIDTH;
 
 function focus(target: View | null | undefined) {
   const handle = target ? findNodeHandle(target) : null;
@@ -117,14 +127,39 @@ export default function WorkflowHome({
       typeof client?.isConnected === 'function' &&
       client.isConnected(),
   );
-  const flowing = connected && onStage && !stacked;
+  const flowing = connected && onStage;
   const flowProgress = useDecorativeLoop(flowing);
-  const channels: Channel[] = [
-    ...(projection.mode !== 'hub'
-      ? [{id: 'dps' as const, from: dpsPhoneX, to: phoneLeftX}]
-      : []),
-    {id: 'hub' as const, from: hubPhoneX, to: phoneRightX},
+  const activityPress = usePressSettle('footer', false, onStage);
+  // The caret leads toward the next screen, whichever way reading runs.
+  const trailing = I18nManager.isRTL ? -1 : 1;
+  const activityNudge = activityPress.progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 4 * trailing],
+  });
+  // Stacked services are one full width column, so no fork could touch them.
+  // Each stacked pair gets its own captioned lane, measured on its own row.
+  const [laneWidth, setLaneWidth] = useState<number | null>(null);
+  // Captions lead and stand alone until a real width arrives; no route is
+  // ever drawn from a guessed, zero or negative coordinate space.
+  const laneReady = drawable(laneWidth);
+  const measuredLane = laneReady ? laneWidth : 0;
+  const mapReady = drawable(measuredWidth);
+  const lane = {from: LANE_EDGE, to: measuredLane - LANE_EDGE};
+  const routes: ChannelId[] = [
+    ...(projection.mode !== 'hub' ? (['dps'] as const) : []),
+    'hub' as const,
   ];
+  const channels: Channel[] = routes.map(id => {
+    const from = id === 'dps' ? dpsPhoneX : hubPhoneX;
+    const to = id === 'dps' ? phoneLeftX : phoneRightX;
+    return {
+      id,
+      from: I18nManager.isRTL ? measuredWidth - from : from,
+      to: I18nManager.isRTL ? measuredWidth - to : to,
+    };
+  });
+  // Grey while the phone is not connected: the route is real, the light is not.
+  const routeColor = connected ? colors.channel : colors.controlBorder;
   const mapArrival = useGentleTransition(
     `${stacked}:${projection.mode}`,
     onStage,
@@ -576,12 +611,11 @@ export default function WorkflowHome({
             {text.Simulation}
           </Text>
         )}
-        <View
+        <Surface
           testID="home-map"
-          style={[
-            styles.card,
-            {backgroundColor: colors.surface, borderColor: colors.border},
-          ]}>
+          level="raised"
+          radius={20}
+          style={styles.card}>
           <Text
             style={[
               detailStyles.supporting,
@@ -610,7 +644,7 @@ export default function WorkflowHome({
                 },
               ]}>
               {node('adr')}
-              {stacked ? (
+              {stacked || !mapReady ? (
                 note(text.NamespaceLinks)
               ) : (
                 <Animated.View pointerEvents="none" style={namespaceLineStyle}>
@@ -642,24 +676,49 @@ export default function WorkflowHome({
                 {node('hub')}
               </View>
             </View>
-            {!stacked && (
-              <ChannelFlow
-                width={measuredWidth}
-                channels={channels}
-                color={colors.primary}
-                // The light must read brighter than its route in either theme.
-                glow={dark ? colors.positive : colors.positiveSurface}
-                flowing={flowing}
-                progress={flowProgress}
-                style={phoneLineStyle}
-              />
-            )}
-            {stacked && (
-              <View
-                style={[styles.stackedPaths, {borderColor: colors.primary}]}>
-                {projection.mode !== 'hub' && note(text.PhoneDpsPath)}
-                {note(text.PhoneHubPath)}
+            {stacked ? (
+              <View testID="home-map-stacked-paths" style={styles.stackedPaths}>
+                {routes.map(id => (
+                  <View
+                    key={id}
+                    testID={`home-map-lane-${id}`}
+                    onLayout={event =>
+                      setLaneWidth(event.nativeEvent.layout.width)
+                    }
+                    style={styles.lane}>
+                    {note(id === 'dps' ? text.PhoneDpsPath : text.PhoneHubPath)}
+                    {laneReady && (
+                      <ChannelFlow
+                        width={measuredLane}
+                        channels={[{id, ...lane}]}
+                        layout="lane"
+                        linesTestID={`home-map-lane-${id}-lines`}
+                        color={routeColor}
+                        glow={colors.channelGlow}
+                        peak={dark ? 0.7 : 0.85}
+                        connected={connected}
+                        flowing={flowing}
+                        progress={flowProgress}
+                        style={phoneLineStyle}
+                      />
+                    )}
+                  </View>
+                ))}
               </View>
+            ) : (
+              mapReady && (
+                <ChannelFlow
+                  width={measuredWidth}
+                  channels={channels}
+                  color={routeColor}
+                  glow={colors.channelGlow}
+                  peak={dark ? 0.7 : 0.85}
+                  connected={connected}
+                  flowing={flowing}
+                  progress={flowProgress}
+                  style={phoneLineStyle}
+                />
+              )
             )}
             <View
               testID="home-map-phone"
@@ -674,7 +733,7 @@ export default function WorkflowHome({
             style={[detailStyles.supporting, {color: colors.muted}]}>
             {`${text.MapLegend} ${text.FlowHint}`}
           </Text>
-        </View>
+        </Surface>
         {(connectionAttention || sensorAttention) && (
           <View testID="home-attention" style={styles.attention}>
             <Text
@@ -698,25 +757,70 @@ export default function WorkflowHome({
               )}
           </View>
         )}
-        <View
+        <Surface
           testID="home-communication"
-          style={[
-            styles.card,
-            {backgroundColor: colors.surface, borderColor: colors.border},
-          ]}>
+          level="raised"
+          radius={20}
+          style={styles.card}>
           <Text
             accessibilityRole="header"
             style={[detailStyles.sectionTitle, {color: colors.text}]}>
             {text.Communication}
           </Text>
           {communication ?? note(text.CommunicationEmpty)}
-          <DetailsAction
-            id="home-activity"
-            label={text.Activity}
-            icon="pulse"
+          <Pressable
+            testID="home-activity"
+            accessibilityRole="button"
+            accessibilityLabel={text.Activity}
+            accessibilityHint={text.ActivityHint}
             onPress={onActivity}
-          />
-        </View>
+            onPressIn={activityPress.onPressIn}
+            onPressOut={activityPress.onPressOut}
+            hitSlop={2}
+            style={[styles.footer, {borderColor: colors.surfaceBorder}]}>
+            <SurfaceFill
+              tone="footer"
+              radius={16}
+              pressed={activityPress.pressed}
+            />
+            <View
+              testID="home-activity-plate"
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={[
+                styles.footerPlate,
+                {backgroundColor: colors.positiveSurface},
+              ]}>
+              <Icon
+                name="pulse"
+                type="material-community"
+                size={20}
+                color={colors.primary}
+              />
+            </View>
+            <Text
+              style={[
+                detailStyles.actionLabel,
+                styles.footerLabel,
+                {color: colors.primary},
+              ]}>
+              {text.Activity}
+            </Text>
+            <Animated.View
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={{transform: [{translateX: activityNudge}]}}>
+              <Icon
+                name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+                type="material-community"
+                size={18}
+                color={colors.muted}
+              />
+            </Animated.View>
+          </Pressable>
+        </Surface>
       </ScrollView>
       <Modal
         visible={panel !== null}
@@ -833,7 +937,26 @@ const styles = StyleSheet.create({
   content: {paddingTop: 16, gap: 12},
   kicker: {textTransform: 'none', letterSpacing: 0.6, marginBottom: -4},
   deviceSubtitle: {opacity: 0.88},
-  card: {borderRadius: 20, borderWidth: 1, padding: 14, gap: 10},
+  card: {padding: 14, gap: 10},
+  footer: {
+    minHeight: 56,
+    borderRadius: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 2,
+  },
+  footerPlate: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerLabel: {flexGrow: 1, flexShrink: 1, minWidth: 0},
   map: {width: '100%', maxWidth: 440, alignSelf: 'center'},
   azure: {
     borderWidth: MAP_BORDER,
@@ -868,12 +991,11 @@ const styles = StyleSheet.create({
   phone: {width: `${PHONE_WIDTH_PERCENT}%`, alignSelf: 'center'},
   stackedPhone: {width: '100%'},
   stackedPaths: {
-    marginHorizontal: 12,
-    borderLeftWidth: 2,
-    borderRightWidth: 2,
-    padding: 12,
-    gap: 8,
+    paddingHorizontal: STACKED_PATH_PADDING,
+    paddingTop: 12,
+    gap: 14,
   },
+  lane: {gap: 2},
   attention: {gap: 8},
   attentionRow: {
     minHeight: 48,

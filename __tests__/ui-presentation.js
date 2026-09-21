@@ -5,6 +5,7 @@ import CardView from '../src/CardView';
 import {Headline, Detail, Name, Text} from '../src/components/typography';
 import {cardTint, palette} from '../src/theme/palette';
 import {Loader} from '../src/components/loader';
+import {surfaceStops} from '../src/components/surface';
 
 jest.mock('../src/hooks', () => ({
   useTheme: () => ({
@@ -119,6 +120,66 @@ function luminance(hex) {
   return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
 }
 
+function lightness(hex) {
+  const value = luminance(hex);
+  return value > 0.008856 ? 116 * Math.cbrt(value) - 16 : 903.3 * value;
+}
+
+test.each([false, true])(
+  'surface gradients stay quiet and readable in dark=%s',
+  dark => {
+    const colors = palette(dark);
+    const contrast = (foreground, background) =>
+      (Math.max(luminance(foreground), luminance(background)) + 0.05) /
+      (Math.min(luminance(foreground), luminance(background)) + 0.05);
+    for (const pressed of [false, true]) {
+      for (const tone of [
+        'raised',
+        'secondary',
+        'primary',
+        'footer',
+        'danger',
+        'inset',
+      ]) {
+        const stops = surfaceStops(dark, {tone, pressed});
+        expect(
+          Math.abs(lightness(stops[0]) - lightness(stops[1])),
+        ).toBeLessThanOrEqual(6);
+        const foreground =
+          tone === 'primary'
+            ? colors.onPrimary
+            : tone === 'danger'
+            ? colors.danger
+            : colors.primary;
+        for (const stop of stops)
+          expect(contrast(foreground, stop)).toBeGreaterThanOrEqual(4.5);
+      }
+      for (const [index, accent] of colors.toolAccents.entries()) {
+        const stops = surfaceStops(dark, {tone: 'raised', accent, pressed});
+        expect(
+          Math.abs(lightness(stops[0]) - lightness(stops[1])),
+        ).toBeLessThanOrEqual(6);
+        for (const stop of stops) {
+          for (const foreground of [colors.text, colors.muted]) {
+            expect(contrast(foreground, stop)).toBeGreaterThanOrEqual(4.5);
+          }
+        }
+        for (const stop of [accent, colors.toolAccentEnds[index]]) {
+          expect(contrast(colors.toolOnAccent, stop)).toBeGreaterThanOrEqual(
+            4.5,
+          );
+        }
+        expect(
+          Math.abs(lightness(accent) - lightness(colors.toolAccentEnds[index])),
+        ).toBeLessThanOrEqual(6);
+      }
+    }
+    expect(
+      Math.abs(lightness(colors.channelGlow) - lightness(colors.channel)),
+    ).toBeGreaterThanOrEqual(25);
+  },
+);
+
 test.each([false, true])(
   'pastel surfaces retain readable text and controls in dark=%s',
   dark => {
@@ -193,7 +254,22 @@ test('the blocking busy state stays in-tree so it cannot compete with a native s
   expect(JSON.stringify(view.toJSON())).toContain(
     'Connecting to the assigned IoT Hub...',
   );
-  view.root.findByType('Button').props.onPress();
+  const cancelControl = () => view.root.findByType('Button');
+  expect(cancelControl().props.type).toBe('clear');
+  expect(
+    Native.StyleSheet.flatten(cancelControl().props.buttonStyle),
+  ).toMatchObject({
+    minHeight: 48,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  });
+  act(() => cancelControl().props.onPressIn({}));
+  expect(
+    Native.StyleSheet.flatten(cancelControl().props.buttonStyle)
+      .backgroundColor,
+  ).toBe(palette(false).inset);
+  act(() => cancelControl().props.onPressOut({}));
+  cancelControl().props.onPress();
   expect(cancel).toHaveBeenCalledTimes(1);
 });
 

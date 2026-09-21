@@ -210,3 +210,20 @@ test('rows learn their visibility and position from the feed, never from navigat
     view.root.findAllByProps({testID: 'log-payload-61'}).length,
   ).toBeGreaterThan(0);
 });
+
+it('seats the log disclosure under a press instead of fading it', () => {
+  const record = entry(77, 'Telemetry sent');
+  act(() => {
+    view = renderer.create(<LogEvent entry={record} />);
+  });
+  const toggle = view.root
+    .findAllByProps({testID: 'log-toggle-77'})
+    .find(node => node.props.onPress);
+  expect(controlStyle(toggle)).toMatchObject({minWidth: 48, minHeight: 48});
+  const colors = palette(false);
+  const chevron = pressed =>
+    StyleSheet.flatten(toggle.props.children({pressed}).props.style);
+  expect(chevron(false).backgroundColor).toBe('transparent');
+  expect(chevron(true).backgroundColor).toBe(colors.inset);
+  expect(chevron(true).opacity).toBeUndefined();
+});

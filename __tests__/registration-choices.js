@@ -4,6 +4,7 @@ import {ScrollView, StyleSheet} from 'react-native';
 import {Registration} from '../src/Registration';
 import {RegistrationScreens} from '../src/types';
 import {palette} from '../src/theme/palette';
+import {surfaceStops} from '../src/components/surface';
 import Strings from '../src/strings';
 
 jest.mock('@react-navigation/stack', () => {
@@ -103,9 +104,14 @@ test('the welcome screen groups one restrained scan action with a quiet manual e
   const scanStyle = flatten(scan);
   expect(scan.props.accessibilityRole).toBe('button');
   expect(scan.props.accessibilityLabel).toBe(Strings.Registration.QRCode.Scan);
+  // The primary paint starts at the forest primary and deepens downward.
+  expect(scanStyle.backgroundColor).toBe(
+    surfaceStops(false, {tone: 'primary'})[0],
+  );
   expect(scanStyle.backgroundColor).toBe(colors.primary);
-  // Restrained: the standard action height, not an oversized hero button.
-  expect(scanStyle.minHeight).toBe(48);
+  // Restrained: one standard primary height, not an oversized hero button.
+  expect(scanStyle.minHeight).toBeGreaterThanOrEqual(48);
+  expect(scanStyle.minHeight).toBeLessThanOrEqual(52);
   expect(scanStyle.alignSelf).toBe('stretch');
 
   const manual = control('registration-manual');
@@ -117,6 +123,7 @@ test('the welcome screen groups one restrained scan action with a quiet manual e
   // Quiet: unpainted and borderless, but still a full 48pt target.
   expect(manualStyle.backgroundColor).toBe('transparent');
   expect(manualStyle.borderWidth).toBe(0);
+  expect(manualStyle.opacity).toBeUndefined();
   expect(manualStyle.minHeight).toBeGreaterThanOrEqual(48);
   expect(manualStyle.minWidth).toBeGreaterThanOrEqual(48);
 });
@@ -170,14 +177,14 @@ test('the scanner footer keeps a legible manual action that cancels before repla
   const manual = scanner.root
     .findAllByProps({testID: 'registration-manual'})
     .find(node => node.props.onPress);
+  expect(flatten(manual).alignSelf).toBe('stretch');
   // Over the camera the manual action stays painted so it remains readable.
-  const style = StyleSheet.flatten(
-    typeof manual.props.style === 'function'
-      ? manual.props.style({pressed: false})
-      : manual.props.style,
+  const style = flatten(manual);
+  expect(style.backgroundColor).toBe(
+    surfaceStops(false, {tone: 'secondary'})[0],
   );
-  expect(style.backgroundColor).toBe(colors.inset);
-  expect(style.minHeight).toBe(48);
+  expect(style.backgroundColor).not.toBe('transparent');
+  expect(style.minHeight).toBeGreaterThanOrEqual(48);
   expect(manual.props.accessibilityLabel).toBe(
     Strings.Registration.QRCode.Manually,
   );

@@ -46,19 +46,35 @@ const CardView = React.memo<{
       sectionTitle: {marginBottom: 4},
       sectionDetail: {marginBottom: 12},
       listItem: {
+        minHeight: 56,
+        justifyContent: 'center',
         backgroundColor: colors.card,
       },
+      actionItem: {
+        minHeight: 56,
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
+      },
       listItemText: {
-        fontWeight: 'bold',
+        fontWeight: '600',
         fontSize: normalize(16),
-        color: colors.text,
+        color: appearance.text,
       },
       detailItemText: {
-        fontSize: normalize(14),
-        color: colors.text,
+        fontSize: normalize(15),
+        fontWeight: '600',
+        color: appearance.primary,
       },
     }),
-    [colors],
+    [colors, appearance],
+  );
+
+  // Popup actions keep their row semantics: a tonal fill, never a dimmed label.
+  const rowFeedback = React.useCallback(
+    ({pressed}: {pressed: boolean}) => ({
+      backgroundColor: pressed ? appearance.inset : colors.card,
+    }),
+    [appearance, colors.card],
   );
 
   const onCardLongPress = React.useCallback<CardPressCallback>(
@@ -166,7 +182,8 @@ const CardView = React.memo<{
               bottomItem.retry?.();
               setBottomItem(undefined);
             }}
-            containerStyle={styles.listItem}>
+            style={rowFeedback}
+            containerStyle={styles.actionItem}>
             <ListItem.Content>
               <ListItem.Title style={styles.detailItemText}>
                 {Strings.Sensors.Retry}
@@ -180,7 +197,8 @@ const CardView = React.memo<{
             // close sheet
             setBottomItem(undefined);
           }}
-          containerStyle={styles.listItem}>
+          style={rowFeedback}
+          containerStyle={styles.actionItem}>
           <ListItem.Content>
             <ListItem.Title style={styles.detailItemText}>
               {bottomItem?.enabled

@@ -2,9 +2,10 @@
 // Licensed under the MIT License.
 
 import React from 'react';
-import {AppState, AppStateStatus, Button, StyleSheet, View} from 'react-native';
+import {AppState, AppStateStatus, StyleSheet, View} from 'react-native';
 import {BarcodeScanningResult, Camera, CameraView} from 'expo-camera';
 import {Text} from './typography';
+import DetailsAction from './detailsAction';
 import Strings from '../strings';
 import {acquireCamera} from '../tools/Torch';
 
@@ -190,11 +191,26 @@ export default class QRCodeScanner extends React.Component<
           {this.state.error && (
             <Text style={styles.message}>{this.state.error}</Text>
           )}
-          {!this.state.active && (
-            <Button title={Strings.Core.Retry} onPress={this.reactivate} />
-          )}
-          {onClose && (
-            <Button title={Strings.Core.Close} onPress={this.close} />
+          {(!this.state.active || onClose) && (
+            <View style={styles.controls}>
+              {!this.state.active && (
+                <DetailsAction
+                  label={Strings.Core.Retry}
+                  icon="reload"
+                  variant="primary"
+                  block
+                  onPress={this.reactivate}
+                />
+              )}
+              {onClose && (
+                <DetailsAction
+                  label={Strings.Core.Close}
+                  variant="secondary"
+                  block
+                  onPress={this.close}
+                />
+              )}
+            </View>
           )}
           {bottomContent}
         </View>
@@ -205,6 +221,12 @@ export default class QRCodeScanner extends React.Component<
 
 const styles = StyleSheet.create({
   overlay: {flex: 1, alignItems: 'center', justifyContent: 'center'},
+  controls: {
+    alignSelf: 'stretch',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 8,
+  },
   marker: {borderWidth: 3, borderColor: 'white'},
   message: {
     textAlign: 'center',

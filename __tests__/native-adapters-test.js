@@ -58,6 +58,9 @@ jest.mock('react-native-ble-plx', () => ({
   State: {PoweredOn: 'PoweredOn'},
 }));
 jest.mock('../src/components/typography', () => ({Text: 'Text'}));
+// This suite exercises adapter logic against a minimal react-native stub, so the
+// shared themed action is stubbed instead of pulling the whole UI kit in.
+jest.mock('../src/components/detailsAction', () => 'DetailsAction');
 jest.mock('expo-camera', () => ({
   CameraView: 'CameraView',
   Camera: {

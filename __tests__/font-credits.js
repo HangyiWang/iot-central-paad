@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import FontCredits from '../src/components/fontCredits';
 import Strings from '../src/strings';
 import {StyleSheet} from 'react-native';
+import {palette} from '../src/theme/palette';
 
 jest.mock('../src/hooks', () => ({useTheme: () => ({dark: false})}));
 jest.mock('expo-constants', () => ({
@@ -53,3 +54,25 @@ it.each([undefined, '', 42])(
     );
   },
 );
+
+it('presents the disclosure as a quiet control with a tonal pressed step', () => {
+  act(() => {
+    tree = renderer.create(<FontCredits />);
+  });
+  const toggle = tree.root.findByProps({testID: 'font-credits-toggle'});
+  expect(toggle.props.accessibilityRole).toBe('button');
+  const target = StyleSheet.flatten(toggle.props.style);
+  expect(target.minHeight).toBeGreaterThanOrEqual(48);
+  expect(target.backgroundColor).toBeUndefined();
+  const fill = pressed =>
+    StyleSheet.flatten(toggle.props.children({pressed}).props.style);
+  expect(fill(false).backgroundColor).toBeUndefined();
+  expect(fill(false).borderWidth).toBeUndefined();
+  // Pressed feedback deepens the background instead of dimming the label.
+  expect(fill(true).backgroundColor).toBe(palette(false).inset);
+  expect(fill(true).opacity).toBeUndefined();
+  const label = tree.root.findAllByType('Text')[0];
+  expect(StyleSheet.flatten(label.props.style).color).toBe(
+    palette(false).primary,
+  );
+});

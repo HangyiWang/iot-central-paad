@@ -34,7 +34,9 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import AzureContextPanel from './azureContextPanel';
 import DetailsAction from './detailsAction';
 import DetailsRow from './detailsRow';
+import {SurfaceFill, surfaceStops} from './surface';
 import {useGentleTransition} from '../hooks/motion';
+import {usePressSettle} from '../hooks/press';
 
 export default function ConnectionSummary({
   onManualConnection,
@@ -581,6 +583,7 @@ function SummaryAction({
 }) {
   const {dark} = useTheme();
   const appearance = palette(dark);
+  const {pressed, scale, onPressIn, onPressOut} = usePressSettle('compact');
   return (
     <Pressable
       testID={id}
@@ -588,34 +591,41 @@ function SummaryAction({
       accessibilityLabel={label}
       accessibilityState={accessibilityState}
       onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       hitSlop={8}
       style={[styles.detailsAction, stacked && styles.stackedAction]}>
-      {({pressed}) => (
-        <View
-          style={[
-            styles.actionPill,
-            stacked && styles.stackedAction,
-            {backgroundColor: pressed ? appearance.border : appearance.inset},
-            pressed && styles.pressedPill,
-          ]}>
-          <Text style={[styles.rowAction, {color: appearance.primary}]}>
-            {title}
-          </Text>
-          {disclosure && (
-            <View
-              accessible={false}
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants">
-              <Icon
-                name="chevron-right"
-                type="material-community"
-                color={appearance.primary}
-                size={16}
-              />
-            </View>
-          )}
-        </View>
-      )}
+      <Animated.View
+        style={[
+          styles.actionPill,
+          stacked && styles.stackedAction,
+          {
+            backgroundColor: surfaceStops(dark, {
+              tone: 'secondary',
+              pressed,
+            })[0],
+            borderColor: appearance.surfaceBorder,
+            transform: [{scale}],
+          },
+        ]}>
+        <SurfaceFill tone="secondary" pressed={pressed} radius={14} />
+        <Text style={[styles.rowAction, {color: appearance.primary}]}>
+          {title}
+        </Text>
+        {disclosure && (
+          <View
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants">
+            <Icon
+              name="chevron-right"
+              type="material-community"
+              color={appearance.primary}
+              size={16}
+            />
+          </View>
+        )}
+      </Animated.View>
     </Pressable>
   );
 }
@@ -738,13 +748,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 14,
-    gap: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 4,
+    overflow: 'hidden',
   },
   stackedAction: {alignSelf: 'stretch'},
-  pressedPill: {transform: [{scale: 0.97}]},
   label: detailStyles.label,
   supporting: {fontSize: 12, lineHeight: 17},
   notice: {paddingTop: 8},

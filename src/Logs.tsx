@@ -200,22 +200,29 @@ export const LogEvent = React.memo(
               }: ${entry.logItem.eventName}`}
               accessibilityState={{expanded}}
               onPress={() => setExpanded(current => !current)}
-              style={({pressed}) => [
-                styles.disclosure,
-                pressed && styles.pressed,
-              ]}>
-              <View
-                accessible={false}
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                style={[styles.chevron, {borderColor: appearance.border}]}>
-                <Icon
-                  name={expanded ? 'chevron-up' : 'chevron-down'}
-                  type="material-community"
-                  size={16}
-                  color={appearance.muted}
-                />
-              </View>
+              style={styles.disclosure}>
+              {({pressed}) => (
+                <View
+                  accessible={false}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={[
+                    styles.chevron,
+                    {
+                      borderColor: appearance.border,
+                      backgroundColor: pressed
+                        ? appearance.inset
+                        : 'transparent',
+                    },
+                  ]}>
+                  <Icon
+                    name={expanded ? 'chevron-up' : 'chevron-down'}
+                    type="material-community"
+                    size={16}
+                    color={appearance.muted}
+                  />
+                </View>
+              )}
             </Pressable>
           </View>
           <Text selectable style={styles.eventTitle}>
@@ -288,7 +295,6 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginEnd: -8,
   },
-  pressed: {opacity: 0.6},
   feed: {paddingHorizontal: 20, paddingBottom: 24, flexGrow: 1},
   eventRow: {flexDirection: 'row', gap: 12},
   timeline: {width: 12, alignItems: 'center'},

@@ -9,6 +9,9 @@ import {
   validProofNonce,
 } from '../src/onboarding/proof';
 import {connectionDiagnostics} from '../src/onboarding/diagnostics';
+import {StyleSheet} from 'react-native';
+import {palette} from '../src/theme/palette';
+import {surfaceStops} from '../src/components/surface';
 import {ConnectionError} from '../src/connection/errors';
 import {PHONE_MODEL_ID} from '../src/connection';
 import ThemeProvider from '../src/contexts/theme';
@@ -291,4 +294,79 @@ test('diagnostic DTO allowlists identity and safe errors, never credentials or h
   expect(
     connectionDiagnostics(identity, 'connected', true, true, null).deviceId,
   ).toBeUndefined();
+});
+
+test('credential controls follow one hierarchy and keep the method choices radios', () => {
+  const colors = palette(false);
+  act(() => {
+    view = render(
+      <CredentialForm
+        credentials={null}
+        readonly={false}
+        loading={false}
+        submit={jest.fn()}
+      />,
+    );
+  });
+  const style = node => StyleSheet.flatten(node.props.style);
+
+  // Primary: the single painted commitment, gradient from the forest primary.
+  const connect = control('connection-submit');
+  expect(connect.props.accessibilityRole).toBe('button');
+  expect(style(connect).backgroundColor).toBe(
+    surfaceStops(false, {tone: 'primary'})[0],
+  );
+  expect(style(connect).minHeight).toBeGreaterThanOrEqual(48);
+  expect(style(connect).alignSelf).toBe('stretch');
+  expect(style(connect).opacity).toBeUndefined();
+
+  // Quiet: the method disclosure stays unpainted and keeps its expanded state.
+  const methods = control('connection-methods');
+  expect(style(methods).backgroundColor).toBe('transparent');
+  expect(style(methods).borderWidth).toBe(0);
+  expect(style(methods).minHeight).toBeGreaterThanOrEqual(48);
+  expect(methods.props.accessibilityState).toMatchObject({expanded: false});
+  act(() => methods.props.onPress());
+  expect(
+    control('connection-methods').props.accessibilityState.expanded,
+  ).toBe(true);
+
+  // Choices stay radios with a selected affordance, not solid buttons.
+  const choice = control('connection-mode-individual');
+  expect(choice.props.accessibilityRole).toBe('radio');
+  expect(choice.props.accessibilityState.selected).toBe(true);
+  const chosen = StyleSheet.flatten(choice.props.style({pressed: false}));
+  expect(chosen.backgroundColor).toBe(colors.inset);
+  expect(chosen.borderColor).toBe(colors.primary);
+  expect(chosen.minHeight).toBeGreaterThanOrEqual(48);
+  const other = StyleSheet.flatten(
+    control('connection-mode-hub').props.style({pressed: false}),
+  );
+  expect(other.backgroundColor).toBe(colors.surface);
+  expect(other.backgroundColor).not.toBe(
+    surfaceStops(false, {tone: 'primary'})[0],
+  );
+  // A pressed row steps its background rather than dimming the label.
+  const held = StyleSheet.flatten(
+    control('connection-mode-hub').props.style({pressed: true}),
+  );
+  expect(held.backgroundColor).toBe(colors.inset);
+  expect(held.opacity).toBeUndefined();
+});
+
+test('a connection in flight leaves the credential controls honest', () => {
+  act(() => {
+    view = render(
+      <CredentialForm
+        credentials={null}
+        readonly={false}
+        loading
+        submit={jest.fn()}
+      />,
+    );
+  });
+  for (const id of ['connection-submit', 'connection-methods']) {
+    expect(control(id).props.disabled).toBe(true);
+    expect(control(id).props.accessibilityState.disabled).toBe(true);
+  }
 });

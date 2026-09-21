@@ -144,5 +144,6 @@ export const ExperienceStrings = {
     Communication: 'Latest observations',
     CommunicationEmpty: 'No communication observations are available here.',
     Activity: 'View Activity',
+    ActivityHint: 'Opens the full observation and diagnostics trail.',
   },
 };

@@ -6,6 +6,7 @@ import {Alert, Share, Modal, Platform, StyleSheet} from 'react-native';
 import {PHONE_MODEL_ID} from '../src/connection/types';
 import {ConnectionError} from '../src/connection/errors';
 import {palette} from '../src/theme/palette';
+import {surfaceStops} from '../src/components/surface';
 import Strings from '../src/strings';
 jest.mock('@rneui/themed', () => ({Icon: 'Icon'}));
 jest.mock('react-native-safe-area-context', () => ({
@@ -29,6 +30,13 @@ const clear = jest.fn();
 const manual = jest.fn();
 const originalOS = Platform.OS;
 const text = () => JSON.stringify(view.toJSON());
+// The painted pill inside a compact summary action; it carries no touch target.
+const pill = control =>
+  control.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      StyleSheet.flatten(node.props.style)?.minHeight === 40,
+  )[0];
 const press = label =>
   view.root
     .findAll(
@@ -244,28 +252,38 @@ it.each([false, true])(
     });
     const disclosure = view.root
       .findAllByProps({testID: 'connection-details'})
-      .find(node => typeof node.props.children === 'function');
+      .find(node => node.props.onPress);
     expect(StyleSheet.flatten(disclosure.props.style)).toMatchObject({
       minHeight: 48,
       minWidth: 92,
     });
-    expect(
-      StyleSheet.flatten(
-        disclosure.props.children({pressed: false}).props.style,
-      ),
-    ).toMatchObject({
-      backgroundColor: palette(dark).inset,
+    expect(StyleSheet.flatten(pill(disclosure).props.style)).toMatchObject({
+      backgroundColor: surfaceStops(dark, {tone: 'secondary'})[0],
       minHeight: 40,
       borderRadius: 14,
+      borderWidth: StyleSheet.hairlineWidth,
     });
+    // Pressed feedback is a tonal background step, never dimmed text.
+    act(() => disclosure.props.onPressIn());
+    const held = StyleSheet.flatten(pill(disclosure).props.style);
+    expect(held.backgroundColor).toBe(
+      surfaceStops(dark, {tone: 'secondary', pressed: true})[0],
+    );
+    expect(held.backgroundColor).not.toBe(
+      surfaceStops(dark, {tone: 'secondary'})[0],
+    );
+    expect(held.opacity).toBeUndefined();
     expect(
-      StyleSheet.flatten(
-        disclosure.props.children({pressed: true}).props.style,
-      ),
-    ).toMatchObject({
-      backgroundColor: palette(dark).border,
-      transform: [{scale: 0.97}],
-    });
+      view.root
+        .findAllByType('Text')
+        .every(
+          node => StyleSheet.flatten(node.props.style)?.opacity === undefined,
+        ),
+    ).toBe(true);
+    act(() => disclosure.props.onPressOut());
+    expect(
+      StyleSheet.flatten(pill(disclosure).props.style).backgroundColor,
+    ).toBe(surfaceStops(dark, {tone: 'secondary'})[0]);
   },
 );
 
@@ -299,16 +317,15 @@ it.each([
     expect(status.props.maxFontSizeMultiplier).toBeUndefined();
     const action = view.root
       .findAllByProps({testID: 'connection-details'})
-      .find(node => typeof node.props.children === 'function');
+      .find(node => node.props.onPress);
     expect(
       StyleSheet.flatten(action.props.style).minHeight,
     ).toBeGreaterThanOrEqual(48);
     if (direction === 'column') {
       expect(StyleSheet.flatten(action.props.style).alignSelf).toBe('stretch');
-      expect(
-        StyleSheet.flatten(action.props.children({pressed: false}).props.style)
-          .alignSelf,
-      ).toBe('stretch');
+      expect(StyleSheet.flatten(pill(action).props.style).alignSelf).toBe(
+        'stretch',
+      );
     }
   },
 );
@@ -334,10 +351,14 @@ it('keeps simulation honest during loading and gives Cancel the same real touch 
   });
   const action = view.root
     .findAllByProps({testID: 'connection-cancel'})
-    .find(node => typeof node.props.children === 'function');
+    .find(node => node.props.onPress);
   expect(StyleSheet.flatten(action.props.style)).toMatchObject({
     minHeight: 48,
     minWidth: 92,
+  });
+  expect(StyleSheet.flatten(pill(action).props.style)).toMatchObject({
+    backgroundColor: surfaceStops(false, {tone: 'secondary'})[0],
+    borderRadius: 14,
   });
   await act(async () => {
     await action.props.onPress();
@@ -614,17 +635,17 @@ it.each([
     expect(style(control('connection-details-close'))).toMatchObject({
       minHeight: 48,
       borderRadius: 14,
-      paddingHorizontal: 14,
-      borderWidth: 1,
+      paddingHorizontal: 16,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.controlBorder,
-      backgroundColor: colors.inset,
+      backgroundColor: surfaceStops(dark, {tone: 'secondary'})[0],
     });
     for (const id of ['connection-reconnect', 'connection-manual']) {
       expect(style(control(id))).toMatchObject({
         minHeight: 48,
         borderRadius: 14,
         paddingHorizontal: 14,
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         borderColor: colors.border,
         backgroundColor: colors.tints[0],
       });
@@ -688,9 +709,7 @@ it('styles share failures and disabled forgetting without changing their actions
   const forget = view.root.findAllByProps({testID: 'connection-forget'})[0];
   expect(forget.props.disabled).toBe(true);
   expect(forget.props.accessibilityState.disabled).toBe(true);
-  expect(StyleSheet.flatten(forget.props.style({pressed: false})).opacity).toBe(
-    0.5,
-  );
+  expect(StyleSheet.flatten(forget.props.style).opacity).toBe(0.5);
   await act(async () => {
     finish();
     await pending;
@@ -740,7 +759,7 @@ it.each([false, true])(
       expect(style(control(id))).toMatchObject({
         minHeight: 48,
         borderRadius: 14,
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         paddingHorizontal: 14,
         flexDirection: 'row',
         alignItems: 'center',
@@ -861,7 +880,7 @@ it.each([
       expect(rowStyle).toMatchObject({
         alignSelf: 'stretch',
         borderRadius: 14,
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         flexDirection: 'row',
         alignItems: fontScale > 1.45 ? 'flex-start' : 'center',
       });

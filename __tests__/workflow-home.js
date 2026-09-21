@@ -12,8 +12,16 @@ import {parseAzureContext} from '../src/onboarding/azureContext';
 import {useTheme} from '../src/hooks';
 import {palette} from '../src/theme/palette';
 import {detailStyles} from '../src/theme/detailStyles';
-import {useDecorativeLoop} from '../src/hooks/motion';
-import {caretPath, channelPath} from '../src/experience/ChannelFlow';
+import {useDecorativeLoop, useGentleTransition} from '../src/hooks/motion';
+import ChannelFlow, {
+  FEATHER,
+  LANE_HEIGHT,
+  STRIP_HEIGHT,
+  caretPath,
+  channelPath,
+  laneCaretPath,
+  lanePath,
+} from '../src/experience/ChannelFlow';
 
 const Native = require('react-native');
 
@@ -325,7 +333,7 @@ test.each([320, 360, 440])(
       `0 0 ${serviceWidth} 24`,
     );
     expect(control('home-map-phone-lines').props.viewBox).toBe(
-      `0 0 ${measuredWidth} 34`,
+      `0 0 ${measuredWidth} ${STRIP_HEIGHT}`,
     );
     expect(namespace[0]).toBeCloseTo(serviceWidth / 2);
     expect(namespace[3]).toBeCloseTo(serviceNodeWidth / 2);
@@ -352,7 +360,7 @@ test.each([320, 360, 440])(
     expect(phoneLeftX + phoneRightX).toBeCloseTo(measuredWidth);
     // Neither route bends into a smile: it stays vertical, runs, then lands.
     expect(dps[1]).toBe(1);
-    expect(dps[dps.length - 1]).toBe(33);
+    expect(dps[dps.length - 1]).toBe(STRIP_HEIGHT - 1);
     for (const path of [dps, hub]) {
       for (let index = 1; index < path.length; index += 2)
         expect(path[index]).toBeLessThanOrEqual(path[path.length - 1]);
@@ -372,20 +380,78 @@ test.each([320, 360, 440])(
 
 test('draws only one solid two-way connector per service and keeps ADR dashed', () => {
   render();
+  const colors = palette(false);
+  const route = id => control(`home-map-phone-${id}-path`);
+  expect(control('home-map-namespace-path').props.strokeDasharray).toBe('4 3');
+  // Exactly one route and one caret pair per service, and nothing else solid.
   const solid = tree.root
     .findAllByType('Path')
     .filter(path => !path.props.strokeDasharray);
-  expect(control('home-map-namespace-path').props.strokeDasharray).toBe('4 3');
-  expect(solid).toHaveLength(4);
+  const ids = solid.map(path => path.props.testID).sort();
+  expect(ids).toEqual([
+    'home-map-phone-dps-arrows',
+    'home-map-phone-dps-path',
+    'home-map-phone-dps-tint',
+    'home-map-phone-hub-arrows',
+    'home-map-phone-hub-path',
+    'home-map-phone-hub-tint',
+  ]);
   for (const path of solid) {
-    expect(path.props.stroke).toBe(palette(false).primary);
     expect(path.props.strokeLinecap).toBe('round');
     expect(path.props.strokeLinejoin).toBe('round');
+    expect(path.props.fill).toBe('none');
+  }
+  for (const id of ['dps', 'hub']) {
+    expect(route(id).props.stroke).toBe(colors.channel);
+    expect(control(`home-map-phone-${id}-arrows`).props.stroke).toBe(
+      colors.channel,
+    );
+    // The connected tint rides the identical route, never a second shape.
+    const tint = control(`home-map-phone-${id}-tint`);
+    expect(tint.props.d).toBe(route(id).props.d);
+    expect(tint.props.stroke).toBe(colors.channelGlow);
+    expect(tint.props.strokeOpacity).toBe(0.14);
+    expect(tint.props.strokeWidth).toBeGreaterThan(route(id).props.strokeWidth);
   }
   // No route ever joins the phone to ADR.
   expect(
     tree.root.findAllByProps({testID: 'home-map-phone-adr-path'}),
   ).toHaveLength(0);
+});
+
+test('drops the connected tint and the light when the phone is not connected', () => {
+  connection.client.isConnected.mockReturnValue(false);
+  render();
+  for (const id of ['dps', 'hub']) {
+    // The route itself never disappears or changes shape: it only goes grey.
+    expect(control(`home-map-phone-${id}-path`).props.stroke).toBe(
+      palette(false).controlBorder,
+    );
+    expect(control(`home-map-phone-${id}-path`).props.strokeDasharray).toBe(
+      undefined,
+    );
+    expect(control(`home-map-phone-${id}-arrows`).props.stroke).toBe(
+      palette(false).controlBorder,
+    );
+    expect(
+      tree.root.findAllByProps({testID: `home-map-phone-${id}-tint`}),
+    ).toHaveLength(0);
+    expect(
+      tree.root.findAllByProps({testID: `home-map-flow-${id}`}),
+    ).toHaveLength(0);
+  }
+  expect(useDecorativeLoop).toHaveBeenLastCalledWith(false);
+  // Finite motion stays legible when the map light is correctly dark.
+  expect(useGentleTransition).toHaveBeenCalled();
+  const footer = control('home-activity');
+  act(() => footer.props.onPressIn());
+  expect(control('home-activity').props.accessibilityRole).toBe('button');
+  expect(
+    Native.StyleSheet.flatten(control('home-activity').props.style).opacity,
+  ).toBeUndefined();
+  act(() => footer.props.onPressOut());
+  press('home-activity');
+  expect(props.onActivity).toHaveBeenCalledTimes(1);
 });
 
 test.each([false, true])(
@@ -808,6 +874,181 @@ test('does not invent missing setup, assignment or communication observations', 
   ).toHaveLength(1);
 });
 
+test.each([false, true])(
+  'grounds the activity route as a full-width footer with a settling caret (dark=%s)',
+  dark => {
+    useTheme.mockReturnValue({dark});
+    render();
+    const colors = palette(dark);
+    const footer = control('home-activity');
+    const style = Native.StyleSheet.flatten(footer.props.style);
+    expect(footer.props.accessibilityRole).toBe('button');
+    expect(footer.props.accessibilityLabel).toBe(text.Activity);
+    expect(footer.props.accessibilityHint).toBe(text.ActivityHint);
+    expect(style.minHeight).toBeGreaterThanOrEqual(56);
+    expect(style.flexDirection).toBe('row');
+    expect(style.alignItems).toBe('center');
+    expect(style.borderColor).toBe(colors.surfaceBorder);
+    // Seated on the card, not floating: a hairline lid, no shadow.
+    expect(style.borderTopWidth).toBeGreaterThan(0);
+    expect(style.borderBottomWidth ?? 0).toBe(0);
+    expect(style.shadowOpacity).toBeUndefined();
+    expect(style.elevation).toBeUndefined();
+    const plate = Native.StyleSheet.flatten(
+      control('home-activity-plate').props.style,
+    );
+    expect(plate).toMatchObject({width: 32, height: 32});
+    const carets = footer.findAllByType('Icon');
+    expect(carets.map(icon => icon.props.name)).toEqual([
+      'pulse',
+      'chevron-right',
+    ]);
+    // Press feedback is the caret settling plus the surface, never a dim.
+    act(() => footer.props.onPressIn());
+    expect(
+      Native.StyleSheet.flatten(control('home-activity').props.style).opacity,
+    ).toBeUndefined();
+    act(() => footer.props.onPressOut());
+    expect(footer.props.hitSlop).toBe(2);
+  },
+);
+
+test.each([false, true])(
+  'points the activity caret along the reading direction (rtl=%s)',
+  rtl => {
+    const original = Native.I18nManager.isRTL;
+    Native.I18nManager.isRTL = rtl;
+    try {
+      render();
+      const footer = control('home-activity');
+      // Identity and contract are direction independent.
+      expect(footer.props.testID).toBe('home-activity');
+      expect(footer.props.accessibilityLabel).toBe(text.Activity);
+      expect(footer.props.accessibilityHint).toBe(text.ActivityHint);
+      const icons = footer.findAllByType('Icon');
+      expect(icons.map(icon => icon.props.name)).toEqual([
+        'pulse',
+        rtl ? 'chevron-left' : 'chevron-right',
+      ]);
+      // Only the caret moves, and only along the writing axis.
+      const animated = footer
+        .findAllByType(Native.Animated.View)
+        .filter(node => node.props.style?.transform !== undefined);
+      expect(animated).toHaveLength(1);
+      const [step] = animated[0].props.style.transform;
+      expect(Object.keys(step)).toEqual(['translateX']);
+      // A driven interpolation, seated at rest, settling by four toward
+      // the trailing edge the caret above already points at.
+      expect(typeof step.translateX).toBe('object');
+      expect(step.translateX.__getValue()).toBe(0);
+      const settled = Object.create(
+        Object.getPrototypeOf(step.translateX),
+        Object.getOwnPropertyDescriptors(step.translateX),
+      );
+      settled._parent = {__getValue: () => 1};
+      expect(settled.__getValue()).toBe(rtl ? -4 : 4);
+    } finally {
+      Native.I18nManager.isRTL = original;
+    }
+  },
+);
+
+test.each([false, true])(
+  'mirrors compact routes with their actual service columns (direct Hub=%s)',
+  direct => {
+    const original = Native.I18nManager.isRTL;
+    try {
+      Native.I18nManager.isRTL = false;
+      if (direct) {
+        storage.credentials = {
+          connectionString: `HostName=direct.azure-devices.net;DeviceId=phone;SharedAccessKey=${key}`,
+        };
+      }
+      render();
+      act(() => {
+        control('home-map-compact').props.onLayout({
+          nativeEvent: {layout: {width: 360}},
+        });
+      });
+      const ltr = tree.root.findByType(ChannelFlow).props.channels;
+      expect(ltr.map(route => route.id)).toEqual(
+        direct ? ['hub'] : ['dps', 'hub'],
+      );
+      Native.I18nManager.isRTL = true;
+      render();
+      const mirrored = ltr.map(route => ({
+        ...route,
+        from: 360 - route.from,
+        to: 360 - route.to,
+      }));
+      expect(tree.root.findByType(ChannelFlow).props.channels).toEqual(
+        mirrored,
+      );
+      for (const route of mirrored) {
+        expect(control(`home-map-phone-${route.id}-path`).props.d).toBe(
+          channelPath(route.from, route.to),
+        );
+      }
+    } finally {
+      Native.I18nManager.isRTL = original;
+    }
+  },
+);
+
+test('leads with the captions and draws no route until a width is measured', () => {
+  dimensions = {width: 320, height: 640, scale: 1, fontScale: 1};
+  render();
+  const drawn = id => [
+    ...tree.root.findAllByProps({testID: `home-map-lane-${id}-lines`}),
+    ...tree.root.findAllByProps({testID: `home-map-phone-${id}-path`}),
+    ...tree.root.findAllByProps({testID: `home-map-flow-${id}`}),
+  ];
+  // Text first: the relationship is readable while the measurement arrives.
+  expect(content()).toContain(text.PhoneDpsPath);
+  expect(content()).toContain(text.PhoneHubPath);
+  expect(content()).toContain(text.NamespaceLinks);
+  for (const id of ['dps', 'hub']) {
+    expect(control(`home-map-lane-${id}`)).toBeDefined();
+    expect(drawn(id)).toHaveLength(0);
+  }
+  // A zero measurement is not a coordinate space, so still nothing is drawn.
+  const measure = width =>
+    act(() => {
+      for (const id of ['dps', 'hub'])
+        control(`home-map-lane-${id}`).props.onLayout({
+          nativeEvent: {layout: {width}},
+        });
+    });
+  measure(0);
+  expect(drawn('dps')).toHaveLength(0);
+  measure(24);
+  expect(drawn('dps')).toHaveLength(0);
+  // Once it is real, every viewBox describes a positive area.
+  measure(272);
+  expect(drawn('dps').length).toBeGreaterThan(0);
+  expect(drawn('hub').length).toBeGreaterThan(0);
+  for (const svg of tree.root.findAllByType('Svg')) {
+    if (svg.props.viewBox === undefined) continue;
+    const [x, y, boxWidth, boxHeight] = svg.props.viewBox
+      .split(' ')
+      .map(Number);
+    expect([x, y]).toEqual([0, 0]);
+    expect(boxWidth).toBeGreaterThan(0);
+    expect(boxHeight).toBeGreaterThan(0);
+  }
+});
+
+test('never feathers the light wider than the static connected tint', () => {
+  render();
+  for (const id of ['dps', 'hub'])
+    expect(control(`home-map-phone-${id}-tint`).props.strokeWidth).toBe(
+      FEATHER,
+    );
+  expect(FEATHER).toBeGreaterThan(
+    control('home-map-phone-hub-path').props.strokeWidth,
+  );
+});
+
 test.each([
   {width: 320, height: 640, scale: 1, fontScale: 1},
   {width: 390, height: 844, scale: 1, fontScale: 2},
@@ -821,13 +1062,66 @@ test.each([
     expect(content()).toContain(text.NamespaceLinks);
     expect(content()).toContain(text.PhoneDpsPath);
     expect(content()).toContain(text.PhoneHubPath);
+    act(() => {
+      for (const id of ['dps', 'hub'])
+        control(`home-map-lane-${id}`).props.onLayout({
+          nativeEvent: {layout: {width: 272}},
+        });
+    });
+    // No unlabelled fork: the stacked fallback is two self contained lanes.
+    const notes = control('home-map-stacked-paths');
+    expect(
+      Native.StyleSheet.flatten(notes.props.style).paddingTop,
+    ).toBeGreaterThan(0);
     expect(
       tree.root.findAllByProps({testID: 'home-map-phone-lines'}),
     ).toHaveLength(0);
+    const lane = {from: 10, to: 272 - 10};
+    for (const [id, caption, other] of [
+      ['dps', text.PhoneDpsPath, text.PhoneHubPath],
+      ['hub', text.PhoneHubPath, text.PhoneDpsPath],
+    ]) {
+      const group = control(`home-map-lane-${id}`);
+      // The caption and the only line in the lane name the same one pair.
+      const captions = group
+        .findAllByType('Text')
+        .map(label => label.props.children);
+      expect(captions).toEqual([caption]);
+      expect(captions).not.toContain(other);
+      for (const label of group.findAllByType('Text'))
+        expect(Native.StyleSheet.flatten(label.props.style).fontSize).toBe(
+          Native.StyleSheet.flatten(detailStyles.supporting).fontSize,
+        );
+      expect(
+        group.findAll(
+          node =>
+            typeof node.props.testID === 'string' &&
+            /^home-map-phone-\w+-path$/.test(node.props.testID),
+        ),
+      ).toHaveLength(1);
+      const route = group.findByProps({testID: `home-map-phone-${id}-path`});
+      // A straight, two-way, horizontal connector spanning its own lane.
+      expect(route.props.d).toBe(lanePath(lane.from, lane.to));
+      expect(route.props.strokeDasharray).toBeUndefined();
+      expect(
+        group.findByProps({testID: `home-map-phone-${id}-arrows`}).props.d,
+      ).toBe(laneCaretPath(lane.from, lane.to));
+      expect(
+        group.findByProps({testID: `home-map-lane-${id}-lines`}).props.viewBox,
+      ).toBe(`0 0 272 ${LANE_HEIGHT}`);
+      // Water runs in the lane it belongs to, off nothing else.
+      expect(
+        group.findAllByProps({testID: `home-map-flow-${id}`}).length,
+      ).toBeGreaterThan(0);
+    }
+    // Both lanes share one loop: a single hook call per render, not one each.
+    useDecorativeLoop.mockClear();
+    render();
+    expect(useDecorativeLoop).toHaveBeenCalledTimes(1);
+    expect(useDecorativeLoop).toHaveBeenLastCalledWith(true);
     expect(
-      tree.root.findAllByProps({testID: 'home-map-flow-hub'}),
+      tree.root.findAllByProps({testID: 'home-map-phone-adr-path'}),
     ).toHaveLength(0);
-    expect(useDecorativeLoop).toHaveBeenLastCalledWith(false);
     for (const node of ['phone', 'dps', 'hub', 'adr']) {
       press(`home-node-${node}`);
       expect(control('home-panel-close')).toBeDefined();

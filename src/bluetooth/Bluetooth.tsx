@@ -2,11 +2,11 @@ import {createStackNavigator, StackScreenProps} from '@react-navigation/stack';
 import {Icon} from '@rneui/themed';
 import * as React from 'react';
 import {
+  Animated,
   View,
   ActivityIndicator,
   FlatList,
   StyleSheet,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,8 +16,11 @@ import {useIsFocused} from '@react-navigation/native';
 import {IotcBleManager} from './BleManager';
 import {ItemProps, Pages} from 'types';
 import {Text} from '../components';
+import DetailsAction from '../components/detailsAction';
+import {SurfaceFill, surfaceStops} from '../components/surface';
 import {useIoTCentralClient, useTheme} from '../hooks';
 import {useMotionAllowed} from '../hooks/motion';
+import {usePressSettle} from '../hooks/press';
 import CardView from 'CardView';
 import Strings from 'strings';
 import {cardTint, palette} from '../theme/palette';
@@ -250,6 +253,7 @@ function BluetoothDeviceListItem({
     item.rssi == null
       ? Strings.Bluetooth.SignalUnavailable
       : `${item.rssi} dBm`;
+  const {pressed, scale, onPressIn, onPressOut} = usePressSettle('card');
   return (
     <Pressable
       accessibilityRole="button"
@@ -260,31 +264,47 @@ function BluetoothDeviceListItem({
           deviceName: item.name ?? '',
         });
       }}
-      style={[styles.deviceCard, {backgroundColor: appearance.surface}]}>
-      <View
-        accessible={false}
-        style={[styles.deviceIcon, {backgroundColor: cardTint(item.id, dark)}]}>
-        <Icon
-          name="bluetooth"
-          type="material-community"
-          size={20}
-          color={appearance.text}
-        />
-      </View>
-      <View style={styles.deviceBody}>
-        <Text style={styles.itemTitle}>{item.name}</Text>
-        <Text style={[styles.rssiText, {color: appearance.muted}]}>
-          {signal}
-        </Text>
-      </View>
-      <View accessible={false}>
-        <Icon
-          name="chevron-right"
-          type="material-community"
-          size={20}
-          color={appearance.muted}
-        />
-      </View>
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={styles.deviceRow}>
+      <Animated.View
+        style={[
+          styles.deviceCard,
+          {
+            backgroundColor: surfaceStops(dark, {tone: 'raised', pressed})[0],
+            borderColor: appearance.surfaceBorder,
+            transform: [{scale}],
+          },
+        ]}>
+        <SurfaceFill tone="raised" pressed={pressed} radius={20} />
+        <View
+          accessible={false}
+          style={[
+            styles.deviceIcon,
+            {backgroundColor: cardTint(item.id, dark)},
+          ]}>
+          <Icon
+            name="bluetooth"
+            type="material-community"
+            size={20}
+            color={appearance.text}
+          />
+        </View>
+        <View style={styles.deviceBody}>
+          <Text style={styles.itemTitle}>{item.name}</Text>
+          <Text style={[styles.rssiText, {color: appearance.muted}]}>
+            {signal}
+          </Text>
+        </View>
+        <View accessible={false}>
+          <Icon
+            name="chevron-right"
+            type="material-community"
+            size={20}
+            color={appearance.muted}
+          />
+        </View>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -431,41 +451,18 @@ function BluetoothDetail({
 }
 
 function ScanAgainControl() {
-  const {dark} = useTheme();
-  const appearance = palette(dark);
   return (
-    <Pressable
-      testID="bluetooth-scan-again"
-      accessibilityRole="button"
+    <DetailsAction
+      id="bluetooth-scan-again"
+      label={Strings.Bluetooth.Refresh}
       accessibilityLabel={Strings.Bluetooth.Refresh}
+      icon="reload"
+      variant="secondary"
+      style={styles.scanAgain}
       onPress={() => {
         IotcBleManager.getInstance().resetDeviceList();
       }}
-      style={({pressed}) => [
-        styles.scanAgain,
-        {
-          backgroundColor: pressed ? appearance.border : appearance.surface,
-          borderColor: appearance.border,
-        },
-      ]}>
-      <View
-        accessible={false}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants">
-        <Icon
-          name="reload"
-          type={Platform.select({
-            ios: 'ionicon',
-            android: 'material-community',
-          })}
-          size={16}
-          color={appearance.primary}
-        />
-      </View>
-      <Text style={[styles.scanAgainLabel, {color: appearance.primary}]}>
-        {Strings.Bluetooth.Refresh}
-      </Text>
-    </Pressable>
+    />
   );
 }
 
@@ -490,33 +487,20 @@ const styles = StyleSheet.create({
   statusGlyph: {width: 24, alignItems: 'center', justifyContent: 'center'},
   statusText: {flex: 1, minWidth: 140, fontSize: 13, lineHeight: 19},
   scanAgain: {
-    minHeight: 48,
     minWidth: 48,
     maxWidth: '100%',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  scanAgainLabel: {
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: '600',
-    flexShrink: 1,
   },
   listContent: {paddingHorizontal: 20, paddingBottom: 24},
+  deviceRow: {marginBottom: 12},
   deviceCard: {
     borderRadius: 20,
-    marginBottom: 12,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: 16,
     minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
+    overflow: 'hidden',
   },
   deviceIcon: {
     width: 40,

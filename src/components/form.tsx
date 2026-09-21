@@ -2,10 +2,12 @@
 // Licensed under the MIT License.
 
 import {useTheme} from 'hooks';
+import {palette} from '../theme/palette';
 import React, {useMemo} from 'react';
 import {
   Keyboard,
   Platform,
+  StyleSheet,
   TouchableWithoutFeedback,
   View,
   ViewStyle,
@@ -56,7 +58,8 @@ const Form = React.memo<FormProps>(
   ({title, items, submit, submitAction, onSubmit}) => {
     const [values, setValues] = React.useState<{[itemId: string]: string}>({});
     const [revealed, setRevealed] = React.useState<Record<string, boolean>>({});
-    const {colors} = useTheme();
+    const {colors, dark} = useTheme();
+    const appearance = palette(dark);
 
     // fire if initial items change
     React.useEffect(() => {
@@ -151,10 +154,15 @@ const Form = React.memo<FormProps>(
                         accessibilityLabel: revealed[item.id]
                           ? Strings.Core.HideCredential
                           : Strings.Core.ShowCredential,
-                        containerStyle: {
-                          minWidth: 44,
-                          minHeight: 44,
-                          justifyContent: 'center',
+                        accessibilityRole: 'button',
+                        color: appearance.primary,
+                        size: 20,
+                        containerStyle: controlStyles.reveal,
+                        pressableProps: {
+                          style: ({pressed}) => [
+                            controlStyles.reveal,
+                            pressed && {backgroundColor: appearance.inset},
+                          ],
                         },
                         onPress: () =>
                           setRevealed(current => ({
@@ -178,3 +186,13 @@ const Form = React.memo<FormProps>(
 );
 
 export default Form;
+
+const controlStyles = StyleSheet.create({
+  reveal: {
+    minWidth: 48,
+    minHeight: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

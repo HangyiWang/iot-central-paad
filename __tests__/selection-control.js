@@ -5,9 +5,14 @@ import SelectionControl from '../src/components/selectionControl';
 import {useMotionAllowed} from '../src/hooks/motion';
 import {useTheme} from '../src/hooks';
 import {palette} from '../src/theme/palette';
+import {surfaceStops} from '../src/components/surface';
 
 jest.mock('../src/hooks', () => ({useTheme: jest.fn()}));
-jest.mock('../src/hooks/motion', () => ({useMotionAllowed: jest.fn()}));
+// Only the subscription is mocked; the shared curve stays the real one.
+jest.mock('../src/hooks/motion', () => ({
+  ...jest.requireActual('../src/hooks/motion'),
+  useMotionAllowed: jest.fn(),
+}));
 jest.mock('../src/components/typography', () => ({Text: 'Text'}));
 
 const options = [
@@ -36,9 +41,9 @@ const render = extra =>
 
 beforeEach(() => {
   dimensions = {width: 390, height: 844, fontScale: 1, scale: 1};
-  jest
-    .spyOn(Native, 'useWindowDimensions')
-    .mockImplementation(() => dimensions);
+  // useWindowDimensions reads through Dimensions, so this is where a test
+  // window actually reaches the component.
+  jest.spyOn(Native.Dimensions, 'get').mockImplementation(() => dimensions);
   useTheme.mockReturnValue({dark: false});
   useMotionAllowed.mockReturnValue(false);
   props.onSelect.mockClear();
@@ -127,3 +132,48 @@ test.each([false, true])(
     expect(useMotionAllowed).toHaveBeenLastCalledWith(false);
   },
 );
+
+test.each(['segmented', 'filter'])(
+  '%s presses seat the option deeper instead of fading its label',
+  variant => {
+    render({variant});
+    const seat = id =>
+      Native.StyleSheet.flatten(
+        control(id).props.children({pressed: false}).props.style,
+      );
+    const held = id =>
+      Native.StyleSheet.flatten(
+        control(id).props.children({pressed: true}).props.style,
+      );
+    expect(seat('issues').backgroundColor).toBe('transparent');
+    expect(held('issues').backgroundColor).toBe(palette(false).inset);
+    expect(held('issues').opacity).toBeUndefined();
+    expect(held('all').opacity).toBeUndefined();
+    // The selected seat keeps its own colour under a press.
+    expect(held('all').backgroundColor).toBe(seat('all').backgroundColor);
+  },
+);
+
+test('the segmented thumb carries the shared raised gradient', () => {
+  // The metrics of the device this ships to: a compact, unstacked control.
+  dimensions = {width: 411.43, height: 914.29, fontScale: 1, scale: 2.625};
+  render();
+  expect(style(root()).flexDirection).not.toBe('column');
+  act(() => root().props.onLayout({nativeEvent: {layout: {width: 320}}}));
+  const thumb = view.root.findAll(
+    node =>
+      typeof node.type !== 'string' &&
+      node.props.tone === 'raised' &&
+      node.props.radius === 9,
+  );
+  expect(thumb).toHaveLength(1);
+  const painted = view.root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      Native.StyleSheet.flatten(node.props.style)?.width === 156,
+  )[0];
+  expect(Native.StyleSheet.flatten(painted.props.style).backgroundColor).toBe(
+    surfaceStops(false, {tone: 'raised'})[0],
+  );
+  expect(painted.props.pointerEvents).toBe('none');
+});

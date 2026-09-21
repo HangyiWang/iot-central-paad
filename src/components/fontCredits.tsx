@@ -19,9 +19,17 @@ export default function FontCredits() {
         accessibilityState={{expanded}}
         onPress={() => setExpanded(!expanded)}
         style={styles.toggle}>
-        <Text style={{color: colors.primary}}>
-          {Strings.Settings.Font.Title}
-        </Text>
+        {({pressed}) => (
+          <View
+            style={[
+              styles.toggleFill,
+              pressed && {backgroundColor: colors.inset},
+            ]}>
+            <Text style={[styles.toggleLabel, {color: colors.primary}]}>
+              {Strings.Settings.Font.Title}
+            </Text>
+          </View>
+        )}
       </Pressable>
       {expanded && (
         <Text
@@ -38,7 +46,19 @@ export default function FontCredits() {
 }
 
 const styles = StyleSheet.create({
-  container: {paddingHorizontal: 18, paddingTop: 8},
-  toggle: {minHeight: 48, justifyContent: 'center'},
-  license: {fontSize: 13, lineHeight: 20, paddingBottom: 18},
+  container: {paddingHorizontal: 8, paddingTop: 8},
+  toggle: {minHeight: 48, alignSelf: 'flex-start', justifyContent: 'center'},
+  toggleFill: {
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    borderRadius: 14,
+  },
+  toggleLabel: {fontSize: 14, lineHeight: 20, fontWeight: '600'},
+  license: {
+    fontSize: 13,
+    lineHeight: 20,
+    paddingHorizontal: 12,
+    paddingBottom: 18,
+  },
 });

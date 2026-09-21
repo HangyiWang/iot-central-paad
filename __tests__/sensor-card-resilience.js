@@ -3,6 +3,7 @@ import renderer, {act} from 'react-test-renderer';
 import {Card} from '../src/components/card';
 import {StyleSheet, TouchableOpacity, Pressable} from 'react-native';
 import {Properties} from '../src/properties';
+import {palette} from '../src/theme/palette';
 
 jest.mock('../src/hooks', () => ({
   useTheme: () => ({dark: false, colors: {text: '#111', card: '#fff'}}),
@@ -78,9 +79,18 @@ it('exposes the enable action separately from chart navigation and the long-pres
   expect(toggle.props.accessibilityRole).toBe('switch');
   expect(toggle.props.accessibilityState).toEqual({checked: true});
   expect(toggle.props.accessibilityLabel).toBe('Disable sensor: Location');
-  expect(
-    StyleSheet.flatten(toggle.props.style({pressed: false})).minHeight,
-  ).toBeGreaterThanOrEqual(48);
+  const toggleStyle = () => StyleSheet.flatten(toggle.props.style);
+  expect(toggleStyle().minHeight).toBeGreaterThanOrEqual(48);
+  // A press seats the control deeper; it never dims the label it belongs to.
+  expect(toggleStyle().backgroundColor).toBeUndefined();
+  act(() => toggle.props.onPressIn());
+  const held = StyleSheet.flatten(
+    view.root.findByProps({testID: 'sensor-toggle-location'}).props.style,
+  );
+  expect(held.backgroundColor).toBe(palette(false).inset);
+  expect(held.opacity).toBeUndefined();
+  act(() => toggle.props.onPressOut());
+  expect(toggleStyle().backgroundColor).toBeUndefined();
   const card = view.root.findByType(TouchableOpacity);
   expect(card.findAllByType(Pressable)).toHaveLength(0);
   act(() => toggle.props.onPress());

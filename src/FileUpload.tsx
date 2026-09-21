@@ -24,6 +24,7 @@ import {
   Alert,
   Platform,
   Linking,
+  StyleSheet,
   ViewStyle,
   TextStyle,
   Pressable,
@@ -35,6 +36,7 @@ import BottomPopup from 'components/bottomPopup';
 import {CircleSnail} from 'react-native-progress';
 import {Literal, StyleDefinition} from 'types';
 import {acquireCamera} from './tools/Torch';
+import {SurfaceFill, surfaceStops} from './components/surface';
 import {palette} from './theme/palette';
 import {getObservationStore} from './observation';
 
@@ -102,13 +104,20 @@ export default function FileUpload() {
       iconWrapper: {
         padding: 18,
         borderRadius: 24,
-        backgroundColor: appearance.surface,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: appearance.surfaceBorder,
+        backgroundColor: surfaceStops(dark, {tone: 'secondary'})[0],
+        overflow: 'hidden',
       },
       listItem: {
-        backgroundColor: colors.card,
+        minHeight: 56,
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
       },
       listItemText: {
-        color: colors.text,
+        fontSize: 16,
+        fontWeight: '600',
+        color: appearance.primary,
       },
       closeItemText: {
         color: 'gray',
@@ -120,10 +129,21 @@ export default function FileUpload() {
         alignSelf: 'center',
         padding: 28,
         borderRadius: 24,
-        backgroundColor: appearance.tints[0],
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: appearance.surfaceBorder,
+        backgroundColor: surfaceStops(dark, {tone: 'raised'})[0],
+        overflow: 'hidden',
       },
     }),
-    [colors, appearance],
+    [appearance, dark],
+  );
+
+  // Picker rows settle onto a tonal fill; their labels never dim.
+  const rowFeedback = useCallback(
+    ({pressed}: {pressed: boolean}) => ({
+      backgroundColor: pressed ? appearance.inset : colors.card,
+    }),
+    [appearance, colors.card],
   );
 
   const startUpload = useCallback(
@@ -264,8 +284,10 @@ export default function FileUpload() {
       <View style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.card}>
+            <SurfaceFill tone="raised" radius={24} />
             <View style={styles.simulatedContainer}>
               <View accessible={false} style={styles.iconWrapper}>
+                <SurfaceFill tone="secondary" radius={24} />
                 <Icon
                   size={40}
                   name="cloud-off-outline"
@@ -297,15 +319,20 @@ export default function FileUpload() {
           disabled={uploading}
           style={styles.card}
           onPress={setShowSelector.True}>
-          {uploading ? (
-            <UploadProgress
-              fileSize={fileSize}
-              filename={fileName}
-              uploadStatus={uploadStatus}
-              setUploading={setUploading}
-            />
-          ) : (
-            <UploadIcon />
+          {({pressed}) => (
+            <>
+              <SurfaceFill tone="raised" pressed={pressed} radius={24} />
+              {uploading ? (
+                <UploadProgress
+                  fileSize={fileSize}
+                  filename={fileName}
+                  uploadStatus={uploadStatus}
+                  setUploading={setUploading}
+                />
+              ) : (
+                <UploadIcon />
+              )}
+            </>
           )}
         </Pressable>
 
@@ -327,6 +354,7 @@ export default function FileUpload() {
           onPress={() => {
             void startUpload('library');
           }}
+          style={rowFeedback}
           containerStyle={styles.listItem}>
           <ListItem.Content>
             <ListItem.Title style={styles.listItemText}>
@@ -338,6 +366,7 @@ export default function FileUpload() {
           onPress={() => {
             void startUpload('camera');
           }}
+          style={rowFeedback}
           containerStyle={styles.listItem}>
           <ListItem.Content>
             <ListItem.Title style={styles.listItemText}>
@@ -364,7 +393,10 @@ function UploadIcon() {
     wrapper: {
       padding: 18,
       borderRadius: 24,
-      backgroundColor: appearance.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: appearance.surfaceBorder,
+      backgroundColor: surfaceStops(dark, {tone: 'secondary'})[0],
+      overflow: 'hidden',
     },
     startContainer: {alignItems: 'center', gap: 8},
     title: {fontSize: 22, lineHeight: 29, textAlign: 'center'},
@@ -378,6 +410,7 @@ function UploadIcon() {
   return (
     <View style={styles.container}>
       <View style={styles.wrapper}>
+        <SurfaceFill tone="secondary" radius={24} />
         <Icon
           size={48}
           name="cloud-upload-outline"

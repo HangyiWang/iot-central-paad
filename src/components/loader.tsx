@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import {Text} from './typography';
 import {Theme} from '@react-navigation/native';
-import {Button, Overlay} from '@rneui/themed';
+import {Overlay} from '@rneui/themed';
+import Button from './button';
 import {useScreenDimensions, useTheme} from 'hooks';
 import {StyleDefinition} from 'types';
 

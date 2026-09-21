@@ -15,6 +15,8 @@ import {Pages} from '../src/types';
 import * as picker from 'expo-image-picker';
 import {IotcBleManager} from '../src/bluetooth/BleManager';
 import * as hooks from '../src/hooks';
+import {palette} from '../src/theme/palette';
+import {surfaceStops} from '../src/components/surface';
 
 jest.mock('react-native-animatable', () => ({
   View: require('react-native').View,
@@ -130,6 +132,13 @@ test('upload content scrolls instead of sizing against the entire screen and pre
     minHeight: 260,
   });
   expect(StyleSheet.flatten(card().props.style).height).toBeUndefined();
+  // A neutral raised sheet, never a tinted block.
+  expect(StyleSheet.flatten(card().props.style).backgroundColor).toBe(
+    surfaceStops(false, {tone: 'raised'})[0],
+  );
+  expect(StyleSheet.flatten(card().props.style).backgroundColor).not.toBe(
+    palette(false).tints[0],
+  );
   expect(view.root.findAllByType(ScrollView).length).toBeGreaterThan(0);
   act(() => card().props.onPress());
   await act(async () => {
@@ -235,9 +244,25 @@ test('Bluetooth scanning control meets the minimum touch target and the detail s
         node.props.accessibilityLabel === 'Scan again',
     )
     .find(node => node.props.onPress);
-  const target = StyleSheet.flatten(scan.props.style({pressed: false}));
+  const target = StyleSheet.flatten(
+    typeof scan.props.style === 'function'
+      ? scan.props.style({pressed: false})
+      : scan.props.style,
+  );
   expect(target.minWidth).toBeGreaterThanOrEqual(48);
   expect(target.minHeight).toBeGreaterThanOrEqual(48);
+  // A settled control keeps its reachable target, never a dimmed label.
+  expect(target.opacity).toBeUndefined();
+  // Secondary: a painted, hairline-bordered control with forest ink.
+  expect(target.backgroundColor).toBe(
+    surfaceStops(false, {tone: 'secondary'})[0],
+  );
+  expect(target.borderWidth).toBeLessThanOrEqual(1);
+  expect(
+    view.root
+      .findAllByType('Icon')
+      .some(icon => icon.props.color === palette(false).primary),
+  ).toBe(true);
   act(() => scan.props.onPress());
   expect(manager.resetDeviceList).toHaveBeenCalledTimes(1);
 

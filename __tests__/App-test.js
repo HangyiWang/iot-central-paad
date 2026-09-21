@@ -18,6 +18,7 @@ import DeviceInfo from 'react-native-device-info';
 import VersionCheck from 'react-native-version-check';
 import {IoTCClient} from 'react-native-azure-iotcentral-client';
 import renderer, {act} from 'react-test-renderer';
+import {surfaceStops} from '../src/components/surface';
 
 describe('App startup', () => {
   let app;
@@ -128,6 +129,19 @@ describe('App startup', () => {
         minWidth: 48,
         minHeight: 48,
       });
+      // The header control is a softly shaded plate inside a full target,
+      // never a large floating blob painted over the whole 48pt area.
+      expect(
+        StyleSheet.flatten(settings.props.style).backgroundColor,
+      ).toBeUndefined();
+      const plate = settings
+        .findAll(node => typeof node.type === 'string')
+        .map(node => StyleSheet.flatten(node.props.style))
+        .find(style => style?.borderRadius === 14);
+      expect(plate).toMatchObject({width: 40, height: 40});
+      expect([false, true].map(mode => surfaceStops(mode, {tone: 'secondary'})[0])).toContain(
+        plate.backgroundColor,
+      );
       expect(VersionCheck.needUpdate).toHaveBeenCalledTimes(updateChecks);
       if (updateChecks > 0) {
         expect(VersionCheck.needUpdate).toHaveBeenNthCalledWith(2, {

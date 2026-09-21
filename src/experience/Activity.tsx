@@ -360,22 +360,27 @@ export function ObservationRow({
               expanded ? text.HideDetails : text.Details
             }: ${observationTitle(event)}`}
             onPress={() => setExpanded(value => !value)}
-            style={({pressed}) => [
-              styles.disclosure,
-              pressed && styles.pressed,
-            ]}>
-            <View
-              accessible={false}
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-              style={[styles.chevron, {borderColor: colors.border}]}>
-              <Icon
-                name={expanded ? 'chevron-up' : 'chevron-down'}
-                type="material-community"
-                size={16}
-                color={colors.muted}
-              />
-            </View>
+            style={styles.disclosure}>
+            {({pressed}) => (
+              <View
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={[
+                  styles.chevron,
+                  {
+                    borderColor: colors.border,
+                    backgroundColor: pressed ? colors.inset : 'transparent',
+                  },
+                ]}>
+                <Icon
+                  name={expanded ? 'chevron-up' : 'chevron-down'}
+                  type="material-community"
+                  size={16}
+                  color={colors.muted}
+                />
+              </View>
+            )}
           </Pressable>
         </View>
         <FluidDisclosure expanded={expanded} visible={visible}>
@@ -501,7 +506,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pressed: {opacity: 0.6},
   sessionNotice: {marginBottom: 12},
   communication: {gap: 8},
   summary: {

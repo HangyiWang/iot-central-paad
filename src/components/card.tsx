@@ -4,6 +4,7 @@
 import React, {useState, useMemo} from 'react';
 import {CardProps, IconProps, Icon, Input} from '@rneui/themed';
 import {
+  Animated,
   View,
   TouchableOpacity,
   TouchableOpacityProps,
@@ -14,12 +15,15 @@ import {Button} from 'components';
 import {Text, Headline, bytesToSize} from './typography';
 import {DataType, ItemProps, StyleDefinition} from 'types';
 import {useTheme} from 'hooks';
+import {usePressSettle} from '../hooks/press';
 import Strings from 'strings';
 import {cardTint, palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
 import DetailsAction from './detailsAction';
 import ToolStrings from '../experience/toolStrings';
 import {usePropertyDraft} from '../runtime/propertyDrafts';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type EditCallback = (value: any) => void | Promise<void>;
 
@@ -62,6 +66,7 @@ export function Card(
     ...otherProps
   } = props;
   const [technicalVisible, setTechnicalVisible] = useState(false);
+  const toggleSettle = usePressSettle('compact');
   const {dark} = useTheme();
   const colors = palette(dark);
   const textColor = enabled ? colors.text : colors.muted;
@@ -217,7 +222,7 @@ export function Card(
         <View
           style={[stylesForContent.footer, {borderTopColor: colors.border}]}>
           {onToggle && (
-            <Pressable
+            <AnimatedPressable
               testID={`sensor-toggle-${accentKey}`}
               accessibilityRole="switch"
               accessibilityLabel={`${
@@ -225,9 +230,13 @@ export function Card(
               }: ${otherProps.title}`}
               accessibilityState={{checked: enabled}}
               onPress={onToggle}
-              style={({pressed}) => [
+              onPressIn={toggleSettle.onPressIn}
+              onPressOut={toggleSettle.onPressOut}
+              hitSlop={2}
+              style={[
                 stylesForContent.toggle,
-                pressed && stylesForContent.pressed,
+                toggleSettle.pressed && {backgroundColor: colors.inset},
+                {transform: [{scale: toggleSettle.scale}]},
               ]}>
               <Icon
                 name={enabled ? 'toggle-switch' : 'toggle-switch-off-outline'}
@@ -242,7 +251,7 @@ export function Card(
                   ? Strings.Core.DisableSensor
                   : Strings.Core.EnableSensor}
               </Text>
-            </Pressable>
+            </AnimatedPressable>
           )}
           {technicalName && (
             <DetailsAction
@@ -314,9 +323,11 @@ const stylesForContent = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
+    paddingHorizontal: 10,
+    marginLeft: -10,
+    borderRadius: 14,
     gap: 6,
   },
-  pressed: {opacity: 0.7},
   technical: {marginTop: 4, padding: 10, borderRadius: 12},
   identifier: {fontSize: 13, lineHeight: 20},
 });
@@ -395,8 +406,6 @@ const Value = React.memo<{
             title={presentation?.actionLabel ?? Strings.Client.Properties.Send}
             disabled={draft === String(value ?? '')}
             onPress={() => onEdit(edited)}
-            buttonStyle={{minHeight: 48, borderRadius: 12}}
-            type="clear"
           />
         </View>
       );

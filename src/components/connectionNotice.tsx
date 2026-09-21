@@ -2,11 +2,12 @@
 // Licensed under the MIT License.
 
 import React from 'react';
-import {Pressable, StyleSheet, View} from 'react-native';
+import {StyleSheet, View} from 'react-native';
 import {Icon} from '@rneui/themed';
 import {useTheme} from 'hooks';
 import Strings from 'strings';
 import {Text} from './typography';
+import DetailsAction from './detailsAction';
 import {palette} from '../theme/palette';
 import type {ConnectionError} from '../connection';
 
@@ -73,23 +74,14 @@ export default function ConnectionNotice({
         </View>
       </View>
       {action && (
-        <Pressable
-          testID={action.testID}
-          accessibilityRole="button"
+        <DetailsAction
+          id={action.testID}
+          label={action.label}
           accessibilityLabel={action.label}
+          variant="secondary"
+          onInset
           onPress={action.onPress}
-          style={({pressed}) => [
-            styles.action,
-            {
-              backgroundColor: appearance.surface,
-              borderColor: appearance.border,
-              opacity: pressed ? 0.7 : 1,
-            },
-          ]}>
-          <Text style={[styles.actionLabel, {color: appearance.primary}]}>
-            {action.label}
-          </Text>
-        </Pressable>
+        />
       )}
       {diagnostics && (
         <View style={styles.diagnostics}>
@@ -156,19 +148,6 @@ const styles = StyleSheet.create({
   message: {
     fontSize: 14,
     lineHeight: 20,
-  },
-  action: {
-    minHeight: 48,
-    alignSelf: 'flex-start',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  actionLabel: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '600',
   },
   diagnostics: {
     flexDirection: 'row',

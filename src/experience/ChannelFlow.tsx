@@ -4,22 +4,38 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import Svg, {Defs, LinearGradient, Path, Rect, Stop} from 'react-native-svg';
 
 /**
- * The phone's connectors. Each one is a short, straight, round-jointed route
- * with a caret at both ends: the phone and the service talk to each other, so
- * neither end owns an arrow. The geometry is fixed. Nothing here reads, sends
- * or confirms anything; the optional light is a decorative connection-state
- * indicator, never packets, throughput or delivery.
+ * The phone's connectors. Each one carries a caret at both ends: the phone and
+ * the service talk to each other, so neither end owns an arrow.
+ *
+ * Two layouts, because the map has two honest shapes. 'fork' is the side by
+ * side map, where the services really do sit in a left and right column, so a
+ * route can leave a service center and land on a phone quarter. 'lane' is the
+ * stacked fallback, where the services are a single full width column and no
+ * fork could touch them: each lane is instead a self contained, captioned,
+ * horizontal connector for exactly one pair.
+ *
+ * Nothing here reads, sends or confirms anything; the tint and the light are
+ * decorative connection-state indicators, never packets, throughput or
+ * delivery.
  */
-export const STRIP_HEIGHT = 34;
+export const STRIP_HEIGHT = 44;
+export const LANE_HEIGHT = 24;
+const LANE_MID = LANE_HEIGHT / 2;
 const TOP = 1;
 const BOTTOM = STRIP_HEIGHT - 1;
-const BEND_IN = 12;
-const BEND_OUT = 22;
-const CORNER = 6;
-const CARET = 4;
-const BAND = 64;
+const BEND_IN = 15;
+const BEND_OUT = 29;
+const CORNER = 7;
+const CARET = 5;
+/** The feather matches the static tint exactly, so the light adds no bloom. */
+export const FEATHER = 9;
+const SWELL = 96;
+const GLINT = 28;
+/** The glint trails the swell by about a fifth of the sweep. */
+const LAG = 0.2;
 
 export type ChannelId = 'dps' | 'hub';
+export type ChannelLayout = 'fork' | 'lane';
 export type Channel = {id: ChannelId; from: number; to: number};
 
 const round = (value: number) => Math.round(value * 100) / 100;
@@ -56,23 +72,118 @@ export function caretPath(start: number, end: number): string {
   );
 }
 
+/** A stacked lane: one straight, self contained, two-way horizontal channel. */
+export function lanePath(start: number, end: number): string {
+  return `M${round(start)} ${LANE_MID} L${round(end)} ${LANE_MID}`;
+}
+
+/** A caret on each end, each opening away from the other: still two-way. */
+export function laneCaretPath(start: number, end: number): string {
+  const from = round(start);
+  const to = round(end);
+  const step = to >= from ? CARET : -CARET;
+  return (
+    `M${from + step} ${LANE_MID - CARET} L${from} ${LANE_MID} L${from + step} ${
+      LANE_MID + CARET
+    } ` +
+    `M${to - step} ${LANE_MID - CARET} L${to} ${LANE_MID} L${to - step} ${
+      LANE_MID + CARET
+    }`
+  );
+}
+
+/** Every layout answers the same three questions, so the rest stays shared. */
+export function channelGeometry(layout: ChannelLayout) {
+  return layout === 'lane'
+    ? {height: LANE_HEIGHT, route: lanePath, carets: laneCaretPath}
+    : {height: STRIP_HEIGHT, route: channelPath, carets: caretPath};
+}
+
+function Band({
+  width,
+  height,
+  peak,
+  color,
+  progress,
+  lag,
+  travel,
+  gradientId,
+}: {
+  width: number;
+  height: number;
+  peak: number;
+  color: string;
+  progress: Animated.Value;
+  lag: number;
+  travel: readonly [number, number];
+  gradientId: string;
+}) {
+  return (
+    <Animated.View
+      style={[
+        styles.band,
+        {
+          width,
+          opacity: progress.interpolate({
+            inputRange: [lag, lag + 0.12, 0.9, 1],
+            outputRange: [0, 1, 1, 0],
+            extrapolate: 'clamp',
+          }),
+          transform: [
+            {
+              translateX: progress.interpolate({
+                inputRange: [lag, 1],
+                outputRange: [travel[0] - width / 2, travel[1] - width / 2],
+                extrapolate: 'clamp',
+              }),
+            },
+          ],
+        },
+      ]}>
+      <Svg width={width} height={height}>
+        <Defs>
+          <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+            <Stop offset="0" stopColor={color} stopOpacity={0} />
+            <Stop offset="0.5" stopColor={color} stopOpacity={peak} />
+            <Stop offset="1" stopColor={color} stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Rect width={width} height={height} fill={`url(#${gradientId})`} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+/** Two offset bands share one progress value, so water needs no second timer. */
 function Sweep({
   channel,
+  layout,
   width,
   color,
+  peak,
   progress,
   gradientId,
 }: {
   channel: Channel;
+  layout: ChannelLayout;
   width: number;
   color: string;
+  peak: number;
   progress: Animated.Value;
   gradientId: string;
 }) {
+  const {height, route: routeOf} = channelGeometry(layout);
   const direction = channel.from >= channel.to ? 1 : -1;
-  // Start and finish with the band's faded edge on each end of its own route.
-  const startX = channel.to - (direction * BAND) / 2;
-  const endX = channel.from + (direction * BAND) / 2;
+  // Start and finish with each band's faded edge on an end of its own route.
+  const swell = [
+    channel.to - (direction * SWELL) / 2,
+    channel.from + (direction * SWELL) / 2,
+  ] as const;
+  const glint = [
+    channel.to - (direction * GLINT) / 2,
+    channel.from + (direction * GLINT) / 2,
+  ] as const;
+  const route = routeOf(channel.from, channel.to);
   return (
     <MaskedView
       testID={`home-map-flow-${channel.id}`}
@@ -84,20 +195,20 @@ function Sweep({
       maskElement={
         <Svg
           width="100%"
-          height={STRIP_HEIGHT}
-          viewBox={`0 0 ${width} ${STRIP_HEIGHT}`}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none">
           <Path
-            d={channelPath(channel.from, channel.to)}
+            d={route}
             stroke="#ffffff"
             strokeOpacity={0.4}
-            strokeWidth={9}
+            strokeWidth={FEATHER}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"
           />
           <Path
-            d={channelPath(channel.from, channel.to)}
+            d={route}
             stroke="#ffffff"
             strokeWidth={3}
             strokeLinecap="round"
@@ -106,39 +217,26 @@ function Sweep({
           />
         </Svg>
       }>
-      <Animated.View
-        style={[
-          styles.band,
-          {
-            opacity: progress.interpolate({
-              inputRange: [0, 0.12, 0.88, 1],
-              outputRange: [0, 1, 1, 0],
-            }),
-            transform: [
-              {
-                translateX: progress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [startX - BAND / 2, endX - BAND / 2],
-                }),
-              },
-            ],
-          },
-        ]}>
-        <Svg width={BAND} height={STRIP_HEIGHT}>
-          <Defs>
-            <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0" stopColor={color} stopOpacity={0} />
-              <Stop offset="0.5" stopColor={color} stopOpacity={0.55} />
-              <Stop offset="1" stopColor={color} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
-          <Rect
-            width={BAND}
-            height={STRIP_HEIGHT}
-            fill={`url(#${gradientId})`}
-          />
-        </Svg>
-      </Animated.View>
+      <Band
+        width={SWELL}
+        height={height}
+        peak={peak}
+        color={color}
+        progress={progress}
+        lag={0}
+        travel={swell}
+        gradientId={`${gradientId}-swell`}
+      />
+      <Band
+        width={GLINT}
+        height={height}
+        peak={round(peak * 0.41)}
+        color={color}
+        progress={progress}
+        lag={LAG}
+        travel={glint}
+        gradientId={`${gradientId}-glint`}
+      />
     </MaskedView>
   );
 }
@@ -146,37 +244,60 @@ function Sweep({
 export default function ChannelFlow({
   width,
   channels,
+  layout = 'fork',
+  linesTestID = 'home-map-phone-lines',
   color,
   glow,
+  peak,
+  connected,
   flowing,
   progress,
   style,
 }: {
   width: number;
   channels: Channel[];
+  layout?: ChannelLayout;
+  linesTestID?: string;
   color: string;
   glow: string;
+  peak: number;
+  connected: boolean;
   flowing: boolean;
   progress: Animated.Value;
-  style?: Animated.WithAnimatedValue<StyleProp<ViewStyle>>;
+  style?: StyleProp<ViewStyle>;
 }) {
   const prefix = `flow-${useId().replace(/\W/g, '')}`;
+  const {height, route, carets} = channelGeometry(layout);
   return (
     <Animated.View pointerEvents="none" style={style}>
-      <View style={styles.strip}>
+      <View style={[styles.strip, {height}]}>
         <Svg
-          testID="home-map-phone-lines"
-          height={STRIP_HEIGHT}
+          testID={linesTestID}
+          height={height}
           width="100%"
-          viewBox={`0 0 ${width} ${STRIP_HEIGHT}`}
+          viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
           accessible={false}
           importantForAccessibility="no-hide-descendants">
+          {connected &&
+            channels.map(channel => (
+              <Path
+                key={`${channel.id}-tint`}
+                testID={`home-map-phone-${channel.id}-tint`}
+                d={route(channel.from, channel.to)}
+                stroke={glow}
+                strokeOpacity={0.14}
+                strokeWidth={FEATHER}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            ))}
           {channels.map(channel => (
             <Path
               key={`${channel.id}-route`}
               testID={`home-map-phone-${channel.id}-path`}
-              d={channelPath(channel.from, channel.to)}
+              d={route(channel.from, channel.to)}
               stroke={color}
               strokeWidth={2}
               strokeLinecap="round"
@@ -188,7 +309,7 @@ export default function ChannelFlow({
             <Path
               key={`${channel.id}-carets`}
               testID={`home-map-phone-${channel.id}-arrows`}
-              d={caretPath(channel.from, channel.to)}
+              d={carets(channel.from, channel.to)}
               stroke={color}
               strokeWidth={1.6}
               strokeLinecap="round"
@@ -202,8 +323,10 @@ export default function ChannelFlow({
             <Sweep
               key={`${channel.id}-flow`}
               channel={channel}
+              layout={layout}
               width={width}
               color={glow}
+              peak={peak}
               progress={progress}
               gradientId={`${prefix}-${channel.id}`}
             />
@@ -214,6 +337,6 @@ export default function ChannelFlow({
 }
 
 const styles = StyleSheet.create({
-  strip: {height: STRIP_HEIGHT, overflow: 'hidden'},
-  band: {position: 'absolute', left: 0, top: 0, width: BAND},
+  strip: {overflow: 'hidden'},
+  band: {position: 'absolute', left: 0, top: 0},
 });

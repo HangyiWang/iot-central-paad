@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {Platform, StyleSheet} from 'react-native';
+import {Dimensions, Platform, StyleSheet} from 'react-native';
 import RegistrationActions from '../src/components/registrationActions';
 import {useTheme} from '../src/hooks';
 import {palette} from '../src/theme/palette';
@@ -11,13 +11,12 @@ jest.mock('../src/hooks', () => ({useTheme: jest.fn()}));
 
 const originalOS = Platform.OS;
 let view;
+let window;
 beforeEach(() => {
-  jest.spyOn(require('react-native'), 'useWindowDimensions').mockReturnValue({
-    width: 393,
-    height: 800,
-    scale: 3,
-    fontScale: 1,
-  });
+  // useWindowDimensions reads through Dimensions, so this is where a test
+  // window actually reaches the component.
+  window = {width: 393, height: 800, scale: 3, fontScale: 1};
+  jest.spyOn(Dimensions, 'get').mockImplementation(() => window);
 });
 afterEach(() => {
   act(() => view?.unmount());
@@ -50,6 +49,7 @@ test.each([
     marginTop: 20,
     paddingTop: 16,
     flexDirection: 'row',
+    alignItems: 'center',
     borderTopColor: colors.border,
   });
   expect(buttons.map(button => button.props.title)).toEqual([
@@ -60,15 +60,23 @@ test.each([
     'outline',
     'solid',
   ]);
+  // The shared Button hierarchy owns the paint; the footer only asks for the
+  // secondary/primary pair and the heights that pair implies.
   expect(StyleSheet.flatten(buttons[0].props.buttonStyle)).toMatchObject({
-    backgroundColor: colors.surface,
-    borderColor: colors.controlBorder,
     minHeight: 48,
+    borderRadius: 14,
+    paddingHorizontal: 16,
   });
   expect(StyleSheet.flatten(buttons[1].props.buttonStyle)).toMatchObject({
-    backgroundColor: colors.primary,
-    minHeight: 48,
+    minHeight: 52,
+    borderRadius: 14,
+    paddingHorizontal: 16,
   });
+  for (const button of buttons) {
+    expect(
+      StyleSheet.flatten(button.props.buttonStyle).backgroundColor,
+    ).toBeUndefined();
+  }
   for (const button of buttons) {
     expect(StyleSheet.flatten(button.props.titleStyle)).toMatchObject({
       fontSize: 15,
@@ -83,6 +91,7 @@ test.each([
     });
     expect(StyleSheet.flatten(button.props.buttonStyle).height).toBeUndefined();
   }
+  expect(buttons[1].props.icon.color).toBe(colors.onPrimary);
   expect(buttons[1].props.accessibilityLabel).toBe(
     Strings.Registration.Manual.RegisterNew.Title,
   );
@@ -102,12 +111,7 @@ test.each([
 ])(
   'stacks compact actions without truncating labels at width %s and scale %s',
   (width, fontScale) => {
-    require('react-native').useWindowDimensions.mockReturnValue({
-      width,
-      fontScale,
-      height: 800,
-      scale: 3,
-    });
+    window = {width, fontScale, height: 800, scale: 3};
     useTheme.mockReturnValue({dark: false});
     act(() => {
       view = renderer.create(
