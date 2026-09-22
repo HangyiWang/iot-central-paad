@@ -36,7 +36,7 @@ import BottomPopup from 'components/bottomPopup';
 import {CircleSnail} from 'react-native-progress';
 import {Literal, StyleDefinition} from 'types';
 import {acquireCamera} from './tools/Torch';
-import {SurfaceFill, surfaceStops} from './components/surface';
+import {surfaceColor} from './components/surface';
 import {palette} from './theme/palette';
 import {getObservationStore} from './observation';
 
@@ -106,7 +106,7 @@ export default function FileUpload() {
         borderRadius: 24,
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: appearance.surfaceBorder,
-        backgroundColor: surfaceStops(dark, {tone: 'secondary'})[0],
+        backgroundColor: surfaceColor(dark, {tone: 'secondary'}),
         overflow: 'hidden',
       },
       listItem: {
@@ -131,7 +131,7 @@ export default function FileUpload() {
         borderRadius: 24,
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: appearance.surfaceBorder,
-        backgroundColor: surfaceStops(dark, {tone: 'raised'})[0],
+        backgroundColor: surfaceColor(dark, {tone: 'raised'}),
         overflow: 'hidden',
       },
     }),
@@ -284,10 +284,8 @@ export default function FileUpload() {
       <View style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.card}>
-            <SurfaceFill tone="raised" radius={24} />
             <View style={styles.simulatedContainer}>
               <View accessible={false} style={styles.iconWrapper}>
-                <SurfaceFill tone="secondary" radius={24} />
                 <Icon
                   size={40}
                   name="cloud-off-outline"
@@ -317,11 +315,13 @@ export default function FileUpload() {
           accessibilityLabel={Strings.FileUpload.Start}
           accessibilityState={{disabled: uploading, busy: uploading}}
           disabled={uploading}
-          style={styles.card}
+          style={({pressed}) => [
+            styles.card,
+            {backgroundColor: surfaceColor(dark, {tone: 'raised', pressed})},
+          ]}
           onPress={setShowSelector.True}>
-          {({pressed}) => (
+          {() => (
             <>
-              <SurfaceFill tone="raised" pressed={pressed} radius={24} />
               {uploading ? (
                 <UploadProgress
                   fileSize={fileSize}
@@ -395,7 +395,7 @@ function UploadIcon() {
       borderRadius: 24,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: appearance.surfaceBorder,
-      backgroundColor: surfaceStops(dark, {tone: 'secondary'})[0],
+      backgroundColor: surfaceColor(dark, {tone: 'secondary'}),
       overflow: 'hidden',
     },
     startContainer: {alignItems: 'center', gap: 8},
@@ -410,7 +410,6 @@ function UploadIcon() {
   return (
     <View style={styles.container}>
       <View style={styles.wrapper}>
-        <SurfaceFill tone="secondary" radius={24} />
         <Icon
           size={48}
           name="cloud-upload-outline"

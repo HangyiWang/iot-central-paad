@@ -15,7 +15,7 @@ import {useTheme} from '../hooks';
 import {usePressSettle} from '../hooks/press';
 import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
-import {SurfaceFill, SurfacePaintProps, surfaceStops} from './surface';
+import {SurfacePaintProps, surfaceColor} from './surface';
 import {Text} from './typography';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -59,7 +59,7 @@ export default function DetailsRow({
     inactive,
     visible,
   );
-  // Rows share the action gradient so a list of them reads as one material.
+  // Rows share the action fill so a list of them reads as one material.
   const paint: SurfacePaintProps | null = inactive
     ? null
     : {
@@ -74,7 +74,7 @@ export default function DetailsRow({
           ? {}
           : {from: appearance.tints[0]}),
       };
-  const background = paint ? surfaceStops(dark, paint)[0] : appearance.inset;
+  const background = paint ? surfaceColor(dark, paint) : appearance.inset;
   // The glyph badge stays one step apart from the row it sits on, so rows keep
   // the same depth on a raised card and on the recessed Azure panel.
   const glyphBackground =
@@ -107,7 +107,6 @@ export default function DetailsRow({
         inactive && detailStyles.disabled,
         {transform: [{scale}]},
       ]}>
-      {paint && paint.tone !== 'danger' ? <SurfaceFill {...paint} /> : null}
       <View
         accessible={false}
         accessibilityElementsHidden

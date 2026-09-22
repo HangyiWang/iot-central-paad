@@ -14,11 +14,7 @@ import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
 import ToolStrings from './toolStrings';
 import AppBackground from '../components/appBackground';
-import {
-  SurfaceFill,
-  surfaceElevation,
-  surfaceStops,
-} from '../components/surface';
+import {surfaceColor, surfaceEdge} from '../components/surface';
 import {usePressSettle} from '../hooks/press';
 
 export type ExploreTool =
@@ -103,24 +99,18 @@ function Tile({
           detailStyles.card,
           styles.tool,
           stacked && styles.stackedTool,
-          surfaceElevation(dark, 'raised'),
           {
-            backgroundColor: surfaceStops(dark, paint)[0],
+            backgroundColor: surfaceColor(dark, paint),
             borderColor: colors.surfaceBorder,
           },
+          surfaceEdge(dark, 'raised'),
         ]}>
-        <SurfaceFill {...paint} radius={24} />
         <View
           testID={`explore-plate-${tool.id}`}
           accessible={false}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
-          style={styles.icon}>
-          <SurfaceFill
-            radius={15}
-            from={accent}
-            to={colors.toolAccentEnds[index]}
-          />
+          style={[styles.icon, {backgroundColor: accent}]}>
           <Icon
             name={tool.icon}
             type="material-community"

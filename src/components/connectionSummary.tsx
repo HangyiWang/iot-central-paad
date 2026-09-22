@@ -34,7 +34,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import AzureContextPanel from './azureContextPanel';
 import DetailsAction from './detailsAction';
 import DetailsRow from './detailsRow';
-import {SurfaceFill, surfaceStops} from './surface';
+import {surfaceColor} from './surface';
 import {useGentleTransition} from '../hooks/motion';
 import {usePressSettle} from '../hooks/press';
 
@@ -90,13 +90,19 @@ export default function ConnectionSummary({
   }, [client]);
   const text = Strings.Connection.Summary;
   const online = !simulated && connected;
+  const manuallyDisconnected =
+    stage === 'disconnected' &&
+    !!credentials &&
+    !connected &&
+    !loading &&
+    !simulated;
   const connectionEntrance = useGentleTransition(
     online,
     online && !details && !loading,
   );
   const emblemColor = online
     ? appearance.positive
-    : error && !loading && !simulated
+    : manuallyDisconnected || (error && !loading && !simulated)
     ? appearance.danger
     : appearance.muted;
   const operationId = error?.operationId ?? client?.identity?.operationId;
@@ -189,9 +195,6 @@ export default function ConnectionSummary({
           {
             backgroundColor: appearance.surface,
             borderColor: appearance.border,
-            shadowColor: appearance.text,
-            shadowOpacity: dark ? 0 : 0.06,
-            elevation: dark ? 0 : 1,
           },
         ]}>
         <View
@@ -246,7 +249,7 @@ export default function ConnectionSummary({
               style={[
                 styles.statusText,
                 {
-                  color: online ? appearance.positive : appearance.muted,
+                  color: emblemColor,
                 },
               ]}
               accessibilityRole="header"
@@ -294,6 +297,19 @@ export default function ConnectionSummary({
       {error && !loading && (
         <View style={styles.notice}>
           <ConnectionNotice error={error} action={noticeAction} />
+        </View>
+      )}
+      {manuallyDisconnected && !error && (
+        <View style={styles.notice}>
+          <ConnectionNotice
+            disconnected
+            testID="connection-disconnected"
+            action={{
+              label: text.Reconnect,
+              onPress: () => void connect(credentials),
+              testID: 'connection-disconnected-reconnect',
+            }}
+          />
         </View>
       )}
       {details && (
@@ -423,7 +439,7 @@ export default function ConnectionSummary({
                     supporting={text.DisconnectDetail}
                     icon="link-variant-off"
                     destructive
-                    onPress={clear}
+                    onPress={() => clear({disconnected: true})}
                   />
                 )}
               </View>
@@ -600,15 +616,14 @@ function SummaryAction({
           styles.actionPill,
           stacked && styles.stackedAction,
           {
-            backgroundColor: surfaceStops(dark, {
+            backgroundColor: surfaceColor(dark, {
               tone: 'secondary',
               pressed,
-            })[0],
+            }),
             borderColor: appearance.surfaceBorder,
             transform: [{scale}],
           },
         ]}>
-        <SurfaceFill tone="secondary" pressed={pressed} radius={14} />
         <Text style={[styles.rowAction, {color: appearance.primary}]}>
           {title}
         </Text>
@@ -685,8 +700,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     gap: 12,
-    shadowRadius: 12,
-    shadowOffset: {width: 0, height: 4},
   },
   stackedHeader: {
     flexDirection: 'column',

@@ -29,6 +29,12 @@ const CORNER = 7;
 const CARET = 5;
 /** The feather matches the static tint exactly, so the light adds no bloom. */
 export const FEATHER = 9;
+/**
+ * A dropped connection breaks the route itself: the same shape, in the danger
+ * tone, drawn as a broken line. Nothing moves and nothing glows, so the state
+ * is legible without colour alone and without implying traffic.
+ */
+export const INTERRUPTED_DASH = '6 5';
 const SWELL = 96;
 const GLINT = 28;
 /** The glint trails the swell by about a fifth of the sweep. */
@@ -251,6 +257,7 @@ export default function ChannelFlow({
   peak,
   connected,
   flowing,
+  interrupted = false,
   progress,
   style,
 }: {
@@ -263,6 +270,7 @@ export default function ChannelFlow({
   peak: number;
   connected: boolean;
   flowing: boolean;
+  interrupted?: boolean;
   progress: Animated.Value;
   style?: StyleProp<ViewStyle>;
 }) {
@@ -300,6 +308,7 @@ export default function ChannelFlow({
               d={route(channel.from, channel.to)}
               stroke={color}
               strokeWidth={2}
+              strokeDasharray={interrupted ? INTERRUPTED_DASH : undefined}
               strokeLinecap="round"
               strokeLinejoin="round"
               fill="none"

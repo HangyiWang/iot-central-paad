@@ -13,14 +13,13 @@ import {Button as ElButton, ButtonProps} from '@rneui/themed';
 import {useTheme} from '../hooks';
 import {usePressSettle} from '../hooks/press';
 import {palette} from '../theme/palette';
-import {SurfaceFill, SurfacePaintProps, surfaceStops} from './surface';
+import {SurfacePaintProps, surfaceColor} from './surface';
 
 type Props = Omit<ButtonProps, 'children'> & {children?: React.ReactNode};
 
 const RADIUS = 14;
 
 type Decoration = {
-  paint: SurfacePaintProps | null;
   scale: ReturnType<typeof usePressSettle>['scale'];
 };
 
@@ -41,7 +40,6 @@ function ButtonBody({style, children, ...props}: ViewProps) {
     <Animated.View
       {...props}
       style={[style, {transform: [{scale: decoration.scale}]}]}>
-      {decoration.paint ? <SurfaceFill {...decoration.paint} /> : null}
       {children}
     </Animated.View>
   );
@@ -99,7 +97,7 @@ const Button = React.memo<Props>(
     const background = inactive
       ? colors.inset
       : paint
-      ? surfaceStops(dark, paint)[0]
+      ? surfaceColor(dark, paint)
       : pressed
       ? colors.inset
       : 'transparent';
@@ -118,7 +116,7 @@ const Button = React.memo<Props>(
       [onPressOut, settleOut],
     );
     return (
-      <DecorationContext.Provider value={custom ? null : {paint, scale}}>
+      <DecorationContext.Provider value={custom ? null : {scale}}>
         <ElButton
           {...props}
           type={type}

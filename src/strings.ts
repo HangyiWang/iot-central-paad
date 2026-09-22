@@ -142,6 +142,11 @@ const Strings = {
         'Sends telemetry and a reported property through the connected client. Local submission is not a broker acknowledgement, downstream receipt or registry confirmation.',
     },
     Notice: {
+      Disconnected: {
+        Title: 'Disconnected on this phone',
+        Message:
+          'Your saved connection is kept. Reconnect to resume sending data.',
+      },
       Titles: {
         Default: 'Connection needs attention',
         CONNECTION_LOST: 'Connection interrupted',
@@ -175,6 +180,7 @@ const Strings = {
     },
     Stages: {
       idle: 'Not connected',
+      disconnected: 'Disconnected on this phone',
       validating: 'Checking connection details...',
       provisioning: 'Requesting a device assignment...',
       connecting: 'Connecting to the assigned IoT Hub...',

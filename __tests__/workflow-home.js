@@ -15,6 +15,7 @@ import {detailStyles} from '../src/theme/detailStyles';
 import {useDecorativeLoop, useGentleTransition} from '../src/hooks/motion';
 import ChannelFlow, {
   FEATHER,
+  INTERRUPTED_DASH,
   LANE_HEIGHT,
   STRIP_HEIGHT,
   caretPath,
@@ -22,6 +23,8 @@ import ChannelFlow, {
   laneCaretPath,
   lanePath,
 } from '../src/experience/ChannelFlow';
+import {surfaceColor} from '../src/components/surface';
+import Svg from 'react-native-svg';
 
 const Native = require('react-native');
 
@@ -511,7 +514,10 @@ test('explains the decorative light instead of claiming traffic', () => {
   for (const claim of ['packets', 'throughput', 'delivery confirmation'])
     expect(text.FlowNote).toContain(claim);
   expect(text.FlowNote).toContain('not a persistent message path');
-  expect(text.MapLegend).toContain('Dashed');
+  // Two dashed meanings, told apart by tone in the same legend voice.
+  expect(text.MapLegend).toContain('Grey dashed: cloud coordination');
+  expect(text.Interrupted).toContain('Red, broken');
+  expect(text.Interrupted.split(' ').length).toBeLessThanOrEqual(12);
 });
 
 test.each([
@@ -612,6 +618,11 @@ test.each([false, true])(
       );
       expect(style.backgroundColor).toBe(palette(dark).tints[2]);
       expect(style.backgroundColor).not.toBe(palette(dark).dangerSurface);
+      // One material: the press deepens the same warm tone in both themes.
+      expect(
+        Native.StyleSheet.flatten(row.props.style({pressed: true}))
+          .backgroundColor,
+      ).toBe(surfaceColor(dark, {from: palette(dark).tints[2], pressed: true}));
       expect(style.minHeight).toBeGreaterThanOrEqual(48);
       expect(row.props.accessibilityRole).toBe('button');
       expect(
@@ -903,11 +914,19 @@ test.each([false, true])(
       'pulse',
       'chevron-right',
     ]);
+    // One solid fill, painted by the footer itself: no gradient competes with
+    // the page behind the card, and nothing is layered over the hairline.
+    expect(style.backgroundColor).toBe(surfaceColor(dark, {tone: 'footer'}));
+    expect(footer.findAllByType(Svg)).toHaveLength(0);
     // Press feedback is the caret settling plus the surface, never a dim.
     act(() => footer.props.onPressIn());
-    expect(
-      Native.StyleSheet.flatten(control('home-activity').props.style).opacity,
-    ).toBeUndefined();
+    const held = Native.StyleSheet.flatten(
+      control('home-activity').props.style,
+    );
+    expect(held.opacity).toBeUndefined();
+    expect(held.backgroundColor).toBe(
+      surfaceColor(dark, {tone: 'footer', pressed: true}),
+    );
     act(() => footer.props.onPressOut());
     expect(footer.props.hitSlop).toBe(2);
   },
@@ -1172,3 +1191,280 @@ test.each(['ios', 'android'])(
     expect(connection.client.connect).not.toHaveBeenCalled();
   },
 );
+
+// The runtime's only explicit interruption: a transport that was established
+// and then lost, reported as CONNECTION_LOST while the old identity is kept.
+const drop = () => {
+  connection.client.isConnected = jest.fn(() => false);
+  connection.error = new ConnectionError('CONNECTION_LOST');
+  connection.stage = 'error';
+};
+
+test.each([
+  ['a live connection', () => {}, 'channel', undefined, true],
+  ['an interrupted connection', drop, 'danger', INTERRUPTED_DASH, false],
+  [
+    'a reconnect in progress',
+    () => {
+      drop();
+      connection.connecting = true;
+    },
+    'controlBorder',
+    undefined,
+    false,
+  ],
+  [
+    'simulation',
+    () => {
+      drop();
+      storage.simulated = true;
+    },
+    'controlBorder',
+    undefined,
+    false,
+  ],
+  [
+    'a setup that never connected',
+    () => {
+      connection.client = null;
+      connection.stage = 'idle';
+    },
+    'controlBorder',
+    undefined,
+    false,
+  ],
+  [
+    'a stale drop report on a live transport',
+    () => {
+      connection.error = new ConnectionError('CONNECTION_LOST');
+      connection.stage = 'error';
+    },
+    'controlBorder',
+    undefined,
+    false,
+  ],
+  [
+    'a failure that never reached an established transport',
+    () => {
+      connection.client.isConnected = jest.fn(() => false);
+      connection.error = new ConnectionError('CONNECT_FAILED');
+      connection.stage = 'error';
+    },
+    'controlBorder',
+    undefined,
+    false,
+  ],
+  [
+    'a refused credential',
+    () => {
+      connection.client.isConnected = jest.fn(() => false);
+      connection.error = new ConnectionError('AUTHENTICATION_FAILED');
+      connection.stage = 'error';
+    },
+    'controlBorder',
+    undefined,
+    false,
+  ],
+])(
+  'draws the phone connectors for %s',
+  (_label, prepare, token, dasharray, lit) => {
+    prepare();
+    render();
+    const colors = palette(false);
+    const interrupted = dasharray !== undefined;
+    for (const id of ['dps', 'hub']) {
+      const route = control(`home-map-phone-${id}-path`);
+      // The route keeps its exact shape; only its tone and continuity change.
+      expect(route.props.stroke).toBe(colors[token]);
+      expect(route.props.strokeDasharray).toBe(dasharray);
+      // Both carets survive a drop: the link stays two-way, just broken.
+      const carets = control(`home-map-phone-${id}-arrows`);
+      expect(carets.props.stroke).toBe(colors[token]);
+      expect(carets.props.strokeDasharray).toBeUndefined();
+      expect(
+        tree.root.findAllByProps({testID: `home-map-phone-${id}-tint`}).length >
+          0,
+      ).toBe(lit);
+      expect(
+        tree.root.findAllByProps({testID: `home-map-flow-${id}`}).length > 0,
+      ).toBe(lit);
+    }
+    // Colour never carries the state alone, and no claim is invented.
+    expect(content().includes(text.Interrupted)).toBe(interrupted);
+    if (interrupted) {
+      const notice = control('home-map-interrupted');
+      expect(notice.props.style).toContainEqual({color: colors.danger});
+      // Assistive output states the condition and the route out of it, with
+      // no colour key and no claim the app has reconnected.
+      expect(notice.props.accessibilityLabel).toBe(text.InterruptedAlert);
+      expect(notice.props.accessibilityLabel).not.toMatch(/red|grey|broken/i);
+      expect(text.InterruptedAlert).toContain('Connection details');
+    }
+    // ADR coordination is unrelated to the phone's transport.
+    expect(control('home-map-namespace-path').props.strokeDasharray).toBe(
+      '4 3',
+    );
+    expect(control('home-map-namespace-path').props.stroke).toBe(
+      colors.controlBorder,
+    );
+    if (connection.client)
+      expect(connection.client.connect).not.toHaveBeenCalled();
+  },
+);
+
+test('draws the same broken connectors for a deliberate disconnect, in its own words', () => {
+  // The runtime clears the client and the error and records the stage, so the
+  // map must read the stage instead of inventing a transport failure.
+  connection.client = null;
+  connection.error = null;
+  connection.stage = 'disconnected';
+  render();
+  const colors = palette(false);
+  act(() => {
+    control('home-map-compact').props.onLayout({
+      nativeEvent: {layout: {width: 360}},
+    });
+  });
+  for (const id of ['dps', 'hub']) {
+    const route = control(`home-map-phone-${id}-path`);
+    expect(route.props.stroke).toBe(colors.danger);
+    expect(route.props.strokeDasharray).toBe(INTERRUPTED_DASH);
+    expect(
+      control(`home-map-phone-${id}-arrows`).props.strokeDasharray,
+    ).toBeUndefined();
+    expect(
+      tree.root.findAllByProps({testID: `home-map-flow-${id}`}),
+    ).toHaveLength(0);
+  }
+  const notice = control('home-map-interrupted');
+  expect(content()).toContain(text.Disconnected);
+  expect(content()).not.toContain(text.Interrupted);
+  expect(notice.props.accessibilityLabel).toBe(text.DisconnectedAlert);
+  expect(notice.props.accessibilityLabel).not.toMatch(/red|grey|broken/i);
+  // Attention names a choice the person made, not a fault to diagnose.
+  expect(content()).toContain(text.DisconnectedAttention);
+  expect(content()).not.toContain(text.ConnectionAttention);
+  press('home-attention-connection');
+  expect(props.onDetails).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  ['a reconnect in flight', () => (connection.connecting = true)],
+  ['simulation', () => (storage.simulated = true)],
+  [
+    'a client that still reports a live transport',
+    () => {
+      connection.client = {
+        identity,
+        isConnected: jest.fn(() => true),
+        connect: jest.fn(),
+        disconnect: jest.fn(),
+        on: jest.fn(),
+        fetchTwin: jest.fn(),
+      };
+    },
+  ],
+])('keeps the map whole when %s follows a disconnect', (_label, prepare) => {
+  connection.client = null;
+  connection.error = null;
+  connection.stage = 'disconnected';
+  prepare();
+  render();
+  act(() => {
+    control('home-map-compact').props.onLayout({
+      nativeEvent: {layout: {width: 360}},
+    });
+  });
+  for (const flow of tree.root.findAllByType(ChannelFlow))
+    expect(flow.props.interrupted).toBe(false);
+  expect(control('home-map-phone-hub-path').props.stroke).not.toBe(
+    palette(false).danger,
+  );
+  expect(
+    tree.root.findAllByProps({testID: 'home-map-interrupted'}),
+  ).toHaveLength(0);
+  expect(
+    tree.root.findAllByProps({testID: 'home-attention-connection'}),
+  ).toHaveLength(0);
+});
+
+test('a deliberate disconnect keeps its own stage, never a fabricated error', () => {
+  connection.client = null;
+  connection.error = null;
+  connection.stage = 'disconnected';
+  render();
+  // The map reads the stage alone; nothing here invents a transport failure.
+  expect(content()).not.toContain('CONNECTION_LOST');
+  expect(content()).not.toContain(text.ConnectionAttentionHint);
+  expect(content()).toContain(text.DisconnectedAttentionHint);
+  // An automatic drop and a deliberate disconnect never speak at once.
+  connection.client = {
+    identity,
+    isConnected: jest.fn(() => false),
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    on: jest.fn(),
+    fetchTwin: jest.fn(),
+  };
+  connection.error = new ConnectionError('CONNECTION_LOST');
+  connection.stage = 'error';
+  render();
+  expect(content()).toContain(text.Interrupted);
+  expect(content()).not.toContain(text.Disconnected);
+});
+
+test('breaks each measured lane when a stacked map loses its connection', () => {
+  dimensions = {width: 320, height: 640, scale: 1, fontScale: 1};
+  drop();
+  render();
+  act(() => {
+    for (const id of ['dps', 'hub'])
+      control(`home-map-lane-${id}`).props.onLayout({
+        nativeEvent: {layout: {width: 272}},
+      });
+  });
+  const colors = palette(false);
+  for (const id of ['dps', 'hub']) {
+    const route = control(`home-map-phone-${id}-path`);
+    expect(route.props.d).toBe(lanePath(10, 262));
+    expect(route.props.stroke).toBe(colors.danger);
+    expect(route.props.strokeDasharray).toBe(INTERRUPTED_DASH);
+    const carets = control(`home-map-phone-${id}-arrows`);
+    expect(carets.props.d).toBe(laneCaretPath(10, 262));
+    expect(carets.props.strokeDasharray).toBeUndefined();
+  }
+  expect(content()).toContain(text.Interrupted);
+});
+
+test('mirrors a broken direct-Hub route without inventing a DPS lane', () => {
+  const original = Native.I18nManager.isRTL;
+  try {
+    storage.credentials = {
+      connectionString: `HostName=direct.azure-devices.net;DeviceId=phone;SharedAccessKey=${key}`,
+    };
+    drop();
+    Native.I18nManager.isRTL = true;
+    render();
+    act(() => {
+      control('home-map-compact').props.onLayout({
+        nativeEvent: {layout: {width: 360}},
+      });
+    });
+    const flow = tree.root.findByType(ChannelFlow);
+    expect(flow.props.interrupted).toBe(true);
+    expect(flow.props.channels.map(route => route.id)).toEqual(['hub']);
+    const [route] = flow.props.channels;
+    expect(control('home-map-phone-hub-path').props.d).toBe(
+      channelPath(route.from, route.to),
+    );
+    expect(control('home-map-phone-hub-path').props.strokeDasharray).toBe(
+      INTERRUPTED_DASH,
+    );
+    expect(
+      tree.root.findAllByProps({testID: 'home-map-phone-dps-path'}),
+    ).toHaveLength(0);
+    expect(content()).toContain(text.DpsNotUsed);
+  } finally {
+    Native.I18nManager.isRTL = original;
+  }
+});

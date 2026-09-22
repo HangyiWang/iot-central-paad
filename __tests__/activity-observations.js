@@ -11,6 +11,7 @@ import Activity, {
 import {StorageContext} from '../src/contexts/storage';
 import {palette} from '../src/theme/palette';
 import {DISPLAY_FONT_FAMILY} from '../src/theme/fonts';
+import {detailStyles} from '../src/theme/detailStyles';
 
 let mockSnapshot;
 jest.mock('../src/observation', () => ({
@@ -284,6 +285,26 @@ it('keeps a display-face page title and a readable trail rather than nested card
   expect(StyleSheet.flatten(heading.props.style).fontWeight).toBeUndefined();
   const row = view.root.findAllByProps({testID: 'activity-event-9'})[0];
   expect(StyleSheet.flatten(row.props.style).backgroundColor).toBeUndefined();
+  // An observation is a feed entry, not a section heading: its title sits one
+  // quiet step below the headings around it and above its own timestamp.
+  const title = row
+    .findAllByType('Text')
+    .find(node => typeof node.props.children === 'string');
+  expect(StyleSheet.flatten(title.props.style)).toMatchObject({
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '600',
+  });
+  expect(title.props.allowFontScaling).not.toBe(false);
+  expect(StyleSheet.flatten(title.props.style).fontSize).toBeLessThan(
+    StyleSheet.flatten([detailStyles.sectionTitle]).fontSize,
+  );
+  const stamp = row
+    .findAllByType('Text')
+    .find(node =>
+      JSON.stringify(node.props.children).includes('Observed by this app'),
+    );
+  expect(StyleSheet.flatten(stamp.props.style).fontSize).toBe(13);
   act(() => press('activity-toggle-9'));
   const details = view.root.findAllByProps({testID: 'activity-details-9'})[0];
   expect(StyleSheet.flatten(details.props.style).backgroundColor).toBe(

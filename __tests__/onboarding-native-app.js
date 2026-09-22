@@ -327,6 +327,107 @@ test('failed restore stays visible on welcome and retries saved credentials with
   expect(value('connection-error-code')).toBeUndefined();
 });
 
+test.each([
+  ['individual', 'interrupted'],
+  ['hub', 'interrupted'],
+  ['individual', 'manual'],
+  ['hub', 'manual'],
+])(
+  'Home reconnect starts a fresh %s transport after a %s disconnect and retains saved setup',
+  async (mode, reason) => {
+    const savedCredentials =
+      mode === 'hub'
+        ? {connectionString: direct}
+        : {registrationId: 'saved-phone', scopeId: '0ne123456', deviceKey: key};
+    Keychain.getGenericPassword.mockResolvedValue({
+      username: 'IOTC_PAD_CLIENT',
+      password: JSON.stringify({credentials: savedCredentials}),
+    });
+    await boot();
+    expect(value('connection-status')).toBe('Connected');
+    const previousSocket = [...sockets][0];
+    if (reason === 'manual') {
+      await act(async () => press('connection-details'));
+      await act(async () => press('connection-disconnect'));
+      await act(async () => press('connection-details-close'));
+    } else {
+      await act(async () => {
+        emit(previousSocket, 'error', {message: 'private-transport-failure'});
+      });
+    }
+    await act(async () => jest.advanceTimersByTimeAsync(1100));
+    expect(value('connection-status')).toBe('Disconnected');
+    expect(JSON.stringify(app.toJSON())).toContain(
+      reason === 'manual'
+        ? 'Disconnected on this phone'
+        : 'Connection interrupted',
+    );
+    if (reason === 'manual') {
+      expect(JSON.stringify(app.toJSON())).not.toContain('CONNECTION_LOST');
+      expect(sockets.size).toBe(0);
+    }
+    expect(JSON.stringify(app.toJSON())).not.toContain(
+      'private-transport-failure',
+    );
+    const channels = mode === 'hub' ? ['hub'] : ['dps', 'hub'];
+    await act(async () => {
+      for (const channel of channels) {
+        const lane = app.root.findAllByProps({
+          testID: `home-map-lane-${channel}`,
+        })[0];
+        if (lane) lane.props.onLayout({nativeEvent: {layout: {width: 320}}});
+      }
+    });
+    for (const channel of channels) {
+      const route = app.root.findAllByProps({
+        testID: `home-map-phone-${channel}-path`,
+      })[0];
+      expect(route.props.strokeDasharray).toBe('6 5');
+      expect(
+        app.root.findAllByProps({testID: `home-map-flow-${channel}`}),
+      ).toHaveLength(0);
+    }
+
+    let pendingSocket;
+    jest.spyOn(native, 'connect').mockImplementationOnce((id, url) => {
+      pendingSocket = id;
+      sockets.add(id);
+      destinations.push(url);
+    });
+    const reconnectID =
+      reason === 'manual'
+        ? 'connection-disconnected-reconnect'
+        : 'connection-error-reconnect';
+    await act(async () => press(reconnectID));
+    expect(pendingSocket).toBeDefined();
+    expect(pendingSocket).not.toBe(previousSocket);
+    expect(sockets.size).toBe(1);
+    expect(
+      app.root.findAllByProps({testID: 'app-busy-overlay'}).length,
+    ).toBeGreaterThan(0);
+    expect(app.root.findAllByProps({testID: reconnectID})).toHaveLength(0);
+    await act(async () => {
+      emit(pendingSocket, 'open', {protocol: 'mqtt'});
+      await jest.advanceTimersByTimeAsync(1100);
+    });
+    expect(value('connection-status')).toBe('Connected');
+    for (const channel of channels) {
+      const route = app.root.findAllByProps({
+        testID: `home-map-phone-${channel}-path`,
+      })[0];
+      expect(route.props.strokeDasharray).toBeUndefined();
+    }
+    expect(app.root.findAllByProps({testID: 'app-busy-overlay'})).toHaveLength(
+      0,
+    );
+    expect(destinations).toHaveLength(2);
+    expect(Keychain.resetGenericPassword).not.toHaveBeenCalled();
+    expect(
+      JSON.parse(Keychain.setGenericPassword.mock.calls.at(-1)[1]).credentials,
+    ).toMatchObject(savedCredentials);
+  },
+);
+
 test('one-shot restored real client lands Home even with batched connection updates', async () => {
   Keychain.getGenericPassword.mockResolvedValue({
     username: 'IOTC_PAD_CLIENT',

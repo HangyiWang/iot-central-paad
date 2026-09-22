@@ -498,6 +498,40 @@ captures, new live inputs, cloud proof, or OS/permission changes occurred.
 Owned observers, temporary payloads and active approval were cleaned;
 earlier delivery evidence was preserved.
 
+### Solid surfaces and explicit disconnection (2026-09-22)
+
+The owner clarified that the reported broken Reconnect concerned its outline,
+not the connection operation. A bounded probe of the unchanged installed
+`ee99db9` image began with Disconnected / Connection interrupted. One genuine
+Reconnect tap was acknowledged; the observer saw the busy overlay,
+provisioning, connecting and Connected within its approximately 20-second
+post-tap observation window. The app was left on Home, Connected. This is
+evidence for that one attempt, not an explanation of earlier disconnections
+or independent cloud proof. No credential values or private captures were
+collected. There was no data clearing, storage injection, app restart or
+OS/permission change. The observer and temporary device payloads were cleaned.
+
+The follow-up design keeps gradients on page backgrounds only. Buttons,
+panels and messages use solid tonal surfaces, clear edges and no decorative
+shadows; functional busy-overlay stacking remains. Activity observation
+headings use the quieter 15-point entry style instead of the 17-point section
+heading. Removing control paint overlays also leaves their native outlines
+uncovered. These are
+Opus 5/high design refinements, not changes to Azure transport behaviour.
+
+An explicit local `disconnected` session stage distinguishes the user's
+Disconnect action from both initial idle/setup and an unexpected
+`CONNECTION_LOST`. Manual disconnection keeps saved credentials, exposes a
+non-error Home recovery notice and marks the phone paths red and broken.
+It does not manufacture an error code, change cloud resources or initiate an
+automatic reconnect. The state is not persisted: normal cold-start restoration
+continues to use the saved setup. Reconnect uses the existing connection
+pipeline and clears the disconnected presentation as it starts.
+
+This refinement still requires exact-source ordinary native builds and
+in-place delivery. The earlier `ee99db9` preservation result and the bounded
+reconnect probe are not acceptance evidence for the new source.
+
 ### Completed simulator acceptance (2026-09-18)
 
 The foundation's ordinary locked build/startup lanes passed on Android and iOS

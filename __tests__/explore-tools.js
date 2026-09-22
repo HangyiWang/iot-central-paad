@@ -3,7 +3,7 @@ import renderer, {act} from 'react-test-renderer';
 import {ScrollView, StyleSheet} from 'react-native';
 import Explore from '../src/experience/Explore';
 import {palette} from '../src/theme/palette';
-import {surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 
 let mockDark = false;
 jest.mock('../src/hooks', () => ({useTheme: () => ({dark: mockDark})}));
@@ -53,21 +53,25 @@ test.each([false, true])(
       // One porcelain field for every tile; the accent is only a whisper.
       const accent = palette(dark).toolAccents[index];
       expect(style.backgroundColor).toBe(
-        surfaceStops(dark, {tone: 'raised', accent, pressed: false})[0],
+        surfaceColor(dark, {tone: 'raised', accent, pressed: false}),
       );
-      expect(style.borderColor).toBe(palette(dark).surfaceBorder);
+      // A firmer hairline stands the tile up; nothing floats over the page.
+      expect(style.borderColor).toBe(palette(dark).border);
       expect(style.opacity).toBeUndefined();
-      expect(style.elevation).toBe(2);
+      expect(style.elevation).toBeUndefined();
+      expect(style.shadowOpacity).toBeUndefined();
+      expect(style.shadowRadius).toBeUndefined();
       const badge = view.root.findByProps({testID: `explore-plate-${id}`});
       expect(StyleSheet.flatten(badge.props.style)).toMatchObject({
         width: 44,
         height: 44,
         borderRadius: 15,
       });
-      // The plate carries the identity as its own two-stop surface.
-      const plate = badge.findAllByProps({from: accent});
-      expect(plate.length).toBeGreaterThan(0);
-      expect(plate[0].props.to).toBe(palette(dark).toolAccentEnds[index]);
+      // The plate carries the identity as one solid accent, not a gradient.
+      expect(StyleSheet.flatten(badge.props.style).backgroundColor).toBe(
+        accent,
+      );
+      expect(badge.props.children).toBeTruthy();
       act(() => tool.props.onPress());
       expect(onOpen).toHaveBeenLastCalledWith(route);
     }
@@ -93,7 +97,7 @@ test.each([false, true])(
       StyleSheet.flatten(
         view.root.findByProps({testID: 'explore-tool-telemetry'}).props.style,
       );
-    expect(field().backgroundColor).toBe(surfaceStops(dark, paint(false))[0]);
+    expect(field().backgroundColor).toBe(surfaceColor(dark, paint(false)));
     expect(field().opacity).toBeUndefined();
     act(() =>
       view.root
@@ -101,14 +105,14 @@ test.each([false, true])(
         .props.onPressIn(),
     );
     // Feedback survives even when the OS withholds decorative motion.
-    expect(field().backgroundColor).toBe(surfaceStops(dark, paint(true))[0]);
+    expect(field().backgroundColor).toBe(surfaceColor(dark, paint(true)));
     expect(field().opacity).toBeUndefined();
     act(() =>
       view.root
         .findByProps({testID: 'explore-tool-telemetry'})
         .props.onPressOut(),
     );
-    expect(field().backgroundColor).toBe(surfaceStops(dark, paint(false))[0]);
+    expect(field().backgroundColor).toBe(surfaceColor(dark, paint(false)));
     expect(
       view.root.findByProps({testID: 'explore-tool-telemetry'}).props.hitSlop,
     ).toBe(2);

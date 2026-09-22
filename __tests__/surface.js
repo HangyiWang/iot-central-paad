@@ -1,18 +1,15 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {StyleSheet, Text, View} from 'react-native';
-import Svg, {LinearGradient, Rect} from 'react-native-svg';
-import Surface, {
-  SurfaceFill,
-  surfaceElevation,
-  surfaceStops,
-} from '../src/components/surface';
+import {StyleSheet, Text} from 'react-native';
+import Svg from 'react-native-svg';
+import {palette} from '../src/theme/palette';
+import Surface, {surfaceColor, surfaceEdge} from '../src/components/surface';
 
 let mockDark = false;
 jest.mock('../src/hooks', () => ({useTheme: () => ({dark: mockDark})}));
 
 test.each([false, true])(
-  'paint is opaque, decorative and independent per surface (%s)',
+  'paint is one solid colour, opaque and free of overlays (%s)',
   dark => {
     mockDark = dark;
     let tree;
@@ -23,7 +20,7 @@ test.each([false, true])(
           <Surface testID="first" radius={24} level="raised" onLayout={layout}>
             <Text>Real content</Text>
           </Surface>
-          <Surface tone="primary">
+          <Surface testID="second" tone="primary">
             <Text>Connect</Text>
           </Surface>
         </>,
@@ -32,74 +29,88 @@ test.each([false, true])(
     const host = tree.root
       .findAllByProps({testID: 'first'})
       .find(node => typeof node.type === 'string');
-    expect(StyleSheet.flatten(host.props.style)).toMatchObject({
+    const face = StyleSheet.flatten(host.props.style);
+    expect(face).toMatchObject({
       borderRadius: 24,
-      elevation: 2,
-      shadowOffset: {width: 0, height: 3},
+      borderColor: palette(dark).border,
+      borderWidth: StyleSheet.hairlineWidth,
+      backgroundColor: palette(dark).surfaceRaised,
     });
-    expect(host.props.onLayout).toBe(layout);
-    const ids = tree.root
-      .findAllByType(LinearGradient)
-      .map(node => node.props.id);
-    expect(new Set(ids).size).toBe(2);
-    for (const drawing of tree.root.findAllByType(Svg)) {
-      expect(drawing.props).toMatchObject({
-        pointerEvents: 'none',
-        accessibilityElementsHidden: true,
-        importantForAccessibility: 'no-hide-descendants',
-      });
+    // Nothing floats: hierarchy is the tone, the edge and the spacing.
+    for (const key of [
+      'shadowColor',
+      'shadowOpacity',
+      'shadowRadius',
+      'shadowOffset',
+      'elevation',
+    ]) {
+      expect(face[key]).toBeUndefined();
     }
-    expect(tree.root.findAllByType(Rect)[0].props.rx).toBe(24);
+    expect(host.props.onLayout).toBe(layout);
+    const primary = tree.root
+      .findAllByProps({testID: 'second'})
+      .find(node => typeof node.type === 'string');
+    const primaryFace = StyleSheet.flatten(primary.props.style);
+    expect(primaryFace.backgroundColor).toBe(palette(dark).primary);
+    expect(primaryFace.borderWidth).toBe(0);
+    // Gradients belong to the page, never to a face sitting on it.
+    expect(tree.root.findAllByType(Svg)).toHaveLength(0);
     expect(JSON.stringify(tree.toJSON())).toContain('Real content');
     act(() => tree.unmount());
   },
 );
 
-test('ground controls never acquire a raised shadow', () => {
-  expect(surfaceElevation(false, 'ground')).toEqual({});
-  expect(surfaceElevation(true, 'ground')).toEqual({});
+test('a raised face is an edge, never a shadow, and ground stays plain', () => {
+  expect(surfaceEdge(false, 'ground')).toEqual({});
+  expect(surfaceEdge(true, 'ground')).toEqual({});
+  for (const dark of [false, true]) {
+    expect(surfaceEdge(dark, 'raised')).toEqual({
+      borderColor: palette(dark).border,
+    });
+    expect(palette(dark).border).not.toBe(palette(dark).surfaceBorder);
+  }
 });
 
-test('padded controls give percentage paint a separate full-size native viewport', () => {
-  let tree;
-  act(() => {
-    tree = renderer.create(
-      <View
-        style={{
-          width: 320,
-          minHeight: 52,
-          paddingHorizontal: 16,
-          paddingVertical: 11,
-        }}>
-        <SurfaceFill tone="primary" />
-        <Text>Scan QR code</Text>
-      </View>,
-    );
-  });
-  const viewport = tree.root.findAll(
-    node => typeof node.type === 'string' && node.props.collapsable === false,
-  );
-  expect(viewport).toHaveLength(1);
-  expect(StyleSheet.flatten(viewport[0].props.style)).toEqual({
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-  });
-  expect(viewport[0].props).toMatchObject({
-    pointerEvents: 'none',
-    accessibilityElementsHidden: true,
-    importantForAccessibility: 'no-hide-descendants',
-  });
-  expect(viewport[0].findAllByType(Svg)).toHaveLength(1);
-  expect(viewport[0].findAllByType(Text)).toHaveLength(0);
-  act(() => tree.unmount());
+test.each([false, true])(
+  'a press deepens the same material towards the page (%s)',
+  dark => {
+    const luminance = color =>
+      [1, 3, 5].reduce(
+        (sum, offset) => sum + parseInt(color.slice(offset, offset + 2), 16),
+        0,
+      );
+    for (const tone of ['raised', 'secondary', 'primary', 'footer']) {
+      const rest = surfaceColor(dark, {tone});
+      const held = surfaceColor(dark, {tone, pressed: true});
+      expect(held).not.toBe(rest);
+      expect(luminance(held)).toBeLessThan(luminance(rest));
+    }
+  },
+);
+
+test('faces keep a visible step away from the page they sit on', () => {
+  for (const dark of [false, true]) {
+    const colors = palette(dark);
+    const distance = (a, b) =>
+      [1, 3, 5].reduce(
+        (total, offset) =>
+          total +
+          Math.abs(
+            parseInt(a.slice(offset, offset + 2), 16) -
+              parseInt(b.slice(offset, offset + 2), 16),
+          ),
+        0,
+      );
+    for (const page of [colors.gradientStart, colors.gradientEnd]) {
+      expect(distance(colors.surface, page)).toBeGreaterThanOrEqual(24);
+      expect(distance(colors.surfaceRaised, page)).toBeGreaterThanOrEqual(24);
+    }
+  }
 });
 
-test.each([{from: '#fff'}, {to: 'red'}, {accent: ''}])(
+test.each([{from: '#fff'}, {accent: ''}, {from: 'red'}])(
   'invalid paint fails explicitly (%j)',
   paint => {
-    expect(() => surfaceStops(false, paint)).toThrow('six-digit hex');
+    expect(() => surfaceColor(false, paint)).toThrow('six-digit hex');
   },
 );

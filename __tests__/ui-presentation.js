@@ -5,7 +5,7 @@ import CardView from '../src/CardView';
 import {Headline, Detail, Name, Text} from '../src/components/typography';
 import {cardTint, palette} from '../src/theme/palette';
 import {Loader} from '../src/components/loader';
-import {surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 
 jest.mock('../src/hooks', () => ({
   useTheme: () => ({
@@ -125,60 +125,41 @@ function lightness(hex) {
   return value > 0.008856 ? 116 * Math.cbrt(value) - 16 : 903.3 * value;
 }
 
-test.each([false, true])(
-  'surface gradients stay quiet and readable in dark=%s',
-  dark => {
-    const colors = palette(dark);
-    const contrast = (foreground, background) =>
-      (Math.max(luminance(foreground), luminance(background)) + 0.05) /
-      (Math.min(luminance(foreground), luminance(background)) + 0.05);
-    for (const pressed of [false, true]) {
-      for (const tone of [
-        'raised',
-        'secondary',
-        'primary',
-        'footer',
-        'danger',
-        'inset',
-      ]) {
-        const stops = surfaceStops(dark, {tone, pressed});
-        expect(
-          Math.abs(lightness(stops[0]) - lightness(stops[1])),
-        ).toBeLessThanOrEqual(6);
-        const foreground =
-          tone === 'primary'
-            ? colors.onPrimary
-            : tone === 'danger'
-            ? colors.danger
-            : colors.primary;
-        for (const stop of stops)
-          expect(contrast(foreground, stop)).toBeGreaterThanOrEqual(4.5);
-      }
-      for (const [index, accent] of colors.toolAccents.entries()) {
-        const stops = surfaceStops(dark, {tone: 'raised', accent, pressed});
-        expect(
-          Math.abs(lightness(stops[0]) - lightness(stops[1])),
-        ).toBeLessThanOrEqual(6);
-        for (const stop of stops) {
-          for (const foreground of [colors.text, colors.muted]) {
-            expect(contrast(foreground, stop)).toBeGreaterThanOrEqual(4.5);
-          }
-        }
-        for (const stop of [accent, colors.toolAccentEnds[index]]) {
-          expect(contrast(colors.toolOnAccent, stop)).toBeGreaterThanOrEqual(
-            4.5,
-          );
-        }
-        expect(
-          Math.abs(lightness(accent) - lightness(colors.toolAccentEnds[index])),
-        ).toBeLessThanOrEqual(6);
-      }
+test.each([false, true])('solid surfaces stay readable in dark=%s', dark => {
+  const colors = palette(dark);
+  const contrast = (foreground, background) =>
+    (Math.max(luminance(foreground), luminance(background)) + 0.05) /
+    (Math.min(luminance(foreground), luminance(background)) + 0.05);
+  for (const pressed of [false, true]) {
+    for (const tone of [
+      'raised',
+      'secondary',
+      'primary',
+      'footer',
+      'danger',
+      'inset',
+    ]) {
+      const background = surfaceColor(dark, {tone, pressed});
+      const foreground =
+        tone === 'primary'
+          ? colors.onPrimary
+          : tone === 'danger'
+          ? colors.danger
+          : colors.primary;
+      expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
     }
-    expect(
-      Math.abs(lightness(colors.channelGlow) - lightness(colors.channel)),
-    ).toBeGreaterThanOrEqual(25);
-  },
-);
+    for (const accent of colors.toolAccents) {
+      const background = surfaceColor(dark, {tone: 'raised', accent, pressed});
+      for (const foreground of [colors.text, colors.muted]) {
+        expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrast(colors.toolOnAccent, accent)).toBeGreaterThanOrEqual(4.5);
+    }
+  }
+  expect(
+    Math.abs(lightness(colors.channelGlow) - lightness(colors.channel)),
+  ).toBeGreaterThanOrEqual(25);
+});
 
 test.each([false, true])(
   'pastel surfaces retain readable text and controls in dark=%s',
@@ -281,6 +262,11 @@ test('screen-local modal loaders retain native blocking, including the navigatio
   expect(view.root.findAllByProps({testID: 'app-busy-overlay'})).toHaveLength(
     0,
   );
+  // Blocking comes from the modal, never from a floating sheet.
+  const sheet = Native.StyleSheet.flatten(
+    view.root.findByType('Overlay').props.overlayStyle,
+  );
+  expect(sheet).toMatchObject({elevation: 0, shadowOpacity: 0});
 });
 
 test('in-tree Android busy overlays swallow back only while visible and release the listener', () => {

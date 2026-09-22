@@ -4,16 +4,19 @@ import {ScrollView, StyleSheet} from 'react-native';
 import {Registration} from '../src/Registration';
 import {RegistrationScreens} from '../src/types';
 import {palette} from '../src/theme/palette';
-import {surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 import Strings from '../src/strings';
 
 jest.mock('@react-navigation/stack', () => {
   // Screens render nothing here; the test drives each screen component directly.
   const Screen = () => null;
   const Navigator = ({children}) => children;
-  return {createStackNavigator: () => ({Navigator, Screen}), Screen};
+  return {createStackNavigator: () => ({Navigator, Screen}), Navigator, Screen};
 });
-const {Screen: StackScreen} = require('@react-navigation/stack');
+const {
+  Navigator: StackNavigator,
+  Screen: StackScreen,
+} = require('@react-navigation/stack');
 const mockNavigate = jest.fn();
 const mockReplace = jest.fn();
 let mockInsets = {top: 24, bottom: 24, left: 0, right: 0};
@@ -91,6 +94,16 @@ const renderEmptyScreen = () => {
   });
 };
 
+test('nested registration headers do not cast a shadow', () => {
+  act(() => {
+    view = renderer.create(<Registration />);
+  });
+  expect(
+    view.root.findByType(StackNavigator).props.screenOptions
+      .headerShadowVisible,
+  ).toBe(false);
+});
+
 test('the welcome screen groups one restrained scan action with a quiet manual entry', () => {
   renderEmptyScreen();
   const group = view.root.findAllByProps({testID: 'registration-choices'})[0];
@@ -104,9 +117,9 @@ test('the welcome screen groups one restrained scan action with a quiet manual e
   const scanStyle = flatten(scan);
   expect(scan.props.accessibilityRole).toBe('button');
   expect(scan.props.accessibilityLabel).toBe(Strings.Registration.QRCode.Scan);
-  // The primary paint starts at the forest primary and deepens downward.
+  // The primary action uses the shared solid forest fill.
   expect(scanStyle.backgroundColor).toBe(
-    surfaceStops(false, {tone: 'primary'})[0],
+    surfaceColor(false, {tone: 'primary'}),
   );
   expect(scanStyle.backgroundColor).toBe(colors.primary);
   // Restrained: one standard primary height, not an oversized hero button.
@@ -180,9 +193,7 @@ test('the scanner footer keeps a legible manual action that cancels before repla
   expect(flatten(manual).alignSelf).toBe('stretch');
   // Over the camera the manual action stays painted so it remains readable.
   const style = flatten(manual);
-  expect(style.backgroundColor).toBe(
-    surfaceStops(false, {tone: 'secondary'})[0],
-  );
+  expect(style.backgroundColor).toBe(surfaceColor(false, {tone: 'secondary'}));
   expect(style.backgroundColor).not.toBe('transparent');
   expect(style.minHeight).toBeGreaterThanOrEqual(48);
   expect(manual.props.accessibilityLabel).toBe(

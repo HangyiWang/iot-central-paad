@@ -11,7 +11,7 @@ import {
 import {connectionDiagnostics} from '../src/onboarding/diagnostics';
 import {StyleSheet} from 'react-native';
 import {palette} from '../src/theme/palette';
-import {surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 import {ConnectionError} from '../src/connection/errors';
 import {PHONE_MODEL_ID} from '../src/connection';
 import ThemeProvider from '../src/contexts/theme';
@@ -142,7 +142,9 @@ test('nonce keyboard submission dismisses without publishing a proof', () => {
   const dismiss = jest.spyOn(Keyboard, 'dismiss');
   const device = client();
   act(() => {
-    view = render(<ProofActivity client={device} connected simulated={false} />);
+    view = render(
+      <ProofActivity client={device} connected simulated={false} />,
+    );
   });
   const input = view.root.findByType(TextInput);
   expect(input.props.selectTextOnFocus).toBe(true);
@@ -296,6 +298,18 @@ test('diagnostic DTO allowlists identity and safe errors, never credentials or h
   ).toBeUndefined();
 });
 
+test('manual-disconnect diagnostics retain the state without an error code', () => {
+  expect(
+    connectionDiagnostics(null, 'disconnected', false, false, null),
+  ).toEqual({
+    schema: 'paad.diagnostics',
+    version: 1,
+    connection: 'disconnected',
+    stage: 'disconnected',
+    registryStatus: 'Not checked',
+  });
+});
+
 test('credential controls follow one hierarchy and keep the method choices radios', () => {
   const colors = palette(false);
   act(() => {
@@ -310,11 +324,11 @@ test('credential controls follow one hierarchy and keep the method choices radio
   });
   const style = node => StyleSheet.flatten(node.props.style);
 
-  // Primary: the single painted commitment, gradient from the forest primary.
+  // Primary: the single commitment, with a solid forest fill.
   const connect = control('connection-submit');
   expect(connect.props.accessibilityRole).toBe('button');
   expect(style(connect).backgroundColor).toBe(
-    surfaceStops(false, {tone: 'primary'})[0],
+    surfaceColor(false, {tone: 'primary'}),
   );
   expect(style(connect).minHeight).toBeGreaterThanOrEqual(48);
   expect(style(connect).alignSelf).toBe('stretch');
@@ -327,9 +341,9 @@ test('credential controls follow one hierarchy and keep the method choices radio
   expect(style(methods).minHeight).toBeGreaterThanOrEqual(48);
   expect(methods.props.accessibilityState).toMatchObject({expanded: false});
   act(() => methods.props.onPress());
-  expect(
-    control('connection-methods').props.accessibilityState.expanded,
-  ).toBe(true);
+  expect(control('connection-methods').props.accessibilityState.expanded).toBe(
+    true,
+  );
 
   // Choices stay radios with a selected affordance, not solid buttons.
   const choice = control('connection-mode-individual');
@@ -344,7 +358,7 @@ test('credential controls follow one hierarchy and keep the method choices radio
   );
   expect(other.backgroundColor).toBe(colors.surface);
   expect(other.backgroundColor).not.toBe(
-    surfaceStops(false, {tone: 'primary'})[0],
+    surfaceColor(false, {tone: 'primary'}),
   );
   // A pressed row steps its background rather than dimming the label.
   const held = StyleSheet.flatten(

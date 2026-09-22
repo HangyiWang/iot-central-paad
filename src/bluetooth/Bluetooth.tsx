@@ -17,7 +17,7 @@ import {IotcBleManager} from './BleManager';
 import {ItemProps, Pages} from 'types';
 import {Text} from '../components';
 import DetailsAction from '../components/detailsAction';
-import {SurfaceFill, surfaceStops} from '../components/surface';
+import {surfaceColor} from '../components/surface';
 import {useIoTCentralClient, useTheme} from '../hooks';
 import {useMotionAllowed} from '../hooks/motion';
 import {usePressSettle} from '../hooks/press';
@@ -271,12 +271,11 @@ function BluetoothDeviceListItem({
         style={[
           styles.deviceCard,
           {
-            backgroundColor: surfaceStops(dark, {tone: 'raised', pressed})[0],
+            backgroundColor: surfaceColor(dark, {tone: 'raised', pressed}),
             borderColor: appearance.surfaceBorder,
             transform: [{scale}],
           },
         ]}>
-        <SurfaceFill tone="raised" pressed={pressed} radius={20} />
         <View
           accessible={false}
           style={[

@@ -46,7 +46,7 @@ import Options from 'components/options';
 import {TorchCameraHost} from './tools/Torch';
 import BrandTitle from './components/brandTitle';
 import PhoneMark from './components/phoneMark';
-import {SurfaceFill, surfaceStops} from './components/surface';
+import {surfaceColor} from './components/surface';
 import {usePressSettle} from './hooks/press';
 import {palette} from './theme/palette';
 
@@ -298,15 +298,14 @@ export const Profile = React.memo((props: {navigate: any}) => {
         style={[
           styles.settingsPlate,
           {
-            backgroundColor: surfaceStops(dark, {
+            backgroundColor: surfaceColor(dark, {
               tone: 'secondary',
               pressed,
-            })[0],
+            }),
             borderColor: appearance.surfaceBorder,
             transform: [{scale}],
           },
         ]}>
-        <SurfaceFill tone="secondary" pressed={pressed} radius={14} />
         <Icon
           name={
             Platform.select({

@@ -26,6 +26,13 @@ export const detailStyles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.2,
   },
+  /** A feed or list entry heading: one quiet step below a section heading. */
+  entryTitle: {
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '600',
+    letterSpacing: -0.1,
+  },
   value: {fontSize: 15, lineHeight: 22, fontWeight: '400'},
   supporting: {fontSize: 13, lineHeight: 19, fontWeight: '400'},
   actionLabel: {fontSize: 15, lineHeight: 20, fontWeight: '600'},

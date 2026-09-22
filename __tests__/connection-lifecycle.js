@@ -407,6 +407,39 @@ describe('connection lifecycle through real providers', () => {
     unsubscribe();
   });
 
+  it('keeps intentional disconnection distinct from errors, resets and a fresh reconnect', async () => {
+    const device = candidate();
+    const retry = candidate();
+    createDeviceClient.mockReturnValueOnce(device).mockReturnValueOnce(retry);
+    await mount();
+    const attempt = await start();
+    expect(await attempt.result).toEqual({ok: true});
+    const saved = consumers[0].storage.credentials;
+    const writes = Keychain.setGenericPassword.mock.calls.length;
+    const store = getObservationStore(status().client);
+
+    act(() => consumers[1].connection[2]({disconnected: true}));
+    expect(status()).toMatchObject({
+      client: null,
+      loading: false,
+      error: null,
+      stage: 'disconnected',
+    });
+    expect(device.cancel).toHaveBeenCalled();
+    expect(store.getSnapshot().active).toBe(false);
+    expect(consumers[0].storage.credentials).toBe(saved);
+    expect(Keychain.setGenericPassword).toHaveBeenCalledTimes(writes);
+    expect(Keychain.resetGenericPassword).not.toHaveBeenCalled();
+    expect(createDeviceClient).toHaveBeenCalledTimes(1);
+
+    const next = await start(1, saved);
+    expect(await next.result).toEqual({ok: true});
+    expectObserved(status().client, retry);
+    expect(status()).toMatchObject({stage: 'connected', error: null});
+    act(() => consumers[0].connection[2]());
+    expect(status()).toMatchObject({stage: 'idle', client: null, error: null});
+  });
+
   it('does not persist or publish a failed candidate and allows a manual retry', async () => {
     const gate = deferred();
     const failed = candidate(gate);

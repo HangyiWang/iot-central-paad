@@ -5,7 +5,7 @@ import SelectionControl from '../src/components/selectionControl';
 import {useMotionAllowed} from '../src/hooks/motion';
 import {useTheme} from '../src/hooks';
 import {palette} from '../src/theme/palette';
-import {surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 
 jest.mock('../src/hooks', () => ({useTheme: jest.fn()}));
 // Only the subscription is mocked; the shared curve stays the real one.
@@ -154,26 +154,21 @@ test.each(['segmented', 'filter'])(
   },
 );
 
-test('the segmented thumb carries the shared raised gradient', () => {
+test('the segmented thumb carries one shared raised fill', () => {
   // The metrics of the device this ships to: a compact, unstacked control.
   dimensions = {width: 411.43, height: 914.29, fontScale: 1, scale: 2.625};
   render();
   expect(style(root()).flexDirection).not.toBe('column');
   act(() => root().props.onLayout({nativeEvent: {layout: {width: 320}}}));
-  const thumb = view.root.findAll(
-    node =>
-      typeof node.type !== 'string' &&
-      node.props.tone === 'raised' &&
-      node.props.radius === 9,
-  );
-  expect(thumb).toHaveLength(1);
   const painted = view.root.findAll(
     node =>
       typeof node.type === 'string' &&
       Native.StyleSheet.flatten(node.props.style)?.width === 156,
   )[0];
   expect(Native.StyleSheet.flatten(painted.props.style).backgroundColor).toBe(
-    surfaceStops(false, {tone: 'raised'})[0],
+    surfaceColor(false, {tone: 'raised'}),
   );
   expect(painted.props.pointerEvents).toBe('none');
+  // The seat paints itself; nothing is laid over its own edge.
+  expect(painted.props.children).toBeUndefined();
 });

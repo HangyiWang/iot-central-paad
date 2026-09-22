@@ -8,7 +8,11 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {IIoTCClient, ConnectionError, ConnectionStage} from '../connection';
+import {
+  IIoTCClient,
+  ConnectionError,
+  ConnectionSessionStage,
+} from '../connection';
 
 type ICentralState = {
   client: IIoTCClient | null;
@@ -26,8 +30,8 @@ export type IIoTCContext = ICentralState & {
   setRegisteringNew: (registeringNew: boolean) => void;
   error: ConnectionError | null;
   setError: (error: ConnectionError | null) => void;
-  stage: ConnectionStage | 'idle';
-  setStage: (stage: ConnectionStage | 'idle') => void;
+  stage: ConnectionSessionStage;
+  setStage: (stage: ConnectionSessionStage) => void;
   request: React.MutableRefObject<{
     controller: AbortController;
     client?: IIoTCClient;
@@ -39,7 +43,7 @@ const {Provider} = IoTCContext;
 
 const IoTCProvider: React.FC<{children: React.ReactNode}> = ({children}) => {
   const [error, setError] = useState<ConnectionError | null>(null);
-  const [stage, setStage] = useState<ConnectionStage | 'idle'>('idle');
+  const [stage, setStage] = useState<ConnectionSessionStage>('idle');
   const request = useRef<{
     controller: AbortController;
     client?: IIoTCClient;

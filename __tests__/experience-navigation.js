@@ -2,13 +2,14 @@ import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
-import {Text, TextInput, View} from 'react-native';
+import {StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import Home from '../src/Home';
 import {IoTCContext} from '../src/contexts/iotc';
 import {StorageContext} from '../src/contexts/storage';
 import {LogsProvider, ThemeProvider} from '../src/contexts';
 import {PHONE_MODEL_ID} from '../src/connection';
+import {palette} from '../src/theme/palette';
 
 const mockAdd = jest.fn();
 const mockRemove = jest.fn();
@@ -144,6 +145,18 @@ it('keeps one runtime through real tabs, tool navigation, draft edits, and retur
   expect(client.on).toHaveBeenCalledTimes(2);
   expect(mockAdd).toHaveBeenCalledTimes(1);
   expect(mockInterval).toHaveBeenCalledTimes(1);
+  // The tab bar is separated by its own tone and a hairline, never by a shadow.
+  const edges = [palette(false).border, palette(true).border];
+  const bars = view.root
+    .findAll(node => typeof node.type === 'string')
+    .map(node => StyleSheet.flatten(node.props.style))
+    .filter(style => edges.includes(style?.borderTopColor));
+  expect(bars.length).toBeGreaterThan(0);
+  for (const bar of bars) {
+    expect(bar.elevation).toBe(0);
+    expect(bar.shadowOpacity ?? 0).toBe(0);
+    expect(bar.shadowRadius ?? 0).toBe(0);
+  }
   await press('tab-explore');
   for (const id of ['telemetry', 'properties', 'image', 'bluetooth']) {
     expect(find(`explore-tool-${id}`)).toBeDefined();

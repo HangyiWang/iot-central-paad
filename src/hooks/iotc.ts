@@ -80,15 +80,18 @@ export function useConnectIoTCentralClient() {
     request,
   } = useContext(IoTCContext);
   const {save, simulated} = useContext(StorageContext);
-  const clear = useCallback(() => {
-    request.current?.controller.abort();
-    request.current?.client?.cancel();
-    client?.cancel();
-    setClient(null);
-    setConnecting(false);
-    setStage('idle');
-    setError(null);
-  }, [request, client, setClient, setConnecting, setStage, setError]);
+  const clear = useCallback(
+    (options?: {disconnected?: boolean}) => {
+      request.current?.controller.abort();
+      request.current?.client?.cancel();
+      client?.cancel();
+      setClient(null);
+      setConnecting(false);
+      setStage(options?.disconnected ? 'disconnected' : 'idle');
+      setError(null);
+    },
+    [request, client, setClient, setConnecting, setStage, setError],
+  );
 
   const connect = useCallback(
     async (

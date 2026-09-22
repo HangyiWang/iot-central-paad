@@ -11,7 +11,7 @@ import {decodeAzureContextInput} from '../src/onboarding/azureContextInput';
 import Strings from '../src/strings';
 import {useTheme} from '../src/hooks';
 import {palette} from '../src/theme/palette';
-import {surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 
 jest.mock('../src/hooks', () => ({useTheme: jest.fn(() => ({dark: false}))}));
 jest.mock('../src/components/typography', () => ({Text: 'Text'}));
@@ -413,8 +413,8 @@ test.each([false, true])(
       });
       // Painted as a lifted secondary control, whichever ground it sits on.
       expect([
-        surfaceStops(dark, {tone: 'secondary'})[0],
-        surfaceStops(dark, {tone: 'raised'})[0],
+        surfaceColor(dark, {tone: 'secondary'}),
+        surfaceColor(dark, {tone: 'raised'}),
       ]).toContain(style(portal).backgroundColor);
     }
     for (const id of [
@@ -437,7 +437,7 @@ test.each([false, true])(
     expect(style(control('azure-context-import-toggle'))).toMatchObject({
       minHeight: 48,
       borderRadius: 14,
-      backgroundColor: surfaceStops(dark, {tone: 'raised'})[0],
+      backgroundColor: surfaceColor(dark, {tone: 'raised'}),
     });
     expect(style(control('azure-context-remove'))).toMatchObject({
       backgroundColor: colors.dangerSurface,
@@ -647,7 +647,7 @@ test.each([false, true])(
       borderColor: colors.danger,
     });
     expect(style(toggle()).backgroundColor).toBe(
-      surfaceStops(dark, {tone: 'raised'})[0],
+      surfaceColor(dark, {tone: 'raised'}),
     );
     expect(toggle().props.accessibilityState).toMatchObject({
       expanded: false,

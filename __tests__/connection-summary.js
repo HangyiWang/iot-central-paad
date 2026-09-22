@@ -6,7 +6,7 @@ import {Alert, Share, Modal, Platform, StyleSheet} from 'react-native';
 import {PHONE_MODEL_ID} from '../src/connection/types';
 import {ConnectionError} from '../src/connection/errors';
 import {palette} from '../src/theme/palette';
-import {surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 import Strings from '../src/strings';
 jest.mock('@rneui/themed', () => ({Icon: 'Icon'}));
 jest.mock('react-native-safe-area-context', () => ({
@@ -232,10 +232,19 @@ it.each([false, true])(
     });
     expect(StyleSheet.flatten(capsule.props.style)).toMatchObject({
       backgroundColor: palette(dark).surface,
+      borderColor: palette(dark).border,
       borderRadius: 20,
       minHeight: 60,
-      shadowOpacity: dark ? 0 : 0.06,
     });
+    for (const key of [
+      'shadowColor',
+      'shadowOpacity',
+      'shadowRadius',
+      'shadowOffset',
+      'elevation',
+    ]) {
+      expect(StyleSheet.flatten(capsule.props.style)[key]).toBeUndefined();
+    }
     const group = view.root.findByProps({testID: 'connection-status-group'});
     expect(StyleSheet.flatten(group.props.style).gap).toBeGreaterThanOrEqual(
       14,
@@ -258,7 +267,7 @@ it.each([false, true])(
       minWidth: 92,
     });
     expect(StyleSheet.flatten(pill(disclosure).props.style)).toMatchObject({
-      backgroundColor: surfaceStops(dark, {tone: 'secondary'})[0],
+      backgroundColor: surfaceColor(dark, {tone: 'secondary'}),
       minHeight: 40,
       borderRadius: 14,
       borderWidth: StyleSheet.hairlineWidth,
@@ -267,10 +276,10 @@ it.each([false, true])(
     act(() => disclosure.props.onPressIn());
     const held = StyleSheet.flatten(pill(disclosure).props.style);
     expect(held.backgroundColor).toBe(
-      surfaceStops(dark, {tone: 'secondary', pressed: true})[0],
+      surfaceColor(dark, {tone: 'secondary', pressed: true}),
     );
     expect(held.backgroundColor).not.toBe(
-      surfaceStops(dark, {tone: 'secondary'})[0],
+      surfaceColor(dark, {tone: 'secondary'}),
     );
     expect(held.opacity).toBeUndefined();
     expect(
@@ -283,7 +292,7 @@ it.each([false, true])(
     act(() => disclosure.props.onPressOut());
     expect(
       StyleSheet.flatten(pill(disclosure).props.style).backgroundColor,
-    ).toBe(surfaceStops(dark, {tone: 'secondary'})[0]);
+    ).toBe(surfaceColor(dark, {tone: 'secondary'}));
   },
 );
 
@@ -357,7 +366,7 @@ it('keeps simulation honest during loading and gives Cancel the same real touch 
     minWidth: 92,
   });
   expect(StyleSheet.flatten(pill(action).props.style)).toMatchObject({
-    backgroundColor: surfaceStops(false, {tone: 'secondary'})[0],
+    backgroundColor: surfaceColor(false, {tone: 'secondary'}),
     borderRadius: 14,
   });
   await act(async () => {
@@ -425,6 +434,7 @@ it('keeps the status row compact and preserves all actions and exact identity in
   expect(text()).toContain('assigned.azure-devices.net');
   act(() => press('Disconnect'));
   expect(clear).toHaveBeenCalledTimes(1);
+  expect(clear).toHaveBeenCalledWith({disconnected: true});
   connected = false;
   act(() => jest.advanceTimersByTime(1000));
   expect(text()).toContain('Disconnected');
@@ -438,6 +448,48 @@ it('keeps the status row compact and preserves all actions and exact identity in
   expect(manual).toHaveBeenCalledTimes(1);
   expect(text()).not.toContain('connection-details-sheet');
 });
+it('offers Home recovery after an intentional disconnect without reporting an error', async () => {
+  connected = false;
+  state = {...state, client: null, stage: 'disconnected'};
+  act(() => {
+    view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+  });
+  expect(text()).toContain('Disconnected on this phone');
+  expect(text()).not.toContain('Connection interrupted');
+  expect(text()).not.toContain('CONNECTION_LOST');
+  const status = view.root.findAllByProps({testID: 'connection-status'})[0];
+  expect(StyleSheet.flatten(status.props.style).color).toBe(
+    palette(false).danger,
+  );
+  const reconnect = view.root
+    .findAllByProps({
+      testID: 'connection-disconnected-reconnect',
+    })
+    .find(node => node.props.onPress);
+  await act(async () => reconnect.props.onPress());
+  expect(connect).toHaveBeenCalledWith({deviceId: 'registration-id'});
+  expect(clear).not.toHaveBeenCalled();
+  expect(cancel).not.toHaveBeenCalled();
+});
+
+it.each(['idle', 'loading', 'simulation', 'no-credentials'])(
+  'does not show intentional-disconnect recovery for %s',
+  condition => {
+    connected = false;
+    state = {...state, client: null, stage: 'disconnected'};
+    if (condition === 'idle') state.stage = 'idle';
+    if (condition === 'loading') state.loading = true;
+    if (condition === 'simulation') hooks.useSimulation.mockReturnValue([true]);
+    if (condition === 'no-credentials')
+      hooks.useIoTCentralClient.mockReturnValue([null, null]);
+    act(() => {
+      view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+    });
+    expect(
+      view.root.findAllByProps({testID: 'connection-disconnected'}),
+    ).toHaveLength(0);
+  },
+);
 it('labels simulation as offline and exposes cancellation for the shared active request', async () => {
   hooks.useSimulation.mockReturnValue([true]);
   state = {...state, loading: true, stage: 'connecting'};
@@ -638,7 +690,7 @@ it.each([
       paddingHorizontal: 16,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.controlBorder,
-      backgroundColor: surfaceStops(dark, {tone: 'secondary'})[0],
+      backgroundColor: surfaceColor(dark, {tone: 'secondary'}),
     });
     for (const id of ['connection-reconnect', 'connection-manual']) {
       expect(style(control(id))).toMatchObject({

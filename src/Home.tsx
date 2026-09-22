@@ -196,6 +196,8 @@ function Experience({navigation}: {navigation: PagesNavigator}) {
           tabBarStyle: {
             backgroundColor: appearance.surface,
             borderTopColor: appearance.border,
+            // A hairline separator carries the bar, not a cast shadow.
+            elevation: 0,
           },
           tabBarItemStyle: {minHeight: 48},
         }}>

@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import Button from '../src/components/button';
-import {SurfaceFill, surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 import {useTheme} from '../src/hooks';
 import {palette} from '../src/theme/palette';
 
@@ -23,10 +23,11 @@ const touch = () =>
       typeof node.type === 'string' &&
       node.props.testID === 'RNE_BUTTON_PRESSABLE',
   )[0];
+// A button paints its own body; no rounded layer is laid over its outline.
 const paint = () =>
-  view.root
-    .findAllByProps({radius: 14})
-    .filter(node => typeof node.type !== 'string' && node.props.tone);
+  view.root.findAll(
+    node => typeof node.type !== 'string' && node.props.radius !== undefined,
+  );
 const bodyStyle = () => {
   const wrapper = view.root.findByProps({testID: 'RNE_BUTTON_WRAPPER'});
   const painted = wrapper.findAll(
@@ -58,9 +59,9 @@ test.each(['ios', 'android'])(
       borderRadius: 14,
       paddingHorizontal: 16,
       borderWidth: 0,
-      backgroundColor: surfaceStops(false, {tone: 'primary'})[0],
+      backgroundColor: surfaceColor(false, {tone: 'primary'}),
     });
-    expect(paint().map(fill => fill.props.tone)).toEqual(['primary']);
+    expect(paint()).toEqual([]);
     expect(
       StyleSheet.flatten(
         view.root.findByProps({testID: 'RNE_BUTTON_WRAPPER'}).props.style,
@@ -79,9 +80,9 @@ test.each([false, true])(
       minHeight: 48,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.controlBorder,
-      backgroundColor: surfaceStops(dark, {tone: 'secondary'})[0],
+      backgroundColor: surfaceColor(dark, {tone: 'secondary'}),
     });
-    expect(paint().map(fill => fill.props.tone)).toEqual(['secondary']);
+    expect(paint()).toEqual([]);
     render({type: 'clear'});
     expect(bodyStyle()).toMatchObject({
       minHeight: 48,
@@ -105,9 +106,8 @@ test('answers a press with a deeper surface instead of fading the label', () => 
   expect(onPressIn).toHaveBeenCalledTimes(1);
   expect(bodyStyle().backgroundColor).not.toBe(resting);
   expect(bodyStyle().backgroundColor).toBe(
-    surfaceStops(false, {tone: 'primary', pressed: true})[0],
+    surfaceColor(false, {tone: 'primary', pressed: true}),
   );
-  expect(paint()[0].props.pressed).toBe(true);
   expect(opacity()).toBeGreaterThanOrEqual(0.9);
   act(() => body().props.onPressOut({}));
   expect(onPressOut).toHaveBeenCalledTimes(1);
@@ -215,7 +215,7 @@ test('the loading spinner is readable on the held background', () => {
   expect(spinner().props.size).toBe('large');
 });
 
-test('the decorative fill sits behind the icon and the label', () => {
+test('the solid body carries the icon and the label without a cover', () => {
   useTheme.mockReturnValue({dark: false});
   render({icon: {name: 'send', type: 'material'}, title: 'Send'});
   const painted = view.root
@@ -223,19 +223,13 @@ test('the decorative fill sits behind the icon and the label', () => {
     .findAll(
       node => typeof node.type === 'string' && node.props.style?.padding,
     )[0];
-  const children = painted.children;
-  const seatOf = node => {
-    let current = node;
-    while (current && current.parent !== painted) current = current.parent;
-    return children.indexOf(current);
-  };
-  const label = painted
-    .findAllByType('Text')
-    .find(node => node.props.children === 'Send');
-  const fill = paint()[0];
-  expect(fill.props.tone).toBe('primary');
-  // The fill is painted first, so the icon and the label are never covered.
-  expect(seatOf(fill)).toBe(0);
-  expect(seatOf(label)).toBeGreaterThan(0);
-  expect(seatOf(painted.findByProps({name: 'send'}))).toBeGreaterThan(0);
+  expect(StyleSheet.flatten(painted.props.style).backgroundColor).toBe(
+    surfaceColor(false, {tone: 'primary'}),
+  );
+  // Nothing is painted over the body, so its own outline stays a single edge.
+  expect(paint()).toEqual([]);
+  expect(
+    painted.findAllByType('Text').some(node => node.props.children === 'Send'),
+  ).toBe(true);
+  expect(painted.findAllByProps({name: 'send'}).length).toBeGreaterThan(0);
 });

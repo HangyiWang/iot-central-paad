@@ -21,7 +21,7 @@ import {
 import Svg, {Path} from 'react-native-svg';
 import {Icon} from '@rneui/themed';
 import AppBackground from '../components/appBackground';
-import Surface, {SurfaceFill} from '../components/surface';
+import Surface, {surfaceColor} from '../components/surface';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useIsFocused} from '@react-navigation/native';
 import {IoTCContext} from '../contexts/iotc';
@@ -77,7 +77,7 @@ export default function WorkflowHome({
   communication,
   motionVisible = true,
 }: WorkflowHomeProps) {
-  const {client, error, connecting} = useContext(IoTCContext);
+  const {client, error, connecting, stage} = useContext(IoTCContext);
   const {credentials, simulated, azureContext, azureContextError} =
     useContext(StorageContext);
   const {dark} = useTheme();
@@ -114,6 +114,16 @@ export default function WorkflowHome({
       ? azureContext
       : null;
   const connectionAttention = Boolean(error && !connecting && !simulated);
+  // A deliberate disconnect is a state the person chose, not a fault. It is a
+  // UI stage the runtime records after clearing the client and the error; no
+  // transport ever emits it, so the map still checks the live link before it
+  // draws anything as broken.
+  const manuallyDisconnected = Boolean(
+    !simulated &&
+      !connecting &&
+      stage === 'disconnected' &&
+      !(typeof client?.isConnected === 'function' && client.isConnected()),
+  );
   const sensorAttention = sensors.some(
     sensor => sensor.enabled && sensor.availability === 'unavailable',
   );
@@ -128,6 +138,22 @@ export default function WorkflowHome({
       client.isConnected(),
   );
   const flowing = connected && onStage;
+  // A dropped, previously established transport is the only interruption the
+  // runtime reports explicitly: CONNECTION_LOST arrives after CONNACK, while a
+  // pre-CONNACK CONNECT_FAILED, an auth or config failure, a reconnect in
+  // flight, a fresh setup and simulation are all something else. Nothing here
+  // probes the network to decide that.
+  const interrupted = Boolean(
+    !simulated &&
+      !connecting &&
+      error?.code === 'CONNECTION_LOST' &&
+      client &&
+      typeof client.isConnected === 'function' &&
+      !client.isConnected(),
+  );
+  // Both a dropped link and a deliberate disconnect leave the phone off the
+  // cloud, so the map draws the same broken connectors; only the words differ.
+  const linkBroken = interrupted || manuallyDisconnected;
   const flowProgress = useDecorativeLoop(flowing);
   const activityPress = usePressSettle('footer', false, onStage);
   // The caret leads toward the next screen, whichever way reading runs.
@@ -158,15 +184,20 @@ export default function WorkflowHome({
       to: I18nManager.isRTL ? measuredWidth - to : to,
     };
   });
-  // Grey while the phone is not connected: the route is real, the light is not.
-  const routeColor = connected ? colors.channel : colors.controlBorder;
+  // Grey while the phone is not connected, danger while a live link dropped:
+  // the route is real, the light is not.
+  const routeColor = connected
+    ? colors.channel
+    : linkBroken
+    ? colors.danger
+    : colors.controlBorder;
   const mapArrival = useGentleTransition(
     `${stacked}:${projection.mode}`,
     onStage,
   );
   const attentionArrival = useGentleTransition(
-    `${connectionAttention}:${sensorAttention}`,
-    onStage && (connectionAttention || sensorAttention),
+    `${connectionAttention || manuallyDisconnected}:${sensorAttention}`,
+    onStage && (connectionAttention || manuallyDisconnected || sensorAttention),
   );
   const namespaceLineStyle = {
     opacity: mapArrival.interpolate({
@@ -292,7 +323,10 @@ export default function WorkflowHome({
       style={({pressed}) => [
         styles.attentionRow,
         {
-          backgroundColor: pressed ? colors.border : colors.tints[2],
+          backgroundColor: surfaceColor(dark, {
+            from: colors.tints[2],
+            pressed,
+          }),
           borderColor: colors.controlBorder,
         },
       ]}>
@@ -698,6 +732,7 @@ export default function WorkflowHome({
                         peak={dark ? 0.7 : 0.85}
                         connected={connected}
                         flowing={flowing}
+                        interrupted={linkBroken}
                         progress={flowProgress}
                         style={phoneLineStyle}
                       />
@@ -715,6 +750,7 @@ export default function WorkflowHome({
                   peak={dark ? 0.7 : 0.85}
                   connected={connected}
                   flowing={flowing}
+                  interrupted={linkBroken}
                   progress={flowProgress}
                   style={phoneLineStyle}
                 />
@@ -726,6 +762,21 @@ export default function WorkflowHome({
               {node('phone')}
             </View>
           </View>
+          {linkBroken && (
+            <Text
+              testID="home-map-interrupted"
+              accessibilityLiveRegion="polite"
+              // The visible line is a legend key; assistive output states the
+              // condition itself, never the colour.
+              accessibilityLabel={
+                manuallyDisconnected
+                  ? text.DisconnectedAlert
+                  : text.InterruptedAlert
+              }
+              style={[detailStyles.supporting, {color: colors.danger}]}>
+              {manuallyDisconnected ? text.Disconnected : text.Interrupted}
+            </Text>
+          )}
           <Text
             accessibilityLabel={`${text.NamespaceLinks}. ${
               projection.mode === 'hub' ? text.DpsNotUsed : text.PhoneDpsPath
@@ -734,18 +785,22 @@ export default function WorkflowHome({
             {`${text.MapLegend} ${text.FlowHint}`}
           </Text>
         </Surface>
-        {(connectionAttention || sensorAttention) && (
+        {(connectionAttention || manuallyDisconnected || sensorAttention) && (
           <View testID="home-attention" style={styles.attention}>
             <Text
               accessibilityRole="header"
               style={[detailStyles.sectionTitle, {color: colors.text}]}>
               {text.Attention}
             </Text>
-            {connectionAttention &&
+            {(connectionAttention || manuallyDisconnected) &&
               attentionRow(
                 'home-attention-connection',
-                text.ConnectionAttention,
-                text.ConnectionAttentionHint,
+                manuallyDisconnected
+                  ? text.DisconnectedAttention
+                  : text.ConnectionAttention,
+                manuallyDisconnected
+                  ? text.DisconnectedAttentionHint
+                  : text.ConnectionAttentionHint,
                 onDetails,
               )}
             {sensorAttention &&
@@ -777,12 +832,16 @@ export default function WorkflowHome({
             onPressIn={activityPress.onPressIn}
             onPressOut={activityPress.onPressOut}
             hitSlop={2}
-            style={[styles.footer, {borderColor: colors.surfaceBorder}]}>
-            <SurfaceFill
-              tone="footer"
-              radius={16}
-              pressed={activityPress.pressed}
-            />
+            style={[
+              styles.footer,
+              {
+                borderColor: colors.surfaceBorder,
+                backgroundColor: surfaceColor(dark, {
+                  tone: 'footer',
+                  pressed: activityPress.pressed,
+                }),
+              },
+            ]}>
             <View
               testID="home-activity-plate"
               accessible={false}
@@ -889,7 +948,7 @@ export default function WorkflowHome({
                 stackedHeader && styles.stackedClose,
                 {
                   borderColor: colors.controlBorder,
-                  backgroundColor: pressed ? colors.border : colors.inset,
+                  backgroundColor: surfaceColor(dark, {tone: 'inset', pressed}),
                 },
               ]}>
               <Text style={[detailStyles.actionLabel, {color: colors.primary}]}>

@@ -16,7 +16,7 @@ import * as picker from 'expo-image-picker';
 import {IotcBleManager} from '../src/bluetooth/BleManager';
 import * as hooks from '../src/hooks';
 import {palette} from '../src/theme/palette';
-import {surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 
 jest.mock('react-native-animatable', () => ({
   View: require('react-native').View,
@@ -127,17 +127,26 @@ test('upload content scrolls instead of sizing against the entire screen and pre
     view.root
       .findAllByProps({testID: 'image-upload-card'})
       .find(node => node.props.onPress);
-  expect(StyleSheet.flatten(card().props.style)).toMatchObject({
+  // The card paints itself, so its style is resolved against a press state.
+  const cardStyle = (pressed = false) =>
+    StyleSheet.flatten(
+      typeof card().props.style === 'function'
+        ? card().props.style({pressed})
+        : card().props.style,
+    );
+  expect(cardStyle()).toMatchObject({
     width: '100%',
     minHeight: 260,
   });
-  expect(StyleSheet.flatten(card().props.style).height).toBeUndefined();
+  expect(cardStyle().height).toBeUndefined();
   // A neutral raised sheet, never a tinted block.
-  expect(StyleSheet.flatten(card().props.style).backgroundColor).toBe(
-    surfaceStops(false, {tone: 'raised'})[0],
+  expect(cardStyle().backgroundColor).toBe(
+    surfaceColor(false, {tone: 'raised'}),
   );
-  expect(StyleSheet.flatten(card().props.style).backgroundColor).not.toBe(
-    palette(false).tints[0],
+  expect(cardStyle().backgroundColor).not.toBe(palette(false).tints[0]);
+  // Pressing deepens that same sheet instead of layering a second one.
+  expect(cardStyle(true).backgroundColor).toBe(
+    surfaceColor(false, {tone: 'raised', pressed: true}),
   );
   expect(view.root.findAllByType(ScrollView).length).toBeGreaterThan(0);
   act(() => card().props.onPress());
@@ -254,9 +263,7 @@ test('Bluetooth scanning control meets the minimum touch target and the detail s
   // A settled control keeps its reachable target, never a dimmed label.
   expect(target.opacity).toBeUndefined();
   // Secondary: a painted, hairline-bordered control with forest ink.
-  expect(target.backgroundColor).toBe(
-    surfaceStops(false, {tone: 'secondary'})[0],
-  );
+  expect(target.backgroundColor).toBe(surfaceColor(false, {tone: 'secondary'}));
   expect(target.borderWidth).toBeLessThanOrEqual(1);
   expect(
     view.root

@@ -338,7 +338,7 @@ export function ObservationRow({
           <View style={[styles.body, styles.eventCopy]}>
             <Text
               style={[
-                detailStyles.sectionTitle,
+                detailStyles.entryTitle,
                 {color: issue ? colors.danger : colors.text},
               ]}>
               {observationTitle(event)}
@@ -347,7 +347,7 @@ export function ObservationRow({
               {text.Local}: {new Date(event.observedAt).toLocaleString()}
             </Text>
             {event.simulated && (
-              <Text style={[detailStyles.status, {color: colors.primary}]}>
+              <Text style={[detailStyles.label, {color: colors.primary}]}>
                 {text.Simulated}
               </Text>
             )}

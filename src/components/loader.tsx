@@ -67,6 +67,10 @@ export function Loader(props: ILoaderProps) {
               borderRadius: 20,
               backgroundColor: colors.card,
               width: screen.width / 1.5,
+              // The library floats its overlay on Android; the sheet is told
+              // apart by its own fill and the dimmed page behind it instead.
+              elevation: 0,
+              shadowOpacity: 0,
             },
           ]}
           backdropStyle={{backgroundColor: colors.background}}>

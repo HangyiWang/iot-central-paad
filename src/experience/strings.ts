@@ -4,8 +4,16 @@ export const ExperienceStrings = {
     Map: 'Connection',
     MapHint: 'Tap a node to understand its role and this setup.',
     MapLegend:
-      'Solid: the phone\u2019s two-way links. Dashed: cloud coordination.',
+      'Solid: the phone\u2019s two-way links. Grey dashed: cloud coordination.',
     FlowHint: 'The light shows connection state, not message traffic.',
+    Interrupted:
+      'Red, broken: the phone\u2019s connection dropped. Reconnect in Connection details.',
+    InterruptedAlert:
+      'The phone\u2019s connection dropped. Reconnect in Connection details.',
+    Disconnected:
+      'Red, broken: you disconnected this phone. Reconnect in Connection details.',
+    DisconnectedAlert:
+      'You disconnected this phone. Reconnect in Connection details.',
     FlowNote:
       'While connected, a soft light drifts along the connectors. It is a decorative state indicator, not packets, throughput or delivery confirmation. DPS is contacted for assignment; it is not a persistent message path.',
     MapAuthority:
@@ -139,6 +147,9 @@ export const ExperienceStrings = {
     Attention: 'Needs attention',
     ConnectionAttention: 'Connection needs attention',
     ConnectionAttentionHint: 'Review the reported connection error in Details.',
+    DisconnectedAttention: 'Disconnected on this phone',
+    DisconnectedAttentionHint:
+      'Your saved connection is kept. Reconnect in Details when you are ready.',
     SensorAttention: 'An enabled sensor is unavailable',
     SensorAttentionHint: 'Review enabled sources in Telemetry.',
     Communication: 'Latest observations',

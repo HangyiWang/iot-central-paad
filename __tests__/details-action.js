@@ -2,7 +2,7 @@ import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import {StyleSheet} from 'react-native';
 import DetailsAction from '../src/components/detailsAction';
-import {surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 import {useTheme} from '../src/hooks';
 import {palette} from '../src/theme/palette';
 
@@ -13,10 +13,12 @@ jest.mock('@rneui/themed', () => ({Icon: 'Icon'}));
 let tree;
 const control = () => tree.root.findAllByProps({testID: 'action'})[0];
 const style = () => StyleSheet.flatten(control().props.style);
-const fills = () =>
-  tree.root
-    .findAllByProps({radius: 14})
-    .filter(node => typeof node.type !== 'string' && node.props.tone);
+// Nothing is layered over a control: every face paints its own background,
+// so its hairline outline is never covered by a second rounded rectangle.
+const overlays = () =>
+  tree.root.findAll(
+    node => typeof node.type !== 'string' && node.props.radius !== undefined,
+  );
 const press = (down = true) =>
   act(() =>
     down ? control().props.onPressIn() : control().props.onPressOut(),
@@ -56,7 +58,7 @@ test.each([false, true])(
         alignSelf: 'flex-start',
         flexDirection: 'row',
         gap: 8,
-        backgroundColor: surfaceStops(dark, {tone})[0],
+        backgroundColor: surfaceColor(dark, {tone}),
         borderColor:
           variant === 'danger' ? colors.danger : colors.controlBorder,
         borderWidth: variant === 'primary' ? 0 : StyleSheet.hairlineWidth,
@@ -64,10 +66,7 @@ test.each([false, true])(
       expect(style().height).toBeUndefined();
       // The reachable target never shrinks with the press settle.
       expect(control().props.hitSlop).toBe(2);
-      // Flat danger stays flat; the other two carry the shared gradient.
-      expect(fills().map(fill => fill.props.tone)).toEqual(
-        variant === 'danger' ? [] : [tone],
-      );
+      expect(overlays()).toEqual([]);
       const label = tree.root.findByType('Text');
       expect(label.props.numberOfLines).toBeUndefined();
       expect(label.props.allowFontScaling).not.toBe(false);
@@ -116,12 +115,9 @@ test.each(['primary', 'secondary', 'danger', 'quiet'])(
     expect(held.backgroundColor).not.toBe(resting.backgroundColor);
     expect(held.opacity).toBeUndefined();
     expect(labelColor()).toBe(restingLabel);
-    if (variant !== 'quiet' && variant !== 'danger') {
-      expect(fills()[0].props.pressed).toBe(true);
-    }
+    expect(overlays()).toEqual([]);
     press(false);
     expect(style().backgroundColor).toBe(resting.backgroundColor);
-    expect(fills()[0]?.props.pressed ?? false).toBe(false);
   },
 );
 
@@ -142,10 +138,7 @@ test('distinguishes external links, expanded toggles and disabled busy actions',
   });
   expect(control().props.accessibilityRole).toBe('link');
   // On a recessed panel the action lifts with the raised pair.
-  expect(style().backgroundColor).toBe(
-    surfaceStops(false, {tone: 'raised'})[0],
-  );
-  expect(fills()[0].props.tone).toBe('raised');
+  expect(style().backgroundColor).toBe(surfaceColor(false, {tone: 'raised'}));
   expect(tree.root.findByType('Icon').props.name).toBe('open-in-new');
   act(() => {
     tree.update(
@@ -163,7 +156,6 @@ test('distinguishes external links, expanded toggles and disabled busy actions',
     backgroundColor: colors.tints[0],
     alignSelf: 'stretch',
   });
-  expect(fills()[0].props.from).toBe(colors.tints[0]);
   expect(tree.root.findByType('Icon').props.name).toBe('chevron-up');
   act(() => {
     tree.update(
@@ -182,7 +174,6 @@ test('distinguishes external links, expanded toggles and disabled busy actions',
     busy: true,
   });
   // A held action stops being painted at all, so it cannot look live.
-  expect(fills()).toEqual([]);
   expect(style()).toMatchObject({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.controlBorder,
@@ -217,7 +208,7 @@ test.each([false, true])(
       backgroundColor: 'transparent',
       maxWidth: '100%',
     });
-    expect(fills()).toEqual([]);
+    expect(overlays()).toEqual([]);
     expect(control().props.accessibilityState.expanded).toBe(false);
     expect(
       StyleSheet.flatten(tree.root.findByType('Text').props.style),

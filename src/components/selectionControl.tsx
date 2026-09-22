@@ -10,7 +10,7 @@ import {
 import {useTheme} from '../hooks';
 import {FLUID_EASING, useMotionAllowed} from '../hooks/motion';
 import {palette} from '../theme/palette';
-import {SurfaceFill, surfaceStops} from './surface';
+import {surfaceColor} from './surface';
 import {Text} from './typography';
 
 type Choice = {id: string; label: string};
@@ -100,13 +100,12 @@ export default function SelectionControl({
             styles.thumb,
             {
               width: segmentWidth,
-              backgroundColor: surfaceStops(dark, thumbPaint)[0],
+              backgroundColor: surfaceColor(dark, thumbPaint),
               borderColor: colors.border,
               transform: [{translateX: position}],
             },
-          ]}>
-          <SurfaceFill {...thumbPaint} />
-        </Animated.View>
+          ]}
+        />
       )}
       {options.map((option, index) => {
         const active = index === selected;

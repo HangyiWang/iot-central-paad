@@ -4,7 +4,7 @@ import {StyleSheet} from 'react-native';
 import QRCodeScanner from '../src/components/qrcodeScanner';
 import Strings from '../src/strings';
 import {palette} from '../src/theme/palette';
-import {surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 
 jest.mock('expo-camera', () => ({
   Camera: {
@@ -24,13 +24,12 @@ jest.mock('../src/hooks', () => ({
 
 let view;
 const control = label =>
-  view.root
-    .findAll(
-      node =>
-        typeof node.type === 'string' &&
-        node.props.accessibilityRole === 'button' &&
-        node.props.accessibilityLabel === label,
-    )[0];
+  view.root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      node.props.accessibilityRole === 'button' &&
+      node.props.accessibilityLabel === label,
+  )[0];
 afterEach(() => {
   act(() => view?.unmount());
   view = undefined;
@@ -58,24 +57,26 @@ it('ranks the paused scanner controls without changing what they do', async () =
 
   // One primary recovery action, painted with the forest gradient.
   expect(retryStyle.backgroundColor).toBe(
-    surfaceStops(false, {tone: 'primary'})[0],
+    surfaceColor(false, {tone: 'primary'}),
   );
   expect(retryStyle.minHeight).toBeGreaterThanOrEqual(48);
   expect(retryStyle.opacity).toBeUndefined();
 
   // The secondary action stays painted and legible over the camera.
   expect(closeStyle.backgroundColor).toBe(
-    surfaceStops(false, {tone: 'secondary'})[0],
+    surfaceColor(false, {tone: 'secondary'}),
   );
   expect(closeStyle.backgroundColor).not.toBe(
-    surfaceStops(false, {tone: 'primary'})[0],
+    surfaceColor(false, {tone: 'primary'}),
   );
   expect(closeStyle.minHeight).toBeGreaterThanOrEqual(48);
   expect(closeStyle.borderWidth).toBeLessThanOrEqual(1);
   expect(
     view.root
       .findAllByType('Text')
-      .some(node => StyleSheet.flatten(node.props.style)?.color === colors.primary),
+      .some(
+        node => StyleSheet.flatten(node.props.style)?.color === colors.primary,
+      ),
   ).toBe(true);
 
   const pressable = view.root.findAll(

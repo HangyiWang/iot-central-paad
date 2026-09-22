@@ -1,4 +1,8 @@
-import {ConnectionStage, DeviceIdentity, JsonObject} from '../connection';
+import {
+  ConnectionSessionStage,
+  DeviceIdentity,
+  JsonObject,
+} from '../connection';
 import {
   ConnectionError,
   safeError,
@@ -8,7 +12,7 @@ import {
 /** Export an explicit nonsecret DTO, never a client, credentials or native error. */
 export function connectionDiagnostics(
   identity: DeviceIdentity | null,
-  stage: ConnectionStage | 'idle',
+  stage: ConnectionSessionStage,
   connected: boolean,
   simulated: boolean,
   error: ConnectionError | null,

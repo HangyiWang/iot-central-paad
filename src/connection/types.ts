@@ -26,6 +26,7 @@ export type ConnectionStage =
   | 'connecting'
   | 'connected'
   | 'error';
+export type ConnectionSessionStage = ConnectionStage | 'idle' | 'disconnected';
 export type DeviceIdentity = Readonly<{
   assignedHub: string;
   deviceId: string;

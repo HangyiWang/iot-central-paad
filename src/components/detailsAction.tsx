@@ -13,7 +13,7 @@ import {useTheme} from '../hooks';
 import {usePressSettle} from '../hooks/press';
 import {palette} from '../theme/palette';
 import {detailStyles} from '../theme/detailStyles';
-import {SurfaceFill, SurfacePaintProps, surfaceStops} from './surface';
+import {SurfacePaintProps, surfaceColor} from './surface';
 import {Text} from './typography';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -70,9 +70,8 @@ export default function DetailsAction({
     : danger
     ? colors.danger
     : colors.primary;
-  // Painted actions share one gradient language: the lighter edge sits at the
-  // top so a control reads as lifted, and pressing deepens it instead of
-  // dimming the label.
+  // Painted actions share one solid language: a flat fill inside a crisp
+  // hairline, and pressing deepens that fill instead of dimming the label.
   const paint: SurfacePaintProps | null =
     inactive || quiet
       ? null
@@ -91,7 +90,7 @@ export default function DetailsAction({
   const backgroundColor = inactive
     ? colors.inset
     : paint
-    ? surfaceStops(dark, paint)[0]
+    ? surfaceColor(dark, paint)
     : pressed
     ? colors.inset
     : 'transparent';
@@ -146,7 +145,6 @@ export default function DetailsAction({
         style,
         {transform: [{scale}]},
       ]}>
-      {paint && paint.tone !== 'danger' ? <SurfaceFill {...paint} /> : null}
       {busy ? (
         <ActivityIndicator size="small" color={color} />
       ) : icon ? (

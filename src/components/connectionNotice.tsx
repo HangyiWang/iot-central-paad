@@ -18,17 +18,20 @@ export type ConnectionNoticeAction = {
 };
 
 /**
- * Single themed presentation for a sanitized {@link ConnectionError}.
+ * Shared presentation for an intentional disconnect or a sanitized {@link ConnectionError}.
  * The error object never carries a raw cause, response body or credential, so
  * everything rendered here is already safe to display.
  */
 export default function ConnectionNotice({
   error,
+  disconnected = false,
   action,
   diagnostics = false,
-  testID = 'connection-error',
-}: {
-  error: ConnectionError;
+  testID = disconnected ? 'connection-disconnected' : 'connection-error',
+}: (
+  | {error: ConnectionError; disconnected?: false}
+  | {error?: never; disconnected: true}
+) & {
   action?: ConnectionNoticeAction;
   diagnostics?: boolean;
   testID?: string;
@@ -38,10 +41,17 @@ export default function ConnectionNotice({
   const notice = Strings.Connection.Notice;
   const titles: Partial<Record<string, string>> = notice.Titles;
   const guidance: Partial<Record<string, string>> = notice.Guidance;
-  const title = titles[error.code] ?? notice.Titles.Default;
-  const hint = guidance[error.code];
+  const title = error
+    ? titles[error.code] ?? notice.Titles.Default
+    : notice.Disconnected.Title;
+  const hint = error ? guidance[error.code] : undefined;
+  const message = error
+    ? hint
+      ? `${error.message} ${hint}`
+      : error.message
+    : notice.Disconnected.Message;
   const status =
-    error.status !== undefined && error.status >= 100 && error.status <= 599
+    error?.status !== undefined && error.status >= 100 && error.status <= 599
       ? error.status
       : undefined;
 
@@ -58,7 +68,7 @@ export default function ConnectionNotice({
           importantForAccessibility="no-hide-descendants"
           style={styles.icon}>
           <Icon
-            name="alert-circle-outline"
+            name={disconnected ? 'link-variant-off' : 'alert-circle-outline'}
             type="material-community"
             size={20}
             color={appearance.danger}
@@ -69,7 +79,7 @@ export default function ConnectionNotice({
             {title}
           </Text>
           <Text style={[styles.message, {color: appearance.text}]}>
-            {hint ? `${error.message} ${hint}` : error.message}
+            {message}
           </Text>
         </View>
       </View>
@@ -83,7 +93,7 @@ export default function ConnectionNotice({
           onPress={action.onPress}
         />
       )}
-      {diagnostics && (
+      {diagnostics && error && (
         <View style={styles.diagnostics}>
           <Text
             testID="connection-error-code"

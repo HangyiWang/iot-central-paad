@@ -1,6 +1,5 @@
-import React, {useId} from 'react';
+import React from 'react';
 import {StyleSheet, View, ViewProps, ViewStyle} from 'react-native';
-import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {useTheme} from '../hooks';
 import {palette} from '../theme/palette';
 
@@ -19,7 +18,6 @@ export type SurfacePaintProps = {
   accent?: string;
   pressed?: boolean;
   from?: string;
-  to?: string;
 };
 
 function tint(base: string, accent: string, strength: number): string {
@@ -35,111 +33,64 @@ function tint(base: string, accent: string, strength: number): string {
     .join('')}`;
 }
 
-export function surfaceStops(
+/**
+ * One flat, opaque colour per control or panel. Gradients belong to the page
+ * behind them; a face that carries its own gradient competes with the page and
+ * blurs the edge that tells the two apart.
+ */
+export function surfaceColor(
   dark: boolean,
-  {tone = 'raised', accent, pressed = false, from, to}: SurfacePaintProps = {},
-): readonly [string, string] {
+  {tone = 'raised', accent, pressed = false, from}: SurfacePaintProps = {},
+): string {
   const colors = palette(dark);
-  let start: string;
-  let end: string;
+  let color: string;
   switch (tone) {
     case 'primary':
-      start = colors.primary;
-      end = colors.primaryDeep;
+      color = pressed ? colors.primaryDeep : colors.primary;
       break;
     case 'secondary':
-      start = colors.surface;
-      end = colors.inset;
-      break;
     case 'footer':
-      start = colors.inset;
-      end = colors.surface;
+      color = colors.surfaceShade;
       break;
     case 'danger':
-      start = end = colors.dangerSurface;
+      color = colors.dangerSurface;
       break;
     case 'inset':
-      start = end = colors.inset;
+      color = colors.inset;
       break;
     default:
-      start = colors.surfaceRaised;
-      end = colors.surfaceShade;
+      color = colors.surfaceRaised;
   }
-  start = from ?? start;
-  end = to ?? end;
+  if (from !== undefined) color = from;
   if (
-    ![start, end, ...(accent === undefined ? [] : [accent])].every(color =>
-      /^#[\da-f]{6}$/i.test(color),
+    ![color, ...(accent === undefined ? [] : [accent])].every(value =>
+      /^#[\da-f]{6}$/i.test(value),
     )
   ) {
     throw new Error('Surface colors must be six-digit hex values.');
   }
-  if (accent !== undefined) start = tint(start, accent, dark ? 0.015 : 0.06);
-  if (pressed) {
-    const ink = tone === 'danger' ? colors.danger : colors.text;
-    start = tint(start, ink, 0.04);
-    end = tint(end, ink, 0.04);
+  if (accent !== undefined) color = tint(color, accent, dark ? 0.04 : 0.09);
+  if (pressed && !(tone === 'primary' && from === undefined)) {
+    // Pressing deepens the same colour towards the page rather than lighting a
+    // new one, so the feedback reads as pressure on the material under the
+    // finger. Both themes deepen, so the gesture means one thing everywhere.
+    const ink = dark
+      ? colors.background
+      : tone === 'danger'
+      ? colors.danger
+      : colors.text;
+    color = tint(color, ink, dark ? 0.16 : 0.07);
   }
-  return [start, end];
+  return color;
 }
 
-export function surfaceElevation(
-  dark: boolean,
-  level: SurfaceLevel,
-): ViewStyle {
-  return level === 'ground'
-    ? {}
-    : {
-        shadowColor: palette(dark).shadow,
-        shadowOpacity: dark ? 0.32 : 0.06,
-        shadowRadius: 10,
-        shadowOffset: {width: 0, height: 3},
-        elevation: 2,
-      };
+/**
+ * Hierarchy without float. A raised face is told apart from the page by its
+ * own solid tone and by a firmer hairline edge, never by a cast shadow.
+ */
+export function surfaceEdge(dark: boolean, level: SurfaceLevel): ViewStyle {
+  return level === 'ground' ? {} : {borderColor: palette(dark).border};
 }
-
-/** An opaque, decorative paint layer; it never changes layout or touch targets. */
-export const SurfaceFill = React.memo(function SurfacePaint({
-  radius = 14,
-  ...paint
-}: SurfacePaintProps) {
-  const {dark} = useTheme();
-  const [from, to] = surfaceStops(dark, paint);
-  const id = `surface-${useId().replace(/\W/g, '')}`;
-  return (
-    <View
-      collapsable={false}
-      pointerEvents="none"
-      accessible={false}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={StyleSheet.absoluteFill}>
-      {/* Resolve SVG percentages against an unpadded viewport, not the control's content box. */}
-      <Svg
-        pointerEvents="none"
-        accessible={false}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        width="100%"
-        height="100%"
-        style={StyleSheet.absoluteFill}>
-        <Defs>
-          <LinearGradient id={id} x1="0%" y1="0%" x2="0%" y2="100%">
-            <Stop offset="0" stopColor={from} />
-            <Stop offset="1" stopColor={to} />
-          </LinearGradient>
-        </Defs>
-        <Rect
-          width="100%"
-          height="100%"
-          rx={radius}
-          ry={radius}
-          fill={`url(#${id})`}
-        />
-      </Svg>
-    </View>
-  );
-});
 
 export default function Surface({
   tone = 'raised',
@@ -148,14 +99,12 @@ export default function Surface({
   accent,
   pressed,
   from,
-  to,
   style,
   children,
   ...props
 }: ViewProps & SurfacePaintProps & {level?: SurfaceLevel}) {
   const {dark} = useTheme();
   const colors = palette(dark);
-  const paint = {tone, radius, accent, pressed, from, to};
   return (
     <View
       {...props}
@@ -163,14 +112,15 @@ export default function Surface({
         styles.bordered,
         tone === 'primary' && styles.borderless,
         {
-          backgroundColor: surfaceStops(dark, paint)[0],
+          backgroundColor: surfaceColor(dark, {tone, accent, pressed, from}),
           borderRadius: radius,
-          borderColor: tone === 'danger' ? colors.danger : colors.surfaceBorder,
+          borderColor: colors.surfaceBorder,
         },
-        surfaceElevation(dark, level),
+        tone === 'danger'
+          ? {borderColor: colors.danger}
+          : surfaceEdge(dark, level),
         style,
       ]}>
-      <SurfaceFill {...paint} />
       {children}
     </View>
   );

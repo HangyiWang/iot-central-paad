@@ -18,7 +18,7 @@ import DeviceInfo from 'react-native-device-info';
 import VersionCheck from 'react-native-version-check';
 import {IoTCClient} from 'react-native-azure-iotcentral-client';
 import renderer, {act} from 'react-test-renderer';
-import {surfaceStops} from '../src/components/surface';
+import {surfaceColor} from '../src/components/surface';
 
 describe('App startup', () => {
   let app;
@@ -120,7 +120,9 @@ describe('App startup', () => {
         marginLeft: 14,
         marginRight: 8,
       });
-      expect(StyleSheet.flatten(logo.props.style).backgroundColor).toBeUndefined();
+      expect(
+        StyleSheet.flatten(logo.props.style).backgroundColor,
+      ).toBeUndefined();
       const settings = app.root
         .findAllByProps({testID: 'app-settings'})
         .find(node => typeof node.type === 'string');
@@ -139,9 +141,9 @@ describe('App startup', () => {
         .map(node => StyleSheet.flatten(node.props.style))
         .find(style => style?.borderRadius === 14);
       expect(plate).toMatchObject({width: 40, height: 40});
-      expect([false, true].map(mode => surfaceStops(mode, {tone: 'secondary'})[0])).toContain(
-        plate.backgroundColor,
-      );
+      expect(
+        [false, true].map(mode => surfaceColor(mode, {tone: 'secondary'})),
+      ).toContain(plate.backgroundColor);
       expect(VersionCheck.needUpdate).toHaveBeenCalledTimes(updateChecks);
       if (updateChecks > 0) {
         expect(VersionCheck.needUpdate).toHaveBeenNthCalledWith(2, {

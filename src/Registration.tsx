@@ -98,6 +98,7 @@ export const Registration = React.memo<{
         headerBackButtonDisplayMode: 'minimal',
         headerBackAccessibilityLabel: Strings.Core.Back,
         headerBackTestID: 'registration-back',
+        headerShadowVisible: false,
         headerMode: 'float',
       }}>
       <Stack.Screen

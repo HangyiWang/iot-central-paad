@@ -58,6 +58,20 @@ it('announces politely on a restrained danger surface that grows with the text',
   ).toBe(true);
 });
 
+it('describes intentional disconnection without inventing a transport failure', () => {
+  render(<ConnectionNotice disconnected diagnostics />);
+  expect(json()).toContain('Disconnected on this phone');
+  expect(json()).toContain('Your saved connection is kept');
+  expect(json()).not.toContain('Connection interrupted');
+  expect(json()).not.toContain('CONNECTION_LOST');
+  expect(value('connection-error-code')).toBeUndefined();
+  expect(view.root.findByType('Icon').props.name).toBe('link-variant-off');
+  const notice = view.root.findAllByProps({
+    testID: 'connection-disconnected',
+  })[0];
+  expect(notice.props.accessibilityLiveRegion).toBe('polite');
+});
+
 it('offers a single comfortably sized recovery action', () => {
   const onPress = jest.fn();
   render(
