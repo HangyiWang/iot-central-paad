@@ -528,9 +528,38 @@ automatic reconnect. The state is not persisted: normal cold-start restoration
 continues to use the saved setup. Reconnect uses the existing connection
 pipeline and clears the disconnected presentation as it starts.
 
-This refinement still requires exact-source ordinary native builds and
-in-place delivery. The earlier `ee99db9` preservation result and the bounded
-reconnect probe are not acceptance evidence for the new source.
+Source `c4f2bda19f3b72e6ae5f18cda2e7c216f4fa793e` completed ordinary
+[run 35787537369](https://github.com/HangyiWang/iot-central-paad/actions/runs/35787537369),
+attempt 1, on all three lanes. Both hosted, credential-free light-theme startup
+images show solid fills, intact outlines and distinct page/panel tones.
+
+| Binary | SHA-256 |
+| --- | --- |
+| Installed Android APK | `ca867a96e6f634448c7ab9d3433d72cc81e3cf25475d7a39085d994de1d51dc1` |
+| iOS Simulator ZIP | `9e73f837ea169a9461d7e39c3d4e44bdc39df4dbffab185316c385b1399d6840` |
+
+The Android APK was installed with `install -r` over `ee99db9`. Its fresh
+pre-install state was Disconnected for an unknown reason. Exact identity,
+Hub, model and imported Azure context matched after upgrade, after a genuine
+stopped/new-process cold restoration, and after the manual-disconnect flow.
+No stale context was written back over user data.
+
+One normal Disconnect and one manual Reconnect were performed. Native metadata
+showed the explicit disconnected stage, the manual notice, the map's manual
+state and Home connection attention, with no transport-interruption notice or
+visible error code. Reconnect showed the busy overlay, provisioning, connecting
+and Connected during approximately 16.5 seconds of post-tap observation.
+The last native observation at 22:08:20 UTC was Home, Connected, Details closed.
+
+Retained-screen evidence is bounded metadata, not red-pixel or animation
+trajectory proof. Optional Home-panel, Explore, Activity and Bluetooth traversal
+was not performed; dark-theme native acceptance is not claimed. iOS coverage
+is hosted build/startup only. No private captures, credential collection, data
+clearing, storage injection, OS/permission changes or new cloud proof occurred.
+Owned observers, temporary payloads and active approvals were cleaned.
+
+Provenance is retained in `build/actions-installed-c4f2bda.json` and
+`build/native-solid-delivery/runs/c4f2bda19f3b72e6ae5f18cda2e7c216f4fa793e-35787537369/delivery-final.json`.
 
 ### Completed simulator acceptance (2026-09-18)
 
