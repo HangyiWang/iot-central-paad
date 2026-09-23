@@ -561,6 +561,70 @@ Owned observers, temporary payloads and active approvals were cleaned.
 Provenance is retained in `build/actions-installed-c4f2bda.json` and
 `build/native-solid-delivery/runs/c4f2bda19f3b72e6ae5f18cda2e7c216f4fa793e-35787537369/delivery-final.json`.
 
+### Green Meridian refinement (2026-09-23)
+
+Source `283bf58fb9d3f4a611c4580652d03b0e6feb2422` implements the owner's
+selected Meridian direction with Opus 5/high collaboration. The light page
+now falls from pale mint `#ECF7ED` to sage `#C2E3CA`; solid header backgrounds
+match the top stop to avoid a horizontal colour seam. Near-white panels remain
+solid and shadow-free. Dark colours, the four Explore tiles and their identity
+colours, and all telemetry/property/image/Bluetooth tool layouts are preserved.
+
+The connection map has an 18-unit inner inset, 16-unit service gap and a
+quiet solid group outline instead of a close-fitting dashed perimeter. The
+visible namespace coordination caption is removed; its meaning remains in
+accessibility output and ADR Details. Measured routes, direct-Hub behaviour,
+RTL/large-text layouts, flow gates and red broken disconnected paths remain.
+
+The top capsule names Connected, Disconnected or Connection interrupted,
+with compact Reconnect/Details actions where recovery applies. Routine manual
+and transport-loss paragraphs are removed, while meaningful setup/auth/network
+failure notices, pending-stage cancellation and simulation disclosure remain.
+Manual disconnection is still a non-error session state; interruption has a
+distinct icon. Reconnect's accessible hint explains reuse of saved credentials.
+Activity uses bare timestamps, one locality explanation and a small retained
+Latest marker instead of a separate telemetry heading.
+
+Ordinary [run 35802266441](https://github.com/HangyiWang/iot-central-paad/actions/runs/35802266441),
+attempt 1, completed all three lanes with locked pods for this exact source.
+
+| Binary | SHA-256 |
+| --- | --- |
+| Installed Android APK | `2f3c23224b7d47da137ab9c337fe055070f4eb039d51eab9056cabf886afeafc` |
+| iOS Simulator ZIP | `434f252b5cccb653c2ee82f325326edff617e7c9fc077276da228cafd23c0ec9` |
+
+Android was installed with `install -r` over `c4f2bda`. The fresh baseline was
+Disconnected for an unknown reason; no reconnect was forced for that baseline.
+Exact identity, Hub, model and imported context matched after upgrade, after a
+genuine stopped/new-process cold restoration and after the manual recovery flow.
+No credentials were read and no old context was injected.
+
+Exactly one Disconnect and one Reconnect were performed. The first observer
+stopped because it could not resolve the compact recovery control's native
+ancestry; its partial receipt remains unchanged. A read-only target inspection
+confirmed the unique, visible, enabled control inside the recovery bounds.
+A source/container-bound continuation consumed only the unused Reconnect
+budget, in the same cold-restored process. The compact Disconnected header,
+explicit manual Details stage and Home attention were observed without an
+error code. Reconnect showed busy, provisioning, connecting and Connected over
+approximately 14.2 seconds of post-tap observation. The last native UI
+observation at 01:17:53 UTC was Home, Connected, Details closed.
+
+Hosted credential-free startup images show the pale-green base and clean
+controls. Their sampled backgrounds are uniformly `#ECF7ED`, so they do not
+establish the stronger Home/Explore/Activity gradient. Retained-app evidence
+is bounded metadata, not map-spacing, red-path, icon, gradient or animation
+pixel proof. Unchanged tools and broader tab/Bluetooth traversal were not
+repeated; iOS coverage is hosted build/startup only. No private capture, new
+live input, manufactured network loss, cloud proof, data clearing, or
+OS/permission changes occurred. Owned observers, temporary device payloads
+and active approvals were cleaned.
+
+Final provenance is retained in `build/actions-installed-283bf58.json` and
+`build/native-meridian-preparation/runs/283bf58fb9d3f4a611c4580652d03b0e6feb2422-35802266441/delivery-final.json`.
+The original `windows-delivery.json` records the earlier partial outcome;
+the final receipt binds the continuation and subsequent preservation evidence.
+
 ### Completed simulator acceptance (2026-09-18)
 
 The foundation's ordinary locked build/startup lanes passed on Android and iOS
