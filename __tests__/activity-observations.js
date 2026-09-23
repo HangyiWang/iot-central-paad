@@ -237,6 +237,57 @@ it('keeps latest-only telemetry inspectable without manufacturing history rows',
   expect(text()).toContain('No failed operations observed');
 });
 
+it('marks the retained telemetry on its own row instead of a section heading', () => {
+  const telemetry = event(1, {
+    kind: 'telemetry',
+    names: ['battery'],
+    outcome: 'submitted',
+  });
+  mockSnapshot = snapshot([], {telemetry});
+  act(() => {
+    view = renderer.create(<Activity />);
+  });
+  // No heading for a section of exactly one row, and no invented history note.
+  expect(text()).not.toContain('Latest telemetry observation');
+  expect(text()).not.toContain(
+    'Periodic telemetry keeps only its latest outcome',
+  );
+  const mark = view.root.findAllByProps({testID: 'activity-latest-1'})[0];
+  expect(mark.props.children).toBe('Latest');
+  // The retained-sample meaning survives for assistive output.
+  expect(mark.props.accessibilityLabel).toBe(
+    'Latest: Periodic telemetry keeps only its latest outcome, not a row for every reading.',
+  );
+  expect(StyleSheet.flatten(mark.props.style).fontSize).toBe(
+    detailStyles.label.fontSize,
+  );
+  // History rows carry no marker at all.
+  mockSnapshot = snapshot([telemetry], {telemetry});
+  act(() => view.update(<Activity />));
+  expect(view.root.findAllByProps({testID: 'activity-latest-1'})).toHaveLength(
+    0,
+  );
+});
+
+it('states local submission once for the page rather than on every row', () => {
+  const telemetry = event(1, {
+    kind: 'telemetry',
+    names: ['battery'],
+    outcome: 'submitted',
+  });
+  mockSnapshot = snapshot([telemetry], {});
+  act(() => {
+    view = renderer.create(<Activity />);
+  });
+  const lines = view.root
+    .findAllByType('Text')
+    .map(node => String(node.props.children))
+    .filter(line => line.includes('Local submission is not cloud receipt.'));
+  expect(lines).toHaveLength(1);
+  expect(lines[0]).toContain('What this phone observed');
+  expect(text()).not.toContain('Observed by this app:');
+});
+
 it('expands only safe typed metadata and labels command execution limitations', () => {
   const command = event(7, {
     kind: 'command-execution',
@@ -299,12 +350,20 @@ it('keeps a display-face page title and a readable trail rather than nested card
   expect(StyleSheet.flatten(title.props.style).fontSize).toBeLessThan(
     StyleSheet.flatten([detailStyles.sectionTitle]).fontSize,
   );
+  // The stamp is a bare local time: the repeated "Observed by this app"
+  // prefix is gone from every row, and assistive output keeps the meaning.
   const stamp = row
     .findAllByType('Text')
     .find(node =>
-      JSON.stringify(node.props.children).includes('Observed by this app'),
+      String(node.props.accessibilityLabel ?? '').startsWith(
+        'Observed by this app: ',
+      ),
     );
   expect(StyleSheet.flatten(stamp.props.style).fontSize).toBe(13);
+  expect(stamp.props.children).not.toContain('Observed by this app');
+  expect(String(stamp.props.children)).toBe(
+    new Date(failed.observedAt).toLocaleString(),
+  );
   act(() => press('activity-toggle-9'));
   const details = view.root.findAllByProps({testID: 'activity-details-9'})[0];
   expect(StyleSheet.flatten(details.props.style).backgroundColor).toBe(

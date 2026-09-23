@@ -207,6 +207,49 @@ test.each([false, true])(
   },
 );
 
+test('a page recolour never moves a tool identity colour', () => {
+  // Each tool's surface, accent and card tint is its identity. Page work is
+  // free to change the ground under them; it may not repaint them.
+  expect(palette(false).tints).toEqual([
+    '#E5EDE3',
+    '#ECE6F2',
+    '#F4E7DB',
+    '#E7EDEB',
+  ]);
+  expect(palette(false).toolSurfaces).toEqual([
+    '#DCEFE7',
+    '#E5E1F6',
+    '#FAE3D3',
+    '#DBE8F7',
+  ]);
+  expect(palette(false).toolAccents).toEqual([
+    '#1F6B57',
+    '#4A5A86',
+    '#8A5A32',
+    '#2A6E86',
+  ]);
+  expect(palette(true).tints).toEqual([
+    '#253C35',
+    '#343347',
+    '#433831',
+    '#3D3C2F',
+  ]);
+  expect(palette(true).toolSurfaces).toEqual([
+    '#1D3A33',
+    '#2B2947',
+    '#3C2A1E',
+    '#1C3047',
+  ]);
+  expect(palette(true).toolAccents).toEqual([
+    '#6FC7AC',
+    '#9AA8DC',
+    '#D79E70',
+    '#7FBCD0',
+  ]);
+  for (const dark of [false, true])
+    expect(new Set(palette(dark).toolSurfaces).size).toBe(4);
+});
+
 test('the blocking busy state stays in-tree so it cannot compete with a native sheet presentation', () => {
   const cancel = jest.fn();
   act(() => {

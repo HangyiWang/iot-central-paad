@@ -381,6 +381,46 @@ test.each([320, 360, 440])(
   },
 );
 
+test('gives the group plate real air and drops the namespace caption from the map face', () => {
+  render();
+  const azure = Native.StyleSheet.flatten(
+    control('home-map-azure').props.style,
+  );
+  const services = Native.StyleSheet.flatten(
+    control('home-map-services').props.style,
+  );
+  // A calm plate: one solid edge with room inside it, not a dashed box drawn
+  // tight around the nodes.
+  expect(azure.borderStyle).toBeUndefined();
+  expect(azure.padding).toBeGreaterThanOrEqual(18);
+  expect(services.gap).toBeGreaterThanOrEqual(16);
+  const captions = () =>
+    tree.root
+      .findAllByType('Text')
+      .filter(node => node.props.children === text.NamespaceLinks);
+  expect(captions()).toHaveLength(0);
+  // The only dashed stroke left on the map is the namespace coordination line.
+  expect(control('home-map-namespace-path').props.strokeDasharray).toBe('4 3');
+  // The relationship itself is still stated, in the legend's assistive output.
+  expect(
+    tree.root
+      .findAllByType('Text')
+      .find(node =>
+        node.props.accessibilityLabel?.includes(text.NamespaceLinks),
+      ),
+  ).toBeDefined();
+  // Stacked layouts lose the caption too, and keep their own lane captions.
+  dimensions = {width: 320, height: 640, scale: 1, fontScale: 1};
+  render();
+  expect(control('home-map-stacked')).toBeDefined();
+  expect(captions()).toHaveLength(0);
+  expect(content()).toContain(text.PhoneDpsPath);
+  expect(
+    Native.StyleSheet.flatten(control('home-map-services').props.style)
+      .marginTop,
+  ).toBeGreaterThanOrEqual(16);
+});
+
 test('draws only one solid two-way connector per service and keeps ADR dashed', () => {
   render();
   const colors = palette(false);

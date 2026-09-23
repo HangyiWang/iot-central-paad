@@ -103,8 +103,11 @@ export function CommunicationSummary() {
                   : text.NoInbound}
               </Text>
               {event && (
-                <Text style={[detailStyles.supporting, {color: colors.muted}]}>
-                  {text.Local}:{' '}
+                <Text
+                  accessibilityLabel={`${text.Local}: ${new Date(
+                    event.observedAt,
+                  ).toLocaleTimeString()}`}
+                  style={[detailStyles.supporting, {color: colors.muted}]}>
                   {new Date(event.observedAt).toLocaleTimeString()}
                 </Text>
               )}
@@ -170,7 +173,7 @@ export default function Activity() {
           )}
         </View>
         <Text style={[detailStyles.supporting, {color: colors.muted}]}>
-          {text.Description}
+          {`${text.Description} ${text.NotReceipt}`}
         </Text>
         {simulated && (
           <Text style={[detailStyles.status, {color: colors.primary}]}>
@@ -239,24 +242,12 @@ export default function Activity() {
                 </Text>
               )}
               {latestTelemetry && (
-                <View>
-                  <Text style={detailStyles.sectionTitle}>
-                    {text.LatestTelemetry}
-                  </Text>
-                  <Text
-                    style={[
-                      detailStyles.supporting,
-                      styles.sessionNotice,
-                      {color: colors.muted},
-                    ]}>
-                    {text.TelemetryHistory}
-                  </Text>
-                  <ObservationRow
-                    event={latestTelemetry}
-                    visible={observing}
-                    last={!entries.length}
-                  />
-                </View>
+                <ObservationRow
+                  event={latestTelemetry}
+                  visible={observing}
+                  last={!entries.length}
+                  latest
+                />
               )}
             </>
           }
@@ -300,10 +291,13 @@ export function ObservationRow({
   event,
   visible = true,
   last = true,
+  latest = false,
 }: {
   event: Observation;
   visible?: boolean;
   last?: boolean;
+  /** The retained telemetry outcome, shown as a marker on its own row. */
+  latest?: boolean;
 }) {
   const {dark} = useTheme();
   const colors = palette(dark);
@@ -336,15 +330,38 @@ export function ObservationRow({
       <View style={[styles.body, styles.trail]}>
         <View style={styles.eventHeader}>
           <View style={[styles.body, styles.eventCopy]}>
+            <View style={styles.titleRow}>
+              <Text
+                style={[
+                  detailStyles.entryTitle,
+                  styles.eventTitle,
+                  {color: issue ? colors.danger : colors.text},
+                ]}>
+                {observationTitle(event)}
+              </Text>
+              {latest && (
+                <Text
+                  testID={`activity-latest-${event.id}`}
+                  accessibilityLabel={`${text.Latest}: ${text.TelemetryHistory}`}
+                  style={[
+                    detailStyles.label,
+                    styles.latestMark,
+                    {
+                      color: colors.muted,
+                      backgroundColor: colors.inset,
+                      borderColor: colors.border,
+                    },
+                  ]}>
+                  {text.Latest}
+                </Text>
+              )}
+            </View>
             <Text
-              style={[
-                detailStyles.entryTitle,
-                {color: issue ? colors.danger : colors.text},
-              ]}>
-              {observationTitle(event)}
-            </Text>
-            <Text style={[detailStyles.supporting, {color: colors.muted}]}>
-              {text.Local}: {new Date(event.observedAt).toLocaleString()}
+              accessibilityLabel={`${text.Local}: ${new Date(
+                event.observedAt,
+              ).toLocaleString()}`}
+              style={[detailStyles.supporting, {color: colors.muted}]}>
+              {new Date(event.observedAt).toLocaleString()}
             </Text>
             {event.simulated && (
               <Text style={[detailStyles.label, {color: colors.primary}]}>
@@ -482,6 +499,20 @@ const styles = StyleSheet.create({
   trail: {paddingBottom: 18},
   eventHeader: {flexDirection: 'row', alignItems: 'flex-start', gap: 8},
   eventCopy: {gap: 4},
+  titleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  eventTitle: {flexShrink: 1},
+  latestMark: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
   branch: {
     marginTop: 10,
     borderRadius: 18,

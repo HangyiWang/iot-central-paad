@@ -53,8 +53,8 @@ export type WorkflowHomeProps = {
 type Node = 'phone' | 'dps' | 'hub' | 'adr';
 const text = ExperienceStrings.Home;
 const MAP_BORDER = 1;
-const MAP_PADDING = 5;
-const SERVICE_GAP = 30;
+const MAP_PADDING = 18;
+const SERVICE_GAP = 16;
 const PHONE_WIDTH_PERCENT = 42;
 const STACKED_PATH_PADDING = 4;
 /** Room for a lane's own caret, so each end reads as a head and not a stub. */
@@ -673,14 +673,12 @@ export default function WorkflowHome({
               style={[
                 styles.azure,
                 {
-                  borderColor: colors.controlBorder,
+                  borderColor: colors.border,
                   backgroundColor: colors.inset,
                 },
               ]}>
               {node('adr')}
-              {stacked || !mapReady ? (
-                note(text.NamespaceLinks)
-              ) : (
+              {stacked || !mapReady ? null : (
                 <Animated.View pointerEvents="none" style={namespaceLineStyle}>
                   <Svg
                     testID="home-map-namespace-lines"
@@ -705,7 +703,11 @@ export default function WorkflowHome({
               )}
               <View
                 testID="home-map-services"
-                style={[styles.services, stacked && styles.stackedServices]}>
+                style={[
+                  styles.services,
+                  stacked && styles.stackedServices,
+                  !stacked && !mapReady && styles.spacedServices,
+                ]}>
                 {node('dps')}
                 {node('hub')}
               </View>
@@ -1019,8 +1021,7 @@ const styles = StyleSheet.create({
   map: {width: '100%', maxWidth: 440, alignSelf: 'center'},
   azure: {
     borderWidth: MAP_BORDER,
-    borderStyle: 'dashed',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: MAP_PADDING,
     gap: 0,
   },
@@ -1046,7 +1047,10 @@ const styles = StyleSheet.create({
   namespaceNode: {width: '76%', alignSelf: 'center', flex: 0},
   phoneNode: {flex: 0},
   services: {flexDirection: 'row', gap: SERVICE_GAP},
-  stackedServices: {flexDirection: 'column', gap: 12, marginTop: 12},
+  // Until a width is measured there is no drawn lane, so the row keeps the
+  // same air the lane would have held.
+  spacedServices: {marginTop: 16},
+  stackedServices: {flexDirection: 'column', gap: 16, marginTop: 16},
   phone: {width: `${PHONE_WIDTH_PERCENT}%`, alignSelf: 'center'},
   stackedPhone: {width: '100%'},
   stackedPaths: {

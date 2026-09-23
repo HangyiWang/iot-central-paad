@@ -454,18 +454,28 @@ it('offers Home recovery after an intentional disconnect without reporting an er
   act(() => {
     view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
   });
-  expect(text()).toContain('Disconnected on this phone');
+  expect(text()).not.toContain('Disconnected on this phone');
+  expect(text()).not.toContain(Strings.Connection.Notice.Disconnected.Message);
   expect(text()).not.toContain('Connection interrupted');
   expect(text()).not.toContain('CONNECTION_LOST');
   const status = view.root.findAllByProps({testID: 'connection-status'})[0];
+  expect(status.props.children).toBe('Disconnected');
   expect(StyleSheet.flatten(status.props.style).color).toBe(
     palette(false).danger,
   );
+  expect(
+    view.root
+      .findByProps({testID: 'connection-status-emblem'})
+      .findByType('Icon').props.name,
+  ).toBe('cloud-off-outline');
   const reconnect = view.root
     .findAllByProps({
       testID: 'connection-disconnected-reconnect',
     })
     .find(node => node.props.onPress);
+  expect(reconnect.props.accessibilityHint).toBe(
+    Strings.Connection.Summary.ReconnectDetail,
+  );
   await act(async () => reconnect.props.onPress());
   expect(connect).toHaveBeenCalledWith({deviceId: 'registration-id'});
   expect(clear).not.toHaveBeenCalled();
@@ -486,7 +496,7 @@ it.each(['idle', 'loading', 'simulation', 'no-credentials'])(
       view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
     });
     expect(
-      view.root.findAllByProps({testID: 'connection-disconnected'}),
+      view.root.findAllByProps({testID: 'connection-disconnected-reconnect'}),
     ).toHaveLength(0);
   },
 );
@@ -565,12 +575,78 @@ it('falls back to reviewing details when there is nothing saved to reconnect wit
   expect(
     view.root.findAllByProps({testID: 'connection-error-reconnect'}),
   ).toHaveLength(0);
-  act(() => press('Review details'));
+  act(() => press('Connection details'));
   expect(
     view.root.findAllByProps({testID: 'connection-details-sheet'}).length,
   ).toBeGreaterThan(0);
   expect(connect).not.toHaveBeenCalled();
 });
+
+it.each([
+  [320, 1],
+  [390, 1],
+  [320, 2.5],
+])(
+  'shows an interrupted status and compact recovery without duplicate prose at %s/%s',
+  async (width, fontScale) => {
+    jest.spyOn(require('react-native'), 'useWindowDimensions').mockReturnValue({
+      width,
+      fontScale,
+      height: 800,
+      scale: 2,
+    });
+    connected = false;
+    state = {
+      ...state,
+      error: new ConnectionError('CONNECTION_LOST'),
+      stage: 'error',
+    };
+    act(() => {
+      view = renderer.create(<ConnectionSummary onManualConnection={manual} />);
+    });
+    expect(
+      view.root.findByProps({testID: 'connection-status'}).props.children,
+    ).toBe('Connection interrupted');
+    expect(
+      view.root
+        .findByProps({testID: 'connection-status-emblem'})
+        .findByType('Icon').props.name,
+    ).toBe('cloud-alert');
+    expect(view.root.findAllByProps({testID: 'connection-error'})).toHaveLength(
+      0,
+    );
+    expect(
+      view.root.findAllByType('Text').map(node => node.props.children),
+    ).toEqual(['Connection interrupted', 'Reconnect', 'Details']);
+    const actions = view.root.findByProps({
+      testID: 'connection-summary-recovery',
+    });
+    expect(StyleSheet.flatten(actions.props.style)).toMatchObject({
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      maxWidth: '100%',
+    });
+    for (const id of ['connection-error-reconnect', 'connection-details']) {
+      const action = view.root
+        .findAllByProps({testID: id})
+        .find(node => node.props.onPress);
+      expect(StyleSheet.flatten(action.props.style)).toMatchObject({
+        minHeight: 48,
+        maxWidth: '100%',
+      });
+      expect(StyleSheet.flatten(pill(action).props.style).minHeight).toBe(40);
+    }
+    const group = view.root.findByProps({testID: 'connection-status-group'});
+    expect(StyleSheet.flatten(group.props.style).flexBasis).toBe(
+      fontScale > 1.45 ? undefined : 180,
+    );
+    act(() => press('Connection details'));
+    expect(text()).toContain('CONNECTION_LOST');
+    act(() => press('Close'));
+    await act(async () => press('Reconnect'));
+    expect(connect).toHaveBeenCalledWith({deviceId: 'registration-id'});
+  },
+);
 
 it('hides the notice while a connection attempt is in flight', () => {
   state = {

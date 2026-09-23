@@ -96,6 +96,9 @@ export default function ConnectionSummary({
     !connected &&
     !loading &&
     !simulated;
+  const interrupted =
+    error?.code === 'CONNECTION_LOST' && !connected && !loading && !simulated;
+  const recovery = !!credentials && (manuallyDisconnected || interrupted);
   const connectionEntrance = useGentleTransition(
     online,
     online && !details && !loading,
@@ -199,7 +202,11 @@ export default function ConnectionSummary({
         ]}>
         <View
           testID="connection-status-group"
-          style={[styles.statusGroup, stacked && styles.stackedGroup]}>
+          style={[
+            styles.statusGroup,
+            recovery && !stacked && styles.recoveryStatusGroup,
+            stacked && styles.stackedGroup,
+          ]}>
           <Animated.View
             testID="connection-status-emblem"
             accessible={false}
@@ -226,7 +233,15 @@ export default function ConnectionSummary({
               },
             ]}>
             <Icon
-              name={online ? 'cloud-check-outline' : 'cloud-outline'}
+              name={
+                online
+                  ? 'cloud-check-outline'
+                  : interrupted
+                  ? 'cloud-alert'
+                  : manuallyDisconnected
+                  ? 'cloud-off-outline'
+                  : 'cloud-outline'
+              }
               type="material-community"
               size={19}
               color={emblemColor}
@@ -254,7 +269,11 @@ export default function ConnectionSummary({
               ]}
               accessibilityRole="header"
               accessibilityLiveRegion="polite">
-              {online ? text.Connected : text.Disconnected}
+              {online
+                ? text.Connected
+                : interrupted
+                ? Strings.Connection.Notice.Titles.CONNECTION_LOST
+                : text.Disconnected}
             </Text>
             {simulated && (
               <Text style={[styles.supporting, {color: appearance.muted}]}>
@@ -270,7 +289,39 @@ export default function ConnectionSummary({
             )}
           </View>
         </View>
-        {!loading && (
+        {recovery ? (
+          <View
+            testID="connection-summary-recovery"
+            style={[
+              styles.recoveryActions,
+              stacked && styles.stackedRecoveryActions,
+            ]}>
+            <SummaryAction
+              id={
+                manuallyDisconnected
+                  ? 'connection-disconnected-reconnect'
+                  : 'connection-error-reconnect'
+              }
+              label={text.Reconnect}
+              title={text.Reconnect}
+              accessibilityHint={text.ReconnectDetail}
+              stacked={false}
+              onPress={() => void connect(credentials)}
+            />
+            <SummaryAction
+              id="connection-details"
+              label={text.Details}
+              title={text.OpenDetails}
+              stacked={false}
+              disclosure
+              accessibilityState={{
+                busy: detailsPhase === 'opening',
+                expanded: detailsPhase === 'open',
+              }}
+              onPress={openDetails}
+            />
+          </View>
+        ) : !loading ? (
           <SummaryAction
             id="connection-details"
             label={text.Details}
@@ -283,7 +334,7 @@ export default function ConnectionSummary({
             }}
             onPress={openDetails}
           />
-        )}
+        ) : null}
         {loading && (
           <SummaryAction
             id="connection-cancel"
@@ -294,22 +345,9 @@ export default function ConnectionSummary({
           />
         )}
       </View>
-      {error && !loading && (
+      {error && !loading && error.code !== 'CONNECTION_LOST' && (
         <View style={styles.notice}>
           <ConnectionNotice error={error} action={noticeAction} />
-        </View>
-      )}
-      {manuallyDisconnected && !error && (
-        <View style={styles.notice}>
-          <ConnectionNotice
-            disconnected
-            testID="connection-disconnected"
-            action={{
-              label: text.Reconnect,
-              onPress: () => void connect(credentials),
-              testID: 'connection-disconnected-reconnect',
-            }}
-          />
         </View>
       )}
       {details && (
@@ -586,14 +624,20 @@ function SummaryAction({
   title,
   stacked,
   disclosure = false,
+  accessibilityHint,
   accessibilityState,
   onPress,
 }: {
-  id: 'connection-details' | 'connection-cancel';
+  id:
+    | 'connection-details'
+    | 'connection-cancel'
+    | 'connection-disconnected-reconnect'
+    | 'connection-error-reconnect';
   label: string;
   title: string;
   stacked: boolean;
   disclosure?: boolean;
+  accessibilityHint?: string;
   accessibilityState?: AccessibilityState;
   onPress(): void;
 }) {
@@ -605,6 +649,7 @@ function SummaryAction({
       testID={id}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
       accessibilityState={accessibilityState}
       onPress={onPress}
       onPressIn={onPressIn}
@@ -692,6 +737,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     minHeight: 60,
     paddingVertical: 6,
@@ -715,6 +761,16 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   stackedGroup: {flex: 0},
+  recoveryStatusGroup: {flexBasis: 180},
+  recoveryActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 8,
+    maxWidth: '100%',
+    marginStart: 'auto',
+  },
+  stackedRecoveryActions: {alignSelf: 'stretch', marginStart: 0},
   connectionIcon: {
     width: 36,
     height: 36,
@@ -752,12 +808,14 @@ const styles = StyleSheet.create({
   detailsAction: {
     minHeight: 48,
     minWidth: 92,
+    maxWidth: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionPill: {
     minHeight: 40,
     minWidth: 92,
+    maxWidth: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

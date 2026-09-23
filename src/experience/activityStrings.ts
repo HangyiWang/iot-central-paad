@@ -34,7 +34,6 @@ export const ActivityStrings = {
   Http: 'HTTP status',
   Source: 'Property observation source',
   Reply: 'Handler response category',
-  LatestTelemetry: 'Latest telemetry observation',
   TelemetryHistory:
     'Periodic telemetry keeps only its latest outcome, not a row for every reading.',
   PhysicalLimit:

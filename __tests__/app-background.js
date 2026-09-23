@@ -3,7 +3,7 @@ import path from 'path';
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import {Text} from 'react-native';
-import Svg, {LinearGradient} from 'react-native-svg';
+import Svg, {LinearGradient, Stop} from 'react-native-svg';
 import AppBackground from '../src/components/appBackground';
 import {palette} from '../src/theme/palette';
 
@@ -50,6 +50,63 @@ it.each([false, true])(
   },
 );
 
+it.each([false, true])(
+  'paints two page stops that are a visible fall apart (dark=%s)',
+  dark => {
+    mockDark = dark;
+    let tree;
+    act(() => {
+      tree = renderer.create(
+        <AppBackground>
+          <Text>Real content</Text>
+        </AppBackground>,
+      );
+    });
+    // Read what is actually painted, not the tokens it was meant to use.
+    const stops = tree.root
+      .findAllByType(Stop)
+      .map(node => [String(node.props.offset), node.props.stopColor]);
+    expect(stops.map(([offset]) => offset)).toEqual(['0', '1']);
+    const [top, bottom] = stops.map(([, color]) => color);
+    expect(top).not.toBe(bottom);
+    const channels = hex =>
+      [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16));
+    const luminance = hex =>
+      channels(hex)
+        .map(value => value / 255)
+        .map(value =>
+          value <= 0.03928
+            ? value / 12.92
+            : Math.pow((value + 0.055) / 1.055, 2.4),
+        )
+        .reduce(
+          (total, value, index) =>
+            total + [0.2126, 0.7152, 0.0722][index] * value,
+          0,
+        );
+    const step = (first, second) =>
+      channels(first).reduce(
+        (total, value, index) =>
+          total + Math.abs(value - channels(second)[index]),
+        0,
+      );
+    // A fall, not a flat wash: the lower stop is the deeper one, by an amount
+    // a person can actually see on the page.
+    expect(luminance(bottom)).toBeLessThan(luminance(top));
+    expect(
+      (luminance(top) + 0.05) / (luminance(bottom) + 0.05),
+    ).toBeGreaterThanOrEqual(dark ? 1.05 : 1.2);
+    expect(step(top, bottom)).toBeGreaterThanOrEqual(dark ? 24 : 60);
+    if (!dark)
+      for (const painted of [top, bottom]) {
+        const [red, green, blue] = channels(painted);
+        expect(green).toBeGreaterThan(red);
+        expect(green).toBeGreaterThan(blue);
+      }
+    act(() => tree.unmount());
+  },
+);
+
 it('keeps the gradient on the page and leaves every face a solid colour', () => {
   const root = path.join(__dirname, '..', 'src');
   const sources = [];
@@ -91,7 +148,34 @@ it('keeps the page a clear step away from the faces that sit on it', () => {
     for (const page of [colors.gradientStart, colors.gradientEnd])
       for (const face of [colors.surface, colors.surfaceRaised])
         expect(step(page, face)).toBeGreaterThanOrEqual(24);
-    // The ground is a soft fall, not a second material.
-    expect(step(colors.gradientStart, colors.gradientEnd)).toBeLessThan(60);
+    // The ground is a fall you can actually see - a pale top settling into a
+    // deeper tone - while staying one material rather than two. Daylight
+    // carries the visible fall; the night page stays quieter to avoid banding.
+    const fall = step(colors.gradientStart, colors.gradientEnd);
+    expect(fall).toBeGreaterThanOrEqual(dark ? 24 : 60);
+    expect(fall).toBeLessThan(150);
   }
+});
+
+it('keeps the light page green rather than warm or grey', () => {
+  const colors = palette(false);
+  expect(colors.background).toBe(colors.gradientStart);
+  const channel = (hex, offset) => parseInt(hex.slice(offset, offset + 2), 16);
+  const chroma = hex =>
+    Math.max(...[1, 3, 5].map(offset => channel(hex, offset))) -
+    Math.min(...[1, 3, 5].map(offset => channel(hex, offset)));
+  for (const page of [
+    colors.background,
+    colors.gradientStart,
+    colors.gradientEnd,
+  ]) {
+    const [red, green, blue] = [1, 3, 5].map(offset => channel(page, offset));
+    expect(green).toBeGreaterThan(red);
+    expect(green).toBeGreaterThan(blue);
+  }
+  // The lower page carries the colour; the top is the pale end of the same
+  // green, not a second hue.
+  expect(chroma(colors.gradientEnd)).toBeGreaterThan(
+    chroma(colors.gradientStart) + 8,
+  );
 });

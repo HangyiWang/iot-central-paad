@@ -356,12 +356,19 @@ test.each([
       });
     }
     await act(async () => jest.advanceTimersByTimeAsync(1100));
-    expect(value('connection-status')).toBe('Disconnected');
-    expect(JSON.stringify(app.toJSON())).toContain(
-      reason === 'manual'
-        ? 'Disconnected on this phone'
-        : 'Connection interrupted',
+    expect(value('connection-status')).toBe(
+      reason === 'manual' ? 'Disconnected' : 'Connection interrupted',
     );
+    expect(
+      app.root.findAllByProps({testID: 'connection-summary-recovery'}).length,
+    ).toBeGreaterThan(0);
+    const summary = app.root.findAllByProps({testID: 'connection-summary'})[0];
+    expect(summary.findAllByProps({testID: 'connection-error'})).toHaveLength(
+      0,
+    );
+    expect(
+      summary.findAllByProps({testID: 'connection-disconnected'}),
+    ).toHaveLength(0);
     if (reason === 'manual') {
       expect(JSON.stringify(app.toJSON())).not.toContain('CONNECTION_LOST');
       expect(sockets.size).toBe(0);
